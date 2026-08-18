@@ -99,6 +99,11 @@ def require_permission(permission: str, *, resource_type: str = "api"):
             )
         return ctx
 
+    # Recorded so the route's requirement can be read back by introspection —
+    # the generated API reference and the tests that check every mutating
+    # route declares a permission both rely on it.
+    dependency.required_permission = permission  # type: ignore[attr-defined]
+    dependency.resource_type = resource_type  # type: ignore[attr-defined]
     return dependency
 
 

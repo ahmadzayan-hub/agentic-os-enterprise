@@ -8,10 +8,21 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
-# libpq is needed for psycopg and for the pg_dump/pg_restore the disaster
-# recovery exercise shells out to.
+# libpq is needed for psycopg, and pg_dump/pg_restore for the disaster recovery
+# exercise. The client must match the server major version — pg_dump 15 refuses
+# to dump a 16 server — and Debian bookworm ships 15, so the PGDG repository is
+# added to get 16.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends postgresql-client-15 curl \
+ && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+ && install -d -m 0755 /usr/share/postgresql-common/pgdg \
+ && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+      -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+ && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
+https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+      > /etc/apt/sources.list.d/pgdg.list \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends postgresql-client-16 \
+ && apt-get purge -y gnupg && apt-get autoremove -y \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

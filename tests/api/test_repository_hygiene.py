@@ -133,3 +133,83 @@ def test_gitignore_excludes_local_state() -> None:
     content = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
     for entry in (".env", ".venv/", "__pycache__/", ".data/"):
         assert entry in content, f".gitignore must exclude {entry}"
+
+
+def _routes():
+    """Every concrete route, with its mounted path and declared permission."""
+    from agentic_os.api.app import API_PREFIX, create_app
+
+    app = create_app()
+    app.openapi()
+
+    def walk(routes, mounted: bool = False):
+        """Yield concrete routes, noting which came from an included router.
+
+        Only those carry their path without the mount prefix.
+        """
+        for route in routes:
+            included = getattr(route, "original_router", None)
+            if included is not None:
+                yield from walk(included.routes, mounted=True)
+            else:
+                yield route, mounted
+
+    #: FastAPI's own documentation endpoints, which the application does not
+    #: define and which serve no tenant data.
+    generated = {f"{API_PREFIX}/docs", f"{API_PREFIX}/openapi.json", "/docs/oauth2-redirect"}
+
+    for route, mounted in walk(app.routes):
+        path = getattr(route, "path", "")
+        if not path or path in generated:
+            continue
+        full = API_PREFIX + path if mounted else path
+        permission = ""
+        for dependency in getattr(route, "dependencies", []) or []:
+            call = getattr(dependency, "dependency", None)
+            permission = getattr(call, "required_permission", "") or permission
+        for method in sorted(getattr(route, "methods", set()) - {"HEAD", "OPTIONS"}):
+            yield method, full, permission
+
+
+#: Endpoints that legitimately declare no permission: authentication itself,
+#: the static capability manifest, and the probes.
+_UNAUTHENTICATED = {
+    ("POST", "/api/v1/auth/login"),
+    ("POST", "/api/v1/auth/logout"),
+    ("GET", "/api/v1/auth/me"),
+    ("GET", "/api/v1/capabilities"),
+    ("GET", "/health"),
+    ("GET", "/ready"),
+}
+
+
+def test_every_route_declares_a_permission_or_is_explicitly_exempt() -> None:
+    """A route with no declared permission is only safe if it is meant to be.
+
+    Enumerating the exemptions here means adding an unauthorised endpoint is a
+    deliberate act that shows up in a diff, rather than an omission.
+    """
+    undeclared = {
+        (method, path)
+        for method, path, permission in _routes()
+        if not permission and path.startswith("/api/v1")
+    }
+    unexpected = undeclared - {p for p in _UNAUTHENTICATED if p[1].startswith("/api/v1")}
+    assert unexpected == set(), f"routes with no permission requirement: {sorted(unexpected)}"
+
+
+def test_the_generated_api_reference_matches_the_application() -> None:
+    """The reference is generated; a stale one is a documentation defect."""
+    reference = (REPO_ROOT / "docs" / "api" / "API_REFERENCE.md").read_text(encoding="utf-8")
+    for method, path, permission in _routes():
+        if not path.startswith("/api/v1"):
+            continue
+        assert f"| {method} | `{path}` |" in reference, (
+            f"{method} {path} is missing from docs/api/API_REFERENCE.md; "
+            "regenerate it with scripts/generate_api_reference.py"
+        )
+        if permission:
+            assert f"| {method} | `{path}` | `{permission}` |" in reference, (
+                f"{method} {path} requires {permission} but the reference disagrees; "
+                "regenerate it with scripts/generate_api_reference.py"
+            )

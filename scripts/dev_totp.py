@@ -10,11 +10,10 @@ from __future__ import annotations
 
 import sys
 
-from sqlalchemy import text
-
 from agentic_os.core.config import get_settings
 from agentic_os.core.db import provisioning_session_scope
 from agentic_os.identity.mfa import _kms, totp_now
+from sqlalchemy import text
 
 
 def main(argv: list[str] | None = None) -> int:
