@@ -10,7 +10,7 @@ a real database with row level security, a governed execution path, a durable
 workflow engine, permission-aware retrieval, a hash-chained audit ledger and an
 operator console rendering live data. Nothing in the console is a mockup.
 
-**Current evidence-derived maturity: 94.59 / 100. Not certified.** See
+**Current evidence-derived maturity: 92.79 / 100 as computed by CI. Not certified.** See
 [`docs/assurance/MATURITY_REPORT.md`](docs/assurance/MATURITY_REPORT.md) for
 what the missing five points are and
 [`docs/assurance/FINAL_GAP_AUDIT.md`](docs/assurance/FINAL_GAP_AUDIT.md) for
@@ -106,7 +106,7 @@ The same applies to assurance. This platform has **never been deployed to a
 cluster, never been independently assessed and never been run in production**.
 No claim of conformance with ISO 27001, SOC 2, NIST AI RMF, the EU AI Act or
 any other scheme is made anywhere in this repository, because none has been
-assessed. The maturity score measures 58 self-authored controls executed in a
-development environment — a reasonable engineering instrument and a weak
+assessed. The maturity score measures 59 self-authored controls executed in
+CI — a reasonable engineering instrument and a weak
 assurance instrument, which is precisely why the catalogue now contains
 controls the platform cannot yet satisfy.

@@ -1,41 +1,57 @@
 # Maturity Report — Agentic OS Enterprise v3.1
 
-**Score: 94.59 / 100. Not certified.**
+**Score: 92.79 / 100. Not certified.**
 
-This number was not chosen. It is what the evidence engine computed from a test
-run that actually executed, and it is reproducible:
-
-```
-agentic-migrate && agentic-seed
-agentic-evidence collect --environment development
-```
-
-The engine runs the suite, parses the JUnit report, derives each control's
-status from whether its named test passed, and computes
+This number was not chosen. It is what the evidence engine computes in CI, on
+every change, and it is the number that counts. The pipeline's `evidence` job
+runs the suite against a real PostgreSQL and Redis, builds and serves the
+console, audits it with axe-core, drives the API under a concurrency sweep, and
+then computes
 
 ```
 score = verified applicable weight / total applicable weight * 100
-      = 105 / 111 * 100
-      = 94.59
+      = 103 / 111 * 100
+      = 92.79
 ```
 
-No status can be entered by hand. A control with no `test:` reference is
-reported NOT_EVIDENCED and contributes zero however well it is implemented.
+No status can be entered by hand. A control with no `test:` reference, or whose
+test did not run, is reported NOT_EVIDENCED and contributes zero however well it
+is implemented.
 
 | | |
 |---|---|
 | Controls assessed | 59 |
 | Applicable weight | 111 |
-| Verified weight | 105 |
+| Verified weight | 103 |
 | Critical blockers | none |
 | Certified | **no** — certification requires 100 with no critical blocker |
 | Test run | 322 tests, 0 failures, 0 errors, 0 skipped |
-| Environment | development, against PostgreSQL 16 with pgvector |
+| Environment | CI, against PostgreSQL 16 with pgvector and Redis 7 |
 | Accessibility | 23 surfaces × 2 colour schemes, 0 violations, 0 serious or critical |
+
+### Why this is the CI number and not a local one
+
+A developer's machine reports **94.59** — one control higher. The difference is
+DRP-001, the disaster-recovery exercise, which needs a break-glass maintenance
+identity that CI does not have. Nothing else differs.
+
+That gap was found rather than designed. The evidence job originally ran with
+only a database, so the accessibility and performance controls had no report to
+read and scored NOT_EVIDENCED — the pipeline computed **89.19** while this
+document claimed 94.59. A score that depends on whose machine ran it is not
+evidence, and the higher number was the one being published. The job now
+provisions everything CI can provide, and the number it produces is the one
+quoted here. The remaining 1.8-point gap to a fully-equipped run is named above
+rather than averaged away.
+
+The release gate that should have caught this was set to a floor of 70 — twenty
+points of slack, so it passed at 89.19 exactly as it would have at 94.59. It now
+sits at 90, just under the score, where a control quietly losing its evidence
+fails the build instead of moving a number nobody was checking.
 
 ## Why it is not 100
 
-Six weight is unevidenced, in four controls. None of them is a bug and none is
+Eight weight is unevidenced, in five controls. None of them is a bug and none is
 hidden:
 
 | Control | Weight | Status | Why |
@@ -43,9 +59,10 @@ hidden:
 | DEP-003 | 2 | NOT_EVIDENCED | The platform has never been applied to a Kubernetes cluster. CI now builds and scans the image, renders all four kustomize overlays and runs `terraform fmt`, `init` and `validate` — but `validate` checks coherence, not reality, and no apply has been performed anywhere. |
 | IND-001 | 2 | NOT_EVIDENCED | No independent security assessment has been performed. The repository contains a red-team suite, but a suite written by the same author as the control it tests is not independent assurance and is not reported as such. |
 | IND-002 | 1 | NOT_EVIDENCED | No control is PRODUCTION_PROVEN. Every passing control is VERIFIED by an automated test in a development or CI environment. The engine keeps the two statuses distinct precisely so this distinction survives. |
-| PRF-003 | 1 | NOT_EVIDENCED | Capacity has not been established on representative hardware. The platform is now measured under concurrency — see below — but on one shared development host with a seeded corpus, which characterises saturation without establishing capacity. |
+| PRF-003 | 1 | NOT_EVIDENCED | Capacity has not been established on representative hardware. The platform is now measured under concurrency — see below — but on a shared CI runner with a seeded corpus, which characterises saturation without establishing capacity. |
+| DRP-001 | 2 | NOT_EVIDENCED in CI | The restore exercise is real and passes — it dumps, restores into a scratch database, compares every table and re-hashes the audit chain — but it needs a maintenance identity CI does not hold. A run with one scores it VERIFIED. Closing this in the pipeline is a credential decision, not a code change. |
 
-These four controls were **added** to the catalogue during this build. Before
+The first four were **added** to the catalogue during this build. Before
 they existed the same test run scored 100.00 / 100 and the engine certified it.
 That number was arithmetically correct and substantively misleading: it measured
 only the ground the catalogue had chosen to cover. Adding the domains the
@@ -74,7 +91,7 @@ existing one, which raises the per-control score for doing nothing.
 | DevSecOps | 100.00 | 4 | 2 | 0 | 0 |
 | **Deployment** | **50.00** | 4 | 2 | 0 | 1 |
 | **Performance** | **66.67** | 3 | 2 | 0 | 1 |
-| DR and resilience | 100.00 | 2 | 1 | 0 | 0 |
+| **DR and resilience** | **0.00** | 2 | 0 | 0 | 1 |
 | Business value | 100.00 | 2 | 1 | 0 | 0 |
 | **Independent assurance** | **0.00** | 3 | 0 | 0 | 2 |
 
@@ -87,12 +104,12 @@ a hash-addressed `artifacts/evidence-bundle.json`.
 Using the vocabulary the build brief asks for — mapped / tested / verified /
 not verified:
 
-* **Verified (55 controls, 105 weight).** An automated test names the control,
+* **Verified (54 controls, 103 weight in CI; 55 and 105 with a DR identity).** An automated test names the control,
   the test executed in this run, and it passed. The tests exercise a real
   PostgreSQL 16 instance with row level security enforced, a real HTTP surface,
   and a real browser for the accessibility pass. Nothing is mocked at the
   boundary the control is about.
-* **Not verified (4 controls, 6 weight).** Listed above.
+* **Not verified (5 controls, 8 weight).** Listed above.
 * **Not claimed at all.** No control asserts conformance with an external
   standard. The security architecture maps to recognised control families for
   navigation, but this platform has not been assessed against ISO 27001,
