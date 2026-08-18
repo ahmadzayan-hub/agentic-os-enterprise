@@ -7,7 +7,6 @@ here so that no individual router can forget them.
 from __future__ import annotations
 
 import time
-from collections import defaultdict, deque
 from decimal import Decimal
 from typing import Any
 
@@ -15,6 +14,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from agentic_os.api.ratelimit import build_rate_limiter
 from agentic_os.core.config import get_settings
 from agentic_os.core.db import healthcheck
 from agentic_os.core.errors import AgenticError
@@ -62,29 +62,6 @@ _SECURITY_HEADERS = {
 }
 
 
-class _RateLimiter:
-    """Sliding-window per-principal limiter.
-
-    In-process and therefore per-replica: it bounds a single instance and is a
-    defence-in-depth layer, not the platform's only rate control. The ingress
-    gateway carries the global limit.
-    """
-
-    def __init__(self, limit_per_minute: int) -> None:
-        self.limit = limit_per_minute
-        self._hits: dict[str, deque[float]] = defaultdict(deque)
-
-    def allow(self, key: str) -> tuple[bool, int]:
-        now = time.monotonic()
-        window = self._hits[key]
-        while window and now - window[0] > 60:
-            window.popleft()
-        if len(window) >= self.limit:
-            return False, 0
-        window.append(now)
-        return True, self.limit - len(window)
-
-
 def create_app(*, include_docs: bool = True) -> FastAPI:
     settings = get_settings()
     app = FastAPI(
@@ -110,7 +87,9 @@ def create_app(*, include_docs: bool = True) -> FastAPI:
         max_age=600,
     )
 
-    limiter = _RateLimiter(settings.rate_limit_per_minute)
+    # Shared across replicas when Redis is configured, so the effective limit
+    # is the deployment's rather than one pod's.
+    limiter = build_rate_limiter(settings.rate_limit_per_minute, settings.redis_url)
 
     @app.middleware("http")
     async def security_and_limits(request: Request, call_next):  # type: ignore[no-untyped-def]

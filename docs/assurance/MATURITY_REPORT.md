@@ -29,7 +29,7 @@ reported NOT_EVIDENCED and contributes zero however well it is implemented.
 | Verified weight | 102 |
 | Critical blockers | none |
 | Certified | **no** — certification requires 100 with no critical blocker |
-| Test run | 297 tests, 0 failures, 0 errors, 0 skipped |
+| Test run | 308 tests, 0 failures, 0 errors, 0 skipped |
 | Environment | development, against PostgreSQL 16 with pgvector |
 | Accessibility | 23 surfaces × 2 colour schemes, 0 violations, 0 serious or critical |
 

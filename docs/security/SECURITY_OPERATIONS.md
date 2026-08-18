@@ -120,8 +120,11 @@ directly:
 * **No independent assessment has been performed.** The red-team suite is
   written by the same author as the controls it probes. Treat every security
   claim in this repository as self-reported until a second party has tested it.
-* **Rate limiting is per-instance**, so the effective limit multiplies with
-  replica count.
+* **Rate limiting is now shared** across replicas through Redis, but it
+  degrades to per-replica limiting if Redis is unreachable — deliberately, so a
+  cache outage cannot become an API outage. The log records the transition;
+  treat a sustained "shared counter unavailable" warning as a control
+  degradation, not just a cache alert.
 * **The `vault` and cloud KMS backends have never run against the real
   service.** Production configuration selects exactly those paths.
 * **No federation.** Local password plus TOTP only; no OIDC, SAML, SCIM or

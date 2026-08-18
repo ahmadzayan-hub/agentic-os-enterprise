@@ -129,11 +129,27 @@ implemented and tested. There is no OIDC or SAML federation, no SCIM
 provisioning, and no WebAuthn — the `identity_provider` column exists and only
 `local` is wired. An enterprise deployment would require federation on day one.
 
-### 2.8 Rate limiting is per-instance
-The API rate limiter is an in-process counter. Behind two replicas the
-effective limit is doubled, and it resets on restart. A shared counter (Redis
-is already a dependency) is needed before the limit means anything under
-horizontal scale.
+### 2.8 Rate limiting — resolved, with one caveat
+Was: an in-process counter, so behind two replicas the effective limit doubled
+and it reset on restart. Now a Redis sliding window evaluated in a single Lua
+script, so the check and the increment cannot interleave between replicas —
+the race that makes a naive GET/INCR limiter leak requests under concurrency.
+Proven against a real Redis in CI: two limiter instances sharing a namespace
+refuse the fifth request of a limit-4 window whichever one receives it.
+
+Two deliberate properties worth review rather than assumption:
+
+* **Degradation, not failure.** If Redis is unreachable the limiter falls back
+  to its in-process twin. Failing closed would turn a cache outage into a total
+  outage; failing open would remove the control. The fallback keeps a real
+  bound — per replica instead of global — and logs the transition once.
+* **Keys are hashed.** The limiter's key is derived from an Authorization
+  header, and a shared store is a wider blast radius than process memory, so
+  what reaches Redis is a SHA-256 digest. A test asserts no token material
+  appears in any Redis key.
+
+Remaining caveat: the limiter bounds requests per principal per minute. It is
+not a defence against a distributed flood, which belongs at the ingress.
 
 ### 2.9 Secret and KMS backends are partly unexercised
 The `env` secret backend and the local KMS envelope are exercised by tests.
@@ -242,8 +258,9 @@ Listed so the audit is balanced, and because each is reproducible.
    apply and a passing readiness check. This also validates the Dockerfiles,
    the Terraform and the pipeline in one pass.
 2. Commission an independent security assessment; close IND-001.
-3. Add OIDC federation and a shared rate limiter — the two gaps that block a
-   real enterprise pilot regardless of anything else.
+3. Add OIDC federation — with the shared rate limiter now in place, this is
+   the remaining gap that blocks a real enterprise pilot regardless of anything
+   else.
 4. Run a load test against a staging deployment and replace the declared SLOs
    with measured ones.
 5. Exercise DR at production scale with WAL archiving and point-in-time
