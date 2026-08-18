@@ -19,39 +19,40 @@ rather than assumed.
 ## 1. Blocking gaps — must close before a production decision
 
 ### 1.1 Never deployed (DEP-003, weight 2, NOT_EVIDENCED)
-The Kubernetes manifests, the container definitions and the release pipeline
-exist and are internally consistent. None has been executed. Specifically:
+The manifests, images and pipeline now build and validate in CI. What has never
+happened is an **apply to a cluster**, and that is what this control requires.
 
-* No container image was built. The build environment's egress policy denied
-  `production.cloudfront.docker.com`, so no base image could be pulled. The
-  Dockerfiles are unbuilt and therefore unproven — including the PGDG
-  repository step that installs `postgresql-client-16` for the DR exercise,
-  which matters because `pg_dump` 15 refuses to dump a 16 server.
-* No `kubectl apply`, no `kustomize build`, no cluster of any kind. `kubectl`
-  and `kustomize` are not installed in the build environment. The manifests
-  parse as YAML and are asserted structurally by
-  `tests/unit/test_deployables.py`; that is the whole of their verification.
-* Terraform has never been run — no `init`, `validate`, `plan` or `apply`, and
-  no Terraform binary was available. Provider argument names, resource
-  attribute names and the `postgresql` provider's behaviour against a managed
-  instance are **unverified**.
+Verified in CI, on this branch:
 
-CI now contains a `deployment-manifests` job that runs these checks
-(`docker compose config`, `kubectl kustomize` per overlay, `terraform fmt` and
-`validate` per environment), and it has since run. It found real defects, which
-is the point of it: the image build failed on a `COPY` of a directory git never
-tracked, `terraform fmt` rejected the module's formatting, and the environment
-roots implicitly required `hashicorp/postgresql` — a provider that does not
-exist — instead of `cyrilgdn/postgresql`, which would have failed
-`terraform init` in any real environment. All three are fixed.
+* The container image **builds**, and Trivy scans it. This closed a defect the
+  build environment could not have found — the image never built at all,
+  because the Dockerfile copied a directory git had never tracked.
+* All four kustomize overlays **render** (`kubectl kustomize`).
+* Terraform **fmt, init and validate** pass for all four environments. This
+  closed a second real defect: the environment roots implicitly required
+  `hashicorp/postgresql`, a provider that does not exist, so `terraform init`
+  would have failed in any real environment.
+* `docker compose config` passes.
 
-What is now verified: `docker compose config` passes, all four kustomize
-overlays render in CI, `terraform fmt` is clean, and the Next.js standalone
-build runs and serves the console (the exact artefact the web image ships).
-What remains unverified: `terraform init`/`validate` completing against the
-provider registry, any image actually building, and any apply. The build
-environment's egress policy blocks both the container registry and
-`registry.terraform.io`, so those cannot be closed from here.
+Still unverified, and the reason this control is NOT_EVIDENCED:
+
+* **No apply.** No `kubectl apply`, no `terraform apply`, no cluster of any
+  kind. `terraform validate` checks that the configuration is coherent; it
+  does not contact a provider or create anything. The `postgresql` provider's
+  behaviour against a managed instance, the resource attribute semantics, the
+  readiness of the workloads under a real scheduler, and the PGDG step that
+  installs `postgresql-client-16` for the DR exercise are all untested by a
+  build that never ran the image or the plan.
+
+The pipeline that proves the above is itself worth recording, because running
+it changed what this repository can honestly claim. Its first five runs found,
+in order: every integration test failing to collect; a Trojan Source hazard in
+the context firewall; an image build broken by an untracked directory; a
+Terraform provider that does not exist; two secret-scan findings that three
+earlier failures had masked; a CI step asserting that an implemented control
+was unimplemented; and an evidence engine hardcoded to the author's own
+virtualenv, so it could never have run anywhere else. Every one of these was
+invisible to a local test run. None was suppressed.
 
 ### 1.2 No independent assessment (IND-001, weight 2, NOT_EVIDENCED)
 No penetration test, no external code review, no third-party control
@@ -148,7 +149,8 @@ lives in deployment topology, which does not exist yet (1.1).
 
 ### 2.11 Accessibility is automated-only
 23 surfaces × 2 colour schemes, 0 axe violations, 0 serious or critical — run
-against the real application in a real browser. But axe detects a minority of
+against the real application in a real browser, and now in CI as well, against
+a seeded database with the API and console actually serving. But axe detects a minority of
 WCAG failures. There has been **no screen-reader pass, no keyboard-only
 walkthrough by a person, no testing with users**, and only Chromium was
 exercised. WCAG 2.2 AA conformance is therefore *not* claimed; what is claimed

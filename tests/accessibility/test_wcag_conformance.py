@@ -11,6 +11,7 @@ NOT_EVIDENCED — a missing audit must never look like a passing one.
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -28,11 +29,22 @@ MINIMUM_SURFACES = 15
 
 @pytest.fixture(scope="module")
 def report() -> dict:
+    """The audit's report, or a decision about why it is missing.
+
+    Skipping is right for a developer running the suite without a browser and
+    a live application. It is wrong anywhere the audit was just supposed to
+    have run: there, a missing report means the audit failed silently and the
+    suite would pass vacuously while claiming a control is evidenced. CI sets
+    ``AGENTIC_REQUIRE_A11Y_REPORT`` so the absence is a failure instead.
+    """
     if not REPORT.exists():
-        pytest.skip(
+        message = (
             "no accessibility report at artifacts/accessibility.json; run "
             "`npm run a11y` in apps/web against a running application"
         )
+        if os.environ.get("AGENTIC_REQUIRE_A11Y_REPORT"):
+            pytest.fail(message)
+        pytest.skip(message)
     return json.loads(REPORT.read_text(encoding="utf-8"))
 
 

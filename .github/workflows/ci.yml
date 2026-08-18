@@ -393,6 +393,10 @@ jobs:
           node tests/accessibility/axe_audit.mjs \
             --base http://127.0.0.1:3000 --out ../../artifacts/accessibility.json
       - name: Assert no serious or critical violations
+        # Without this the suite would skip a missing report and the job would
+        # go green having audited nothing.
+        env:
+          AGENTIC_REQUIRE_A11Y_REPORT: "1"
         run: pytest tests/accessibility -q
       - uses: actions/upload-artifact@v4
         if: always()

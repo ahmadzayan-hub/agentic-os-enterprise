@@ -40,7 +40,7 @@ is hidden:
 
 | Control | Weight | Status | Why |
 |---|---:|---|---|
-| DEP-003 | 2 | NOT_EVIDENCED | The platform has never been applied to a Kubernetes cluster. Manifests, images and pipeline exist; no apply has been performed. The build environment had no cluster and its egress policy blocked the container registry, so the image was never built either. |
+| DEP-003 | 2 | NOT_EVIDENCED | The platform has never been applied to a Kubernetes cluster. CI now builds and scans the image, renders all four kustomize overlays and runs `terraform fmt`, `init` and `validate` — but `validate` checks coherence, not reality, and no apply has been performed anywhere. |
 | IND-001 | 2 | NOT_EVIDENCED | No independent security assessment has been performed. The repository contains a red-team suite, but a suite written by the same author as the control it tests is not independent assurance and is not reported as such. |
 | IND-002 | 1 | NOT_EVIDENCED | No control is PRODUCTION_PROVEN. Every passing control is VERIFIED by an automated test in a development environment. The engine keeps the two statuses distinct precisely so this distinction survives. |
 
