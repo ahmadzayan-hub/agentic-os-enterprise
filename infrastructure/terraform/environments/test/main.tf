@@ -9,6 +9,21 @@
 terraform {
   required_version = ">= 1.6.0"
   backend "s3" {}
+
+  # The root module must name the same provider sources as the module it calls.
+  # Without this, a bare `provider "postgresql"` block below resolves to the
+  # implicit hashicorp/postgresql, which does not exist, and `terraform init`
+  # fails with "Missing required provider".
+  required_providers {
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = ">= 2.30"
+    }
+    postgresql = {
+      source  = "cyrilgdn/postgresql"
+      version = ">= 1.22"
+    }
+  }
 }
 
 provider "kubernetes" {

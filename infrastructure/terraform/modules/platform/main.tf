@@ -10,7 +10,7 @@
 
 locals {
   labels = {
-    "app.kubernetes.io/part-of" = "agentic-os"
+    "app.kubernetes.io/part-of"    = "agentic-os"
     "app.kubernetes.io/managed-by" = "terraform"
     "agentic.rta/environment"      = var.environment
   }
@@ -86,40 +86,40 @@ resource "kubernetes_limit_range_v1" "platform" {
 # reachable only through SET ROLE inside a SECURITY DEFINER function.
 # ---------------------------------------------------------------------------
 resource "postgresql_role" "provisioner" {
-  name        = "agentic_provisioner"
-  login       = false
+  name                      = "agentic_provisioner"
+  login                     = false
   bypass_row_level_security = true
-  create_database = false
-  create_role     = false
+  create_database           = false
+  create_role               = false
 }
 
 resource "postgresql_role" "owner" {
-  name     = "agentic_owner"
-  login    = true
-  password = var.database_owner_password
+  name                      = "agentic_owner"
+  login                     = true
+  password                  = var.database_owner_password
   bypass_row_level_security = false
-  create_database = false
-  create_role     = false
-  roles           = [postgresql_role.provisioner.name]
+  create_database           = false
+  create_role               = false
+  roles                     = [postgresql_role.provisioner.name]
 }
 
 resource "postgresql_role" "app" {
-  name     = "agentic_app"
-  login    = true
-  password = var.database_app_password
+  name                      = "agentic_app"
+  login                     = true
+  password                  = var.database_app_password
   bypass_row_level_security = false
-  superuser       = false
-  create_database = false
-  create_role     = false
+  superuser                 = false
+  create_database           = false
+  create_role               = false
 }
 
 # The break-glass identity for the restore exercise. It needs CREATE DATABASE
 # because a restore target has to be created, and it is the only role with it.
 resource "postgresql_role" "maintenance" {
-  count    = var.enable_dr_exercise ? 1 : 0
-  name     = "agentic_maintenance"
-  login    = true
-  password = var.database_maintenance_password
+  count           = var.enable_dr_exercise ? 1 : 0
+  name            = "agentic_maintenance"
+  login           = true
+  password        = var.database_maintenance_password
   create_database = true
   create_role     = false
   roles           = [postgresql_role.owner.name]

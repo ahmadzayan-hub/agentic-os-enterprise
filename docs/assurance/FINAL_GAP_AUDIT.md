@@ -36,14 +36,22 @@ exist and are internally consistent. None has been executed. Specifically:
   attribute names and the `postgresql` provider's behaviour against a managed
   instance are **unverified**.
 
-CI now contains a `deployment-manifests` job that runs exactly these checks
+CI now contains a `deployment-manifests` job that runs these checks
 (`docker compose config`, `kubectl kustomize` per overlay, `terraform fmt` and
-`validate` per environment). It has not run here either — it will run on the
-first push where those tools are available.
+`validate` per environment), and it has since run. It found real defects, which
+is the point of it: the image build failed on a `COPY` of a directory git never
+tracked, `terraform fmt` rejected the module's formatting, and the environment
+roots implicitly required `hashicorp/postgresql` — a provider that does not
+exist — instead of `cyrilgdn/postgresql`, which would have failed
+`terraform init` in any real environment. All three are fixed.
 
-What *was* verified locally: `docker compose config -q` passes, the Next.js
-standalone build runs and serves the console (the exact artefact the web image
-ships), and every manifest parses.
+What is now verified: `docker compose config` passes, all four kustomize
+overlays render in CI, `terraform fmt` is clean, and the Next.js standalone
+build runs and serves the console (the exact artefact the web image ships).
+What remains unverified: `terraform init`/`validate` completing against the
+provider registry, any image actually building, and any apply. The build
+environment's egress policy blocks both the container registry and
+`registry.terraform.io`, so those cannot be closed from here.
 
 ### 1.2 No independent assessment (IND-001, weight 2, NOT_EVIDENCED)
 No penetration test, no external code review, no third-party control
