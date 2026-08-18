@@ -1,0 +1,45 @@
+agent:
+  id: finance.primary
+  version: 3.0.0
+  owner: Finance
+  criticality: HIGH
+purpose:
+  allowed:
+    - financial_analysis
+    - payment_reconciliation
+    - financial_reporting
+models:
+  approved:
+    - private-general
+    - private-reasoning
+data:
+  read:
+    - invoices
+    - payment_transactions
+  write:
+    - financial_analysis
+    - reconciliation_records
+  prohibited:
+    - employee_medical_data
+tools:
+  allow:
+    - stripe.read
+    - erp.invoice.read
+  conditional:
+    - crm.update
+  deny:
+    - bank.transfer
+autonomy:
+  analysis: A1
+  draft: A2
+  reversible_action: A3
+  financial_action: A4
+limits:
+  financial_execution: 0
+  max_tool_calls: 30
+  max_runtime_seconds: 300
+requirements:
+  citations: true
+  provenance: true
+  confidence: true
+  evidence_record: true

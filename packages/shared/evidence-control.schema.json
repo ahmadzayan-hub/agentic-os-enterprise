@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EvidenceControl",
+  "type": "object",
+  "required": ["control_id", "domain", "weight", "critical", "status"],
+  "properties": {
+    "control_id": {"type": "string"},
+    "domain": {"type": "string"},
+    "weight": {"type": "number", "minimum": 0},
+    "critical": {"type": "boolean"},
+    "status": {"enum": ["PLANNED", "DESIGNED", "IMPLEMENTED", "TESTED", "VERIFIED", "PRODUCTION_PROVEN", "FAILED", "EXPIRED", "NOT_EVIDENCED"]},
+    "environment": {"type": "string"},
+    "commit_sha": {"type": "string"},
+    "artifact_hash": {"type": "string"},
+    "test_id": {"type": "string"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"}
+  }
+}

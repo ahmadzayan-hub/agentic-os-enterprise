@@ -1,0 +1,15 @@
+policy:
+  id: FIN-REFUND-001
+  version: 1.0.0
+  effect: conditional
+rules:
+  - when:
+      amount_aed_lte: 500
+      confidence_gte: 0.95
+      fraud_risk: LOW
+      customer_verified: true
+    decision: ALLOW_A3
+  - when:
+      amount_aed_lte: 50000
+    decision: REQUIRE_A4_HUMAN_APPROVAL
+  - otherwise: DENY

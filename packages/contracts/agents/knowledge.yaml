@@ -1,0 +1,18 @@
+agent:
+  id: knowledge.primary
+  version: 3.0.0
+  owner: Knowledge
+  criticality: HIGH
+purpose:
+  allowed: [enterprise_search, rag_answering, document_analysis]
+tools:
+  allow: [knowledge.search, object.read]
+  deny: [object.delete, acl.modify]
+autonomy:
+  analysis: A1
+  draft: A2
+requirements:
+  acl_before_retrieval: true
+  citations: true
+  provenance: true
+  context_firewall: true

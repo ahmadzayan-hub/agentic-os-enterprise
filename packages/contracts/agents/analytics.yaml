@@ -1,0 +1,18 @@
+agent:
+  id: analytics.primary
+  version: 3.0.0
+  owner: Analytics
+  criticality: MEDIUM
+purpose:
+  allowed: [descriptive_analysis, diagnostic_analysis, predictive_analysis, prescriptive_recommendation]
+tools:
+  allow: [warehouse.read, python.sandbox, knowledge.search]
+  deny: [production.write, payment.execute]
+autonomy:
+  analysis: A1
+  draft: A2
+requirements:
+  provenance: true
+  confidence: true
+  uncertainty: true
+  evidence_record: true

@@ -1,0 +1,28 @@
+name: assurance-ci
+on:
+  pull_request:
+  push:
+    branches: [main, develop, "architecture/**"]
+
+jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest
+      - run: pytest tests/evals -q
+
+  architecture-constitution:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify required governance assets
+        run: |
+          test -f ARCHITECTURE_CONSTITUTION.md
+          test -f docs/architecture/REFERENCE_ARCHITECTURE.md
+          test -f docs/governance/MATURITY_MODEL.md
+          test -f docs/security/SECURITY_ARCHITECTURE.md
+          test -f packages/contracts/agents/finance.yaml
