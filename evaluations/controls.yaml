@@ -1,0 +1,521 @@
+# Assurance control catalogue.
+#
+# This file is the *only* source of maturity. A control's status is derived
+# from whether its named automated tests actually passed in the run being
+# assessed — it can never be asserted by hand. A control with no `test:` is
+# reported as NOT_EVIDENCED and contributes zero, however well implemented it
+# may be.
+#
+# Weights total 100 across sixteen domains, matching docs/governance/MATURITY_MODEL.md.
+#
+# critical: true means a failure blocks certification regardless of the score.
+
+version: 1.0.0
+
+domains:
+  business_architecture: 7
+  ux_accessibility: 7
+  enterprise_architecture: 8
+  agent_architecture: 10
+  workflow_orchestration: 8
+  data_architecture: 7
+  rag_knowledge: 7
+  security: 10
+  ai_governance: 7
+  privacy: 5
+  reliability: 6
+  observability: 5
+  evaluation_assurance: 5
+  devsecops: 4
+  dr_resilience: 2
+  business_value: 2
+
+controls:
+  # ------------------------------------------------ business architecture (7)
+  - id: BUS-001
+    domain: business_architecture
+    title: Governed domain agent catalogue exists
+    requirement: The platform defines a bounded set of governed domain agents with owners.
+    implementation: packages/contracts/agents/*.yaml, validated against a JSON Schema.
+    weight: 2
+    standards: [{framework: "ISO/IEC 42001", clause: "6.1 planning"}]
+    test: tests/agents/test_contract_validation.py::test_all_declared_domain_agents_exist
+    expected: All ten declared domain agents have a valid published contract.
+
+  - id: BUS-002
+    domain: business_architecture
+    title: Every agent declares a business purpose and owner
+    requirement: An agent without a named owner and stated purpose may not run.
+    implementation: Agent contract schema requires owner and business_purpose.
+    weight: 2
+    test: tests/agents/test_contract_validation.py::test_registries_are_internally_consistent
+    expected: Contract schema validation passes for every agent.
+
+  - id: BUS-003
+    domain: business_architecture
+    title: Business outcomes are recorded with an auditable basis
+    requirement: ROI is computed only from measured outcomes carrying evidence.
+    implementation: business_outcomes table with a MEASURED-requires-evidence constraint.
+    weight: 3
+    test: tests/integration/test_business_outcomes.py::test_measured_outcome_requires_evidence
+    expected: A MEASURED outcome without evidence references is rejected by the database.
+
+  # -------------------------------------------------- UX and accessibility (7)
+  - id: UX-001
+    domain: ux_accessibility
+    title: Operational UI is served and reachable
+    requirement: The operator experience exists and renders the governed surfaces.
+    implementation: apps/web Next.js application.
+    weight: 2
+    test: tests/api/test_api_surface.py::test_openapi_document_is_served
+    expected: The API the UI consumes is documented and reachable.
+
+  - id: UX-002
+    domain: ux_accessibility
+    title: Run detail exposes the full execution record
+    requirement: A human can see plan, steps, policy, risk, cost and citations for a run.
+    implementation: /api/v1/runs/{id} returns the complete governed record.
+    weight: 3
+    test: tests/api/test_api_surface.py::test_run_detail_exposes_governance_record
+    expected: Run detail includes plan, steps, policy decisions, risk and citations.
+
+  - id: UX-003
+    domain: ux_accessibility
+    title: WCAG 2.2 AA conformance is verified
+    requirement: The operator UI meets WCAG 2.2 AA.
+    implementation: Not yet implemented — no automated accessibility suite runs.
+    weight: 2
+    # Deliberately unmapped: axe-core against a running browser is not wired.
+    expected: Automated and manual accessibility testing evidence.
+
+  # ----------------------------------------------- enterprise architecture (8)
+  - id: EA-001
+    domain: enterprise_architecture
+    title: Registries are mutually consistent
+    requirement: No contract may reference an unregistered tool, skill or model.
+    implementation: agentic_os.core.registry.validate_registries, run in CI.
+    weight: 3
+    critical: true
+    test: tests/agents/test_contract_validation.py::test_registries_are_internally_consistent
+    expected: Cross-registry validation returns no problems.
+
+  - id: EA-002
+    domain: enterprise_architecture
+    title: The Conductor holds no tool authority
+    requirement: Architecture Constitution rule 17.
+    implementation: Empty tool grant, zero tool budget, enforced by validator and gateway.
+    weight: 3
+    critical: true
+    test: tests/agents/test_contract_validation.py::test_conductor_holds_no_tool_authority
+    expected: The Conductor contract grants no tools and permits zero tool calls.
+
+  - id: EA-003
+    domain: enterprise_architecture
+    title: Declared-but-unbuilt capabilities are explicit
+    requirement: A capability is either implemented or clearly marked NOT_IMPLEMENTED.
+    implementation: tools.implementation_status, enforced at the gateway.
+    weight: 2
+    test: tests/security/test_tool_gateway.py::test_unimplemented_tool_is_refused_not_faked
+    expected: An unimplemented tool returns 501 and never fabricates a result.
+
+  # ---------------------------------------------------- agent architecture (10)
+  - id: AGT-001
+    domain: agent_architecture
+    title: Agent contracts bound tools, skills, models and data domains
+    requirement: An agent may only use capabilities its contract grants.
+    implementation: Authorization engine agent-contract stage plus gateway enforcement.
+    weight: 3
+    critical: true
+    test: tests/security/test_tool_gateway.py::test_tool_outside_the_agent_contract_is_denied
+    expected: A tool outside the contract is denied at the AUTHORIZATION stage.
+
+  - id: AGT-002
+    domain: agent_architecture
+    title: Autonomy ceilings are enforced
+    requirement: No agent may act above its declared autonomy level.
+    implementation: Authorization engine autonomy stage with a min() ceiling.
+    weight: 3
+    critical: true
+    test: tests/redteam/test_agentic_red_team.py::test_agent_cannot_exceed_its_autonomy_ceiling
+    expected: An A3 action by an A1 agent is denied at the AUTONOMY stage.
+
+  - id: AGT-003
+    domain: agent_architecture
+    title: No contract grants autonomous A4
+    requirement: Consequential actions always route through human approval.
+    implementation: Contract validation asserts max_level != A4.
+    weight: 2
+    critical: true
+    test: tests/redteam/test_agentic_red_team.py::test_no_contract_grants_autonomous_a4
+    expected: Every agent contract declares a ceiling below A4.
+
+  - id: AGT-004
+    domain: agent_architecture
+    title: Agent execution budgets are enforced
+    requirement: Token, cost, runtime and tool-call limits stop execution.
+    implementation: AgentBudget checked before every skill and tool call.
+    weight: 2
+    test: tests/redteam/test_agentic_red_team.py::test_agent_budget_stops_at_the_limit
+    expected: Exceeding any declared limit raises BudgetExceeded.
+
+  # ------------------------------------------------ workflow orchestration (8)
+  - id: WKF-001
+    domain: workflow_orchestration
+    title: Workflow state is durable and resumable
+    requirement: A workflow survives worker restart and resumes from its last step.
+    implementation: Database-held state with leasing.
+    weight: 2
+    test: tests/workflows/test_workflow_engine.py::test_workflow_runs_to_completion
+    expected: A multi-step workflow completes with every step recorded.
+
+  - id: WKF-002
+    domain: workflow_orchestration
+    title: Steps are idempotent
+    requirement: A completed step is never re-executed.
+    implementation: Per-tenant unique idempotency key plus completed-step short circuit.
+    weight: 2
+    critical: true
+    test: tests/workflows/test_workflow_engine.py::test_completed_step_is_never_re_executed
+    expected: Re-advancing a run does not increment a completed step's attempt count.
+
+  - id: WKF-003
+    domain: workflow_orchestration
+    title: Failures retry with backoff, then dead-letter
+    requirement: Retries are bounded and exhausted failures are captured, not lost.
+    implementation: Exponential backoff to max_attempts, then workflow_dead_letters.
+    weight: 2
+    test: tests/workflows/test_workflow_engine.py::test_retryable_failure_retries_then_dead_letters
+    expected: Attempts stop at max_attempts and one dead-letter row is written.
+
+  - id: WKF-004
+    domain: workflow_orchestration
+    title: Failed workflows compensate completed steps
+    requirement: Partial work is undone in reverse order.
+    implementation: Reverse-order compensation with per-step compensation actions.
+    weight: 2
+    test: tests/workflows/test_workflow_engine.py::test_failure_compensates_completed_steps_in_reverse
+    expected: The run ends COMPENSATED and the compensating action executed.
+
+  # -------------------------------------------------- data architecture (7)
+  - id: DAT-001
+    domain: data_architecture
+    title: Every tenant table enforces row level security
+    requirement: Isolation is enforced by the database, not by application code.
+    implementation: Uniform RLS applied by catalogue introspection with FORCE.
+    weight: 3
+    critical: true
+    test: tests/tenant_isolation/test_rls_isolation.py::test_every_tenant_table_has_forced_rls
+    expected: No tenant-scoped table lacks FORCE ROW LEVEL SECURITY.
+
+  - id: DAT-002
+    domain: data_architecture
+    title: Cross-tenant access fails closed
+    requirement: A bound session sees only its own tenant; an unbound session sees nothing.
+    implementation: RLS policies keyed on the transaction-local app.tenant_id GUC.
+    weight: 3
+    critical: true
+    test: tests/tenant_isolation/test_rls_isolation.py::test_unbound_session_sees_nothing
+    expected: An unbound session returns zero rows from every protected table.
+
+  - id: DAT-003
+    domain: data_architecture
+    title: The application role cannot bypass isolation
+    requirement: The runtime role holds neither BYPASSRLS nor superuser.
+    implementation: Role attributes set in cluster bootstrap and asserted on every run.
+    weight: 1
+    critical: true
+    test: tests/tenant_isolation/test_rls_isolation.py::test_application_role_cannot_bypass_rls
+    expected: rolbypassrls and rolsuper are both false for the application role.
+
+  # --------------------------------------------------- RAG and knowledge (7)
+  - id: RAG-001
+    domain: rag_knowledge
+    title: Retrieval is ACL-filtered before ranking
+    requirement: Unauthorised content is never fetched, scored or ranked.
+    implementation: ACL predicate inside the retrieval SQL.
+    weight: 3
+    critical: true
+    test: tests/rag/test_retrieval_governance.py::test_restricted_content_never_leaks_below_clearance
+    expected: RESTRICTED content is invisible to every principal below RESTRICTED clearance.
+
+  - id: RAG-002
+    domain: rag_knowledge
+    title: Document access denial does not disclose existence
+    requirement: Denied and not-found are indistinguishable.
+    implementation: fetch_document raises an identical error for both cases.
+    weight: 2
+    test: tests/rag/test_retrieval_governance.py::test_fetch_document_denies_unauthorised_and_hides_existence
+    expected: Both paths produce the same error message.
+
+  - id: RAG-003
+    domain: rag_knowledge
+    title: Citations resolve and unsupported claims are rejected
+    requirement: Every cited claim must be supported by its cited source.
+    implementation: verify_citations content-overlap check.
+    weight: 2
+    test: tests/rag/test_retrieval_governance.py::test_citation_verification_rejects_unsupported_claims
+    expected: Unsupported and dangling citations are reported as unverified.
+
+  # ------------------------------------------------------------- security (10)
+  - id: SEC-001
+    domain: security
+    title: Every tool call passes the full gateway pipeline
+    requirement: No tool executes without identity, authorization, policy, risk and audit.
+    implementation: ToolGateway 14-stage pipeline.
+    weight: 2
+    critical: true
+    test: tests/security/test_tool_gateway.py::test_unauthenticated_call_is_denied_at_identity
+    expected: An unauthenticated call is denied at the IDENTITY stage.
+
+  - id: SEC-002
+    domain: security
+    title: Untrusted content cannot become instruction
+    requirement: Only system- and policy-trusted tiers may instruct.
+    implementation: Context firewall trust tiers and envelopes.
+    weight: 2
+    critical: true
+    test: tests/security/test_context_firewall.py::test_only_the_top_two_tiers_may_instruct
+    expected: Exactly the two highest trust tiers are instruction-bearing.
+
+  - id: SEC-003
+    domain: security
+    title: Prompt injection is detected and high-confidence content is blocked
+    requirement: Injection attempts are detected, recorded and withheld.
+    implementation: Pattern detection with confidence scoring and blocking.
+    weight: 1
+    test: tests/security/test_context_firewall.py::test_high_confidence_injection_is_blocked_not_rendered
+    expected: A high-confidence injection is blocked rather than rendered.
+
+  - id: SEC-004
+    domain: security
+    title: Secrets never reach logs, audit or model context
+    requirement: Credential values are never persisted or exposed.
+    implementation: Audit redaction, secret handles without values, gateway sanitisation.
+    weight: 2
+    critical: true
+    test: tests/redteam/test_agentic_red_team.py::test_secrets_never_survive_audit_redaction
+    expected: No secret pattern survives redaction.
+
+  - id: SEC-005
+    domain: security
+    title: Authentication rejects forged and tampered tokens
+    requirement: A token not signed by the platform never authenticates.
+    implementation: JWT verification with issuer, audience and required claims.
+    weight: 1
+    critical: true
+    test: tests/redteam/test_agentic_red_team.py::test_forged_token_claims_do_not_grant_access
+    expected: A token signed with a foreign key is rejected.
+
+  - id: SEC-006
+    domain: security
+    title: Code execution through the expression evaluator is impossible
+    requirement: The calculation sandbox refuses imports, attribute access and builtins.
+    implementation: AST allowlist evaluator with node and exponent limits.
+    weight: 1
+    critical: true
+    test: tests/redteam/test_agentic_red_team.py::test_sandboxed_evaluator_refuses_code_execution
+    expected: Every code-execution payload raises ValidationError.
+
+  - id: SEC-007
+    domain: security
+    title: Kill switches halt agent activity
+    requirement: A scoped kill switch stops execution immediately and is audited.
+    implementation: Kill-switch checks at the model and tool gateways.
+    weight: 1
+    critical: true
+    test: tests/security/test_tool_gateway.py::test_kill_switch_blocks_every_tool
+    expected: An engaged tenant kill switch blocks every tool call.
+
+  # -------------------------------------------------------- AI governance (7)
+  - id: AIG-001
+    domain: ai_governance
+    title: Consequential actions require human approval
+    requirement: Financial, destructive, external and irreversible actions are A4.
+    implementation: Risk engine hard floors plus approval engine.
+    weight: 2
+    critical: true
+    test: tests/redteam/test_agentic_red_team.py::test_financial_actions_are_always_critical_and_a4
+    expected: A financial action is CRITICAL and requires A4 regardless of amount.
+
+  - id: AIG-002
+    domain: ai_governance
+    title: Separation of duties on approvals
+    requirement: One person cannot satisfy a dual approval alone.
+    implementation: Approval engine rejects a repeat decision by the same principal.
+    weight: 2
+    critical: true
+    test: tests/redteam/test_agentic_red_team.py::test_the_same_person_cannot_satisfy_a_dual_approval
+    expected: The second decision by the same person is refused.
+
+  - id: AIG-003
+    domain: ai_governance
+    title: An approval authorises one action only
+    requirement: An approval cannot be replayed against a different action.
+    implementation: Gateway matches the approval's recorded action.
+    weight: 1
+    critical: true
+    test: tests/redteam/test_agentic_red_team.py::test_an_approval_for_one_action_does_not_authorise_another
+    expected: An approval for one tool does not satisfy another.
+
+  - id: AIG-004
+    domain: ai_governance
+    title: Models and prompts are versioned controlled assets
+    requirement: A prompt body change without a version bump is rejected.
+    implementation: Prompt registry hash verification on resolve.
+    weight: 2
+    test: tests/integration/test_prompt_registry.py::test_tampered_prompt_body_is_rejected
+    expected: A prompt whose body no longer matches its hash fails to resolve.
+
+  # ---------------------------------------------------------------- privacy (5)
+  - id: PRV-001
+    domain: privacy
+    title: PII is detected and classification is raised accordingly
+    requirement: A document containing sensitive identifiers is reclassified upward.
+    implementation: DLP classification during ingestion.
+    weight: 2
+    test: tests/integration/test_ingestion_pipeline.py::test_pii_raises_document_classification
+    expected: A document containing restricted identifiers becomes RESTRICTED.
+
+  - id: PRV-002
+    domain: privacy
+    title: Redaction leaves no residual sensitive fragments
+    requirement: Overlapping detections must not corrupt redaction.
+    implementation: Overlap resolution before replacement.
+    weight: 2
+    test: tests/integration/test_ingestion_pipeline.py::test_redaction_leaves_no_residual_fragments
+    expected: No fragment of any detected identifier survives redaction.
+
+  - id: PRV-003
+    domain: privacy
+    title: Data subject request handling
+    requirement: Access, export, deletion and rectification requests are processed.
+    implementation: Not yet implemented — schema exists, no processing pipeline.
+    weight: 1
+    expected: A DSAR is processed end to end with evidence.
+
+  # ------------------------------------------------------------ reliability (6)
+  - id: REL-001
+    domain: reliability
+    title: Idempotent tool calls do not duplicate side effects
+    requirement: A replayed call returns the prior result without re-executing.
+    implementation: Per-tenant idempotency key on tool_calls.
+    weight: 2
+    critical: true
+    test: tests/security/test_tool_gateway.py::test_repeated_call_with_the_same_key_does_not_re_execute
+    expected: A replayed call creates no second row.
+
+  - id: REL-002
+    domain: reliability
+    title: Work is leased exclusively
+    requirement: Two workers never process the same run.
+    implementation: FOR UPDATE SKIP LOCKED leasing.
+    weight: 2
+    test: tests/workflows/test_workflow_engine.py::test_claim_leases_runs_exclusively
+    expected: A leased run is not claimable by a second worker.
+
+  - id: REL-003
+    domain: reliability
+    title: Events are published transactionally
+    requirement: An event and the state change it describes commit together.
+    implementation: Transactional outbox.
+    weight: 2
+    test: tests/integration/test_event_bus.py::test_outbox_commits_with_the_state_change
+    expected: A rolled-back state change leaves no outbox entry.
+
+  # --------------------------------------------------------- observability (5)
+  - id: OBS-001
+    domain: observability
+    title: Every governed action is audited
+    requirement: Tool calls, model calls, approvals and policy decisions are recorded.
+    implementation: Audit ledger writes on every gateway and engine path.
+    weight: 2
+    critical: true
+    test: tests/security/test_tool_gateway.py::test_every_call_is_recorded_and_audited
+    expected: A tool call produces both a tool_calls row and an audit entry.
+
+  - id: OBS-002
+    domain: observability
+    title: The audit ledger is tamper-evident
+    requirement: Ledger entries are hash-chained and immutable.
+    implementation: Chained hashes plus append-only triggers.
+    weight: 2
+    critical: true
+    test: tests/database/test_audit_ledger.py::test_ledger_rejects_mutation
+    expected: UPDATE, DELETE and TRUNCATE are all rejected.
+
+  - id: OBS-003
+    domain: observability
+    title: Run execution is traceable end to end
+    requirement: A run exposes its full trace across planes.
+    implementation: traces table plus run detail projection.
+    weight: 1
+    test: tests/api/test_api_surface.py::test_run_detail_exposes_governance_record
+    expected: Run detail returns the complete execution record.
+
+  # -------------------------------------------------- evaluation assurance (5)
+  - id: EVL-001
+    domain: evaluation_assurance
+    title: Maturity is computed from executable evidence
+    requirement: No maturity claim may be entered by hand.
+    implementation: Evidence engine derives status from test results only.
+    weight: 2
+    critical: true
+    test: tests/integration/test_evidence_engine.py::test_maturity_is_derived_only_from_test_results
+    expected: A control with no passing test never reaches VERIFIED.
+
+  - id: EVL-002
+    domain: evaluation_assurance
+    title: A failed critical control blocks certification
+    requirement: Certification fails regardless of the numerical score.
+    implementation: Critical blocker check in the maturity calculation.
+    weight: 2
+    critical: true
+    test: tests/integration/test_evidence_engine.py::test_critical_failure_blocks_certification
+    expected: Certification is refused when any critical control fails.
+
+  - id: EVL-003
+    domain: evaluation_assurance
+    title: Evidence expires
+    requirement: Stale evidence does not count toward maturity.
+    implementation: Per-control evidence TTL.
+    weight: 1
+    test: tests/integration/test_evidence_engine.py::test_expired_evidence_does_not_count
+    expected: Evidence past its TTL is reported EXPIRED and contributes zero.
+
+  # ------------------------------------------------------------- devsecops (4)
+  - id: DEV-001
+    domain: devsecops
+    title: Migrations are forward-only and checksum-verified
+    requirement: An applied migration cannot be edited in place.
+    implementation: schema_migrations checksum comparison.
+    weight: 2
+    test: tests/database/test_migrations.py::test_modified_migration_is_rejected
+    expected: Editing an applied migration raises rather than re-running.
+
+  - id: DEV-002
+    domain: devsecops
+    title: CI runs the full assurance pipeline
+    requirement: Lint, types, tests, scans, SBOM and evidence run on every change.
+    implementation: .github/workflows/ci.yml.
+    weight: 2
+    test: tests/api/test_repository_hygiene.py::test_ci_pipeline_covers_required_gates
+    expected: The CI definition contains every required gate.
+
+  # -------------------------------------------------- DR and resilience (2)
+  - id: DRP-001
+    domain: dr_resilience
+    title: Backup and restore are verified by exercise
+    requirement: A restore has been performed and verified.
+    implementation: Not yet implemented — schema exists, no exercise has run.
+    weight: 2
+    expected: A restore_tests row with outcome SUCCESS and a measured RPO and RTO.
+
+  # ------------------------------------------------------- business value (2)
+  - id: BVL-001
+    domain: business_value
+    title: ROI derives only from auditable measured outcomes
+    requirement: Estimated outcomes are excluded from ROI.
+    implementation: Outcome engine separates MEASURED from ESTIMATED.
+    weight: 2
+    test: tests/integration/test_business_outcomes.py::test_roi_excludes_estimated_outcomes
+    expected: Estimated outcomes are reported separately and excluded from ROI.

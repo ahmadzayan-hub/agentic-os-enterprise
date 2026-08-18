@@ -58,6 +58,24 @@ class AuthenticatedPrincipal:
         )
 
 
+def _valid_ip(value: str | None) -> str | None:
+    """Return the address only if it actually parses.
+
+    The client address arrives from a proxy header or an ASGI transport and is
+    not guaranteed to be an address at all. Storing NULL for an unparseable
+    value keeps the audit trail honest and stops a malformed header from
+    failing an otherwise valid login.
+    """
+    import ipaddress
+
+    if not value:
+        return None
+    try:
+        return str(ipaddress.ip_address(value))
+    except ValueError:
+        return None
+
+
 def load_grants(session: Session, tenant_id: str, user_id: str) -> tuple[frozenset[str], frozenset[str], frozenset[str]]:
     """Return (roles, permissions, groups) for a user.
 
@@ -180,7 +198,7 @@ def authenticate_password(
             "uid": row["id"],
             "rth": sha256_hex(refresh_token),
             "mfa": mfa_satisfied,
-            "ip": ip_address,
+            "ip": _valid_ip(ip_address),
             "ua": user_agent[:512],
             "exp": utcnow() + timedelta(seconds=settings.refresh_token_ttl_seconds),
         },

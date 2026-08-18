@@ -107,7 +107,15 @@ def _ids(*prefixes: str) -> tuple[str, ...]:
     return tuple(p.id for p in CATALOGUE if p.id.split(":", 1)[0] in prefixes)
 
 
-READ_ONLY = tuple(p.id for p in CATALOGUE if p.action in ("read",))
+#: Reads that must not be granted by a blanket "read everything" role. The
+#: audit ledger and the privacy register expose who did what and whose personal
+#: data is held; both are assurance surfaces, not operational ones.
+SENSITIVE_READS = frozenset({"audit:read", "privacy:read"})
+
+#: The baseline read grant shared by operational roles.
+READ_ONLY = tuple(
+    p.id for p in CATALOGUE if p.action == "read" and p.id not in SENSITIVE_READS
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -179,7 +187,7 @@ SYSTEM_ROLES: tuple[SystemRole, ...] = (
         slug="auditor",
         name="Auditor",
         description="Read-only assurance access including the audit ledger.",
-        permissions=READ_ONLY + ("audit:verify",),
+        permissions=READ_ONLY + ("audit:read", "audit:verify", "privacy:read"),
         requires_mfa=True,
         max_autonomy="A0",
     ),
@@ -195,6 +203,8 @@ SYSTEM_ROLES: tuple[SystemRole, ...] = (
             "connectors:write",
             "policies:write",
             "incidents:write",
+            "audit:read",
+            "audit:verify",
         ),
         requires_mfa=True,
         max_autonomy="A2",
@@ -213,6 +223,9 @@ SYSTEM_ROLES: tuple[SystemRole, ...] = (
             "models:write",
             "prompts:deploy",
             "agents:publish",
+            "audit:read",
+            "audit:verify",
+            "privacy:read",
         ),
         requires_mfa=True,
         max_autonomy="A2",

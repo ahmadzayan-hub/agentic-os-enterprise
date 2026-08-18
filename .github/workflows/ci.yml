@@ -1,28 +1,299 @@
-name: assurance-ci
+name: assurance-pipeline
+
 on:
   pull_request:
   push:
-    branches: [main, develop, "architecture/**"]
+    branches: [main, "build/**", "claude/**"]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  AGENTIC_APP_ENV: test
+  AGENTIC_JWT_SECRET: ci-only-signing-key-not-for-production-0001
+  AGENTIC_DATABASE_URL: postgresql+psycopg://agentic_app:agentic_app@localhost:5432/agentic
+  AGENTIC_DATABASE_OWNER_URL: postgresql+psycopg://agentic_owner:agentic_owner@localhost:5432/agentic
+
+permissions:
+  contents: read
 
 jobs:
-  python-tests:
+  # ---------------------------------------------------------------- static
+  format-lint-types:
+    name: Format, lint and type check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-      - run: pip install pytest
-      - run: pytest tests/evals -q
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: Format check (ruff)
+        run: ruff format --check .
+      - name: Lint (ruff)
+        run: ruff check .
+      - name: Type check (mypy)
+        run: mypy packages/agentic_os/src/agentic_os
+        continue-on-error: true   # advisory until the annotation debt is cleared
 
-  architecture-constitution:
+  # ------------------------------------------------------------ contracts
+  contract-validation:
+    name: Agent-contract and registry validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify required governance assets
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: Validate registries
         run: |
-          test -f ARCHITECTURE_CONSTITUTION.md
-          test -f docs/architecture/REFERENCE_ARCHITECTURE.md
-          test -f docs/governance/MATURITY_MODEL.md
-          test -f docs/security/SECURITY_ARCHITECTURE.md
-          test -f packages/contracts/agents/finance.yaml
+          python - <<'PY'
+          import sys
+          from agentic_os.core.registry import validate_registries
+          problems = validate_registries()
+          print("\n".join(problems) if problems else "registries valid")
+          sys.exit(1 if problems else 0)
+          PY
+      - name: Agent contract tests
+        run: pytest tests/agents -q
+
+  # ----------------------------------------------------------------- tests
+  tests:
+    name: Unit, integration, database and tenant-isolation tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -e ".[dev,parsers]"
+
+      - name: Bootstrap cluster roles and extensions
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -f database/bootstrap/00_cluster_bootstrap.sql
+          psql -h localhost -U postgres -c "CREATE DATABASE agentic OWNER agentic_owner"
+          psql -h localhost -U postgres -d agentic -f database/bootstrap/01_extensions.sql
+
+      - name: Apply migrations
+        run: agentic-migrate up
+
+      - name: Seed
+        run: agentic-seed
+
+      - name: Unit tests
+        run: pytest tests/unit -q
+
+      - name: Integration tests
+        run: pytest tests/integration -q
+
+      - name: Database and migration tests
+        run: pytest tests/database -q
+
+      - name: Tenant-isolation tests
+        run: pytest tests/tenant_isolation -q
+
+      - name: Workflow tests
+        run: pytest tests/workflows -q
+
+      - name: API tests
+        run: pytest tests/api -q
+
+      - name: RAG evaluation and leakage tests
+        run: pytest tests/rag -q
+
+      - name: Security control tests
+        run: pytest tests/security -q
+
+      - name: Agentic red-team tests
+        run: pytest tests/redteam -q
+
+      - name: Full suite with JUnit report
+        run: pytest tests -q --junitxml=artifacts/junit.xml
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit-report
+          path: artifacts/junit.xml
+
+  # --------------------------------------------------------------- security
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  sast:
+    name: SAST
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install bandit[toml] semgrep
+      - name: bandit
+        run: bandit -r packages/agentic_os/src/agentic_os -ll -f txt
+      - name: semgrep
+        run: semgrep --config auto --error --severity ERROR .
+        continue-on-error: true
+
+  dependency-scan:
+    name: Dependency scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install pip-audit
+      - run: pip install -e "."
+      - name: pip-audit
+        run: pip-audit --strict --ignore-vuln GHSA-none-placeholder
+        continue-on-error: true
+
+  container-scan:
+    name: Container scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        run: docker build -f infrastructure/docker/Dockerfile.api -t agentic-os-api:ci .
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: agentic-os-api:ci
+          severity: HIGH,CRITICAL
+          exit-code: "0"
+          format: table
+
+  iac-scan:
+    name: IaC scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: infrastructure
+          soft_fail: true
+
+  # ------------------------------------------------------------------ SBOM
+  sbom-aibom:
+    name: SBOM and AIBOM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -e "." cyclonedx-bom
+      - name: Generate SBOM (CycloneDX)
+        run: |
+          mkdir -p artifacts
+          cyclonedx-py environment -o artifacts/sbom.json --output-format JSON
+      - name: Generate AIBOM
+        run: python scripts/generate_aibom.py --output artifacts/aibom.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bill-of-materials
+          path: artifacts/
+
+  # -------------------------------------------------------------- evidence
+  evidence:
+    name: Evidence bundle and release gate
+    runs-on: ubuntu-latest
+    needs: [format-lint-types, contract-validation, tests, sast, sbom-aibom]
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -e ".[dev,parsers]"
+      - name: Prepare database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -f database/bootstrap/00_cluster_bootstrap.sql
+          psql -h localhost -U postgres -c "CREATE DATABASE agentic OWNER agentic_owner"
+          psql -h localhost -U postgres -d agentic -f database/bootstrap/01_extensions.sql
+          agentic-migrate up
+          agentic-seed
+
+      - name: Collect evidence and compute maturity
+        run: agentic-evidence collect --environment ci --output artifacts
+
+      - name: Release gate
+        run: agentic-evidence gate --min-score 70 --require-no-critical-blockers
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evidence-bundle
+          path: artifacts/
+
+  # ------------------------------------------------------- frontend and a11y
+  web:
+    name: Web build and accessibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install
+        working-directory: apps/web
+        run: npm ci || npm install
+      - name: Type check
+        working-directory: apps/web
+        run: npx tsc --noEmit
+      - name: Build
+        working-directory: apps/web
+        run: npm run build
+      - name: Accessibility (axe) — NOT YET WIRED
+        run: |
+          echo "Automated accessibility testing is not implemented."
+          echo "Control UX-003 is reported NOT_EVIDENCED until an axe-core run is added."
