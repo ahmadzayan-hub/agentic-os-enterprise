@@ -1,0 +1,28 @@
+# Reviewed gitleaks exceptions.
+#
+# Each entry is a specific finding fingerprint — commit, file, rule, line — not
+# a pattern and not a path glob, so an exception here can never silently cover
+# a different secret. A real leak on another line, or in another file, still
+# fails the scan.
+#
+# Both entries below are synthetic fixtures that exist to prove the platform
+# scrubs credentials before they are persisted. Weakening the fixtures would
+# weaken the tests, which is why they are excepted rather than rewritten.
+#
+# Deliberately described rather than quoted: reproducing the literals here
+# would create a fresh finding in this very file, which is exactly what
+# happened on the first attempt.
+#
+#   tests/redteam/test_agentic_red_team.py:381
+#     Feeds two obviously-synthetic bearer/api-key strings — a sequential
+#     alphabet and a sequential digit run — plus the example AWS access key ID
+#     published in AWS's own public documentation, through redact_payload, and
+#     asserts none of them survives into the audit ledger.
+#
+#   tests/security/test_tool_gateway.py:300
+#     Passes a similarly synthetic key as a tool parameter and asserts the
+#     persisted tool_calls row holds only the redacted form.
+#
+# Neither string is, or ever was, a credential for anything.
+502cece954fa356ee3af0f072388be4cc44387e2:tests/redteam/test_agentic_red_team.py:generic-api-key:381
+502cece954fa356ee3af0f072388be4cc44387e2:tests/security/test_tool_gateway.py:generic-api-key:300

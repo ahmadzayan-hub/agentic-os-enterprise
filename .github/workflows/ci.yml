@@ -314,16 +314,30 @@ jobs:
       - name: Release gate
         run: agentic-evidence gate --min-score 70 --require-no-critical-blockers
 
+      # Best-effort: the gate above is what decides this job.
       - uses: actions/upload-artifact@v4
         if: always()
+        continue-on-error: true
         with:
           name: evidence-bundle
           path: artifacts/
+          retention-days: 14
 
   # ------------------------------------------------------- frontend and a11y
   web:
     name: Web build and accessibility
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -331,6 +345,10 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
       - name: Install
         working-directory: apps/web
         run: npm ci || npm install
@@ -340,7 +358,46 @@ jobs:
       - name: Build
         working-directory: apps/web
         run: npm run build
-      - name: Accessibility (axe) — NOT YET WIRED
+
+      # The audit drives the real application against a real database, because
+      # an accessibility result from a mocked page evidences nothing.
+      - run: pip install -e ".[dev,parsers]"
+      - name: Prepare database
+        env:
+          PGPASSWORD: postgres
         run: |
-          echo "Automated accessibility testing is not implemented."
-          echo "Control UX-003 is reported NOT_EVIDENCED until an axe-core run is added."
+          psql -h localhost -U postgres -f database/bootstrap/00_cluster_bootstrap.sql
+          psql -h localhost -U postgres -c "CREATE DATABASE agentic OWNER agentic_owner"
+          psql -h localhost -U postgres -d agentic -f database/bootstrap/01_extensions.sql
+          agentic-migrate up
+          agentic-seed
+      - name: Start the API and the console
+        working-directory: apps/web
+        run: |
+          uvicorn agentic_os.api.app:app --host 127.0.0.1 --port 8000 --log-level warning &
+          cp -r .next/static .next/standalone/.next/static
+          mkdir -p .next/standalone/public
+          AGENTIC_API_BASE_URL=http://127.0.0.1:8000 PORT=3000 \
+            node .next/standalone/server.js &
+          for _ in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8000/health >/dev/null 2>&1 \
+              && curl -fsS http://127.0.0.1:3000/login >/dev/null 2>&1 && break
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:8000/health
+          curl -fsS -o /dev/null -w "console: %{http_code}\n" http://127.0.0.1:3000/login
+      - name: Accessibility audit (axe-core, WCAG 2.2 AA)
+        working-directory: apps/web
+        run: |
+          npx playwright install --with-deps chromium
+          node tests/accessibility/axe_audit.mjs \
+            --base http://127.0.0.1:3000 --out ../../artifacts/accessibility.json
+      - name: Assert no serious or critical violations
+        run: pytest tests/accessibility -q
+      - uses: actions/upload-artifact@v4
+        if: always()
+        continue-on-error: true
+        with:
+          name: accessibility-report
+          path: artifacts/accessibility.json
+          retention-days: 14

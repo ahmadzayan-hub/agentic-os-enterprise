@@ -60,3 +60,33 @@ def test_the_firewall_still_detects_the_characters_it_no_longer_embeds() -> None
         assert any(f.pattern == "invisible_characters" for f in findings), (
             f"U+{codepoint:04X} is no longer detected"
         )
+
+
+def test_secret_scan_exceptions_only_ever_cover_test_fixtures() -> None:
+    """A suppression file is a place real leaks go to hide. Bound what it can cover.
+
+    Every gitleaks exception must be a full finding fingerprint — which pins it
+    to one commit, one file and one line — and must point at a file under
+    ``tests/``. An exception for application code, or a bare path or pattern
+    that could match more than the finding it was written for, fails here.
+    """
+    ignore_file = REPO_ROOT / ".gitleaksignore"
+    if not ignore_file.exists():
+        return
+
+    entries = [
+        line.strip()
+        for line in ignore_file.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    for entry in entries:
+        parts = entry.split(":")
+        assert len(parts) == 4, f"not a finding fingerprint (expected commit:path:rule:line): {entry}"
+        commit, path, _rule, line_no = parts
+        assert len(commit) == 40 and all(c in "0123456789abcdef" for c in commit), (
+            f"first field must be a full commit sha: {entry}"
+        )
+        assert line_no.isdigit(), f"last field must be a line number: {entry}"
+        assert path.startswith("tests/"), (
+            f"secret-scan exceptions are only permitted for test fixtures, not {path}"
+        )
