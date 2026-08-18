@@ -9,9 +9,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from agentic_os.api.deps import CtxDep, DbDep, require_permission
-from agentic_os.api.serialization import jsonify, row as json_row, rows as json_rows
-from agentic_os.assurance.audit import AuditLedger
+from agentic_os.api.serialization import jsonify
+from agentic_os.api.serialization import rows as json_rows
 from agentic_os.assurance import evidence as evidence_engine
+from agentic_os.assurance.audit import AuditLedger
 from agentic_os.control import approval_engine
 from agentic_os.core.errors import AgenticError
 
@@ -59,9 +60,7 @@ def get_approval(approval_id: str, ctx: CtxDep, db: DbDep) -> dict:
     "/approvals/{approval_id}/decide",
     dependencies=[Depends(require_permission("approvals:decide", resource_type="approval"))],
 )
-def decide_approval(
-    approval_id: str, payload: DecisionRequest, ctx: CtxDep, db: DbDep
-) -> dict:
+def decide_approval(approval_id: str, payload: DecisionRequest, ctx: CtxDep, db: DbDep) -> dict:
     if ctx.human is None or not ctx.human.mfa_satisfied:
         raise HTTPException(
             status_code=403,
@@ -72,16 +71,18 @@ def decide_approval(
         )
     try:
         return approval_engine.decide(
-            db, ctx, approval_id, payload.decision, comment=payload.comment  # type: ignore[arg-type]
+            db,
+            ctx,
+            approval_id,
+            payload.decision,
+            comment=payload.comment,  # type: ignore[arg-type]
         )
     except AgenticError as exc:
         raise HTTPException(status_code=exc.http_status, detail=exc.to_dict()) from exc
 
 
 # ------------------------------------------------------------------- policies
-@router.get(
-    "/policies", dependencies=[Depends(require_permission("policies:read", resource_type="policy"))]
-)
+@router.get("/policies", dependencies=[Depends(require_permission("policies:read", resource_type="policy"))])
 def list_policies(ctx: CtxDep, db: DbDep) -> dict:
     rows = db.execute(
         text(
@@ -113,9 +114,7 @@ def policy_decisions(ctx: CtxDep, db: DbDep, limit: Annotated[int, Query(le=500)
 
 
 # ----------------------------------------------------------------------- risks
-@router.get(
-    "/risks", dependencies=[Depends(require_permission("risks:read", resource_type="risk"))]
-)
+@router.get("/risks", dependencies=[Depends(require_permission("risks:read", resource_type="risk"))])
 def list_risks(ctx: CtxDep, db: DbDep, limit: Annotated[int, Query(le=500)] = 100) -> dict:
     rows = db.execute(
         text(
@@ -129,9 +128,7 @@ def list_risks(ctx: CtxDep, db: DbDep, limit: Annotated[int, Query(le=500)] = 10
 
 
 # -------------------------------------------------------------------- evidence
-@router.get(
-    "/evidence", dependencies=[Depends(require_permission("evidence:read", resource_type="control"))]
-)
+@router.get("/evidence", dependencies=[Depends(require_permission("evidence:read", resource_type="control"))])
 def maturity(ctx: CtxDep, db: DbDep) -> dict:
     evidence_engine.apply_expiry(db, ctx.tenant_id)
     report = evidence_engine.latest_report(db, ctx.tenant_id)
@@ -187,18 +184,14 @@ def certifications(ctx: CtxDep, db: DbDep) -> dict:
 
 
 # ----------------------------------------------------------------------- audit
-@router.get(
-    "/audit", dependencies=[Depends(require_permission("audit:read", resource_type="audit"))]
-)
+@router.get("/audit", dependencies=[Depends(require_permission("audit:read", resource_type="audit"))])
 def audit_log(
     ctx: CtxDep,
     db: DbDep,
     category: str | None = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> dict:
-    return jsonify(
-        {"events": AuditLedger(db).recent(ctx.tenant_id, limit=limit, category=category)}
-    )
+    return jsonify({"events": AuditLedger(db).recent(ctx.tenant_id, limit=limit, category=category)})
 
 
 @router.get(

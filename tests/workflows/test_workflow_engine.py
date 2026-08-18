@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import json
 
-import pytest
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-
 import agentic_os.runtime.steps  # noqa: F401 - registers step handlers
+import pytest
 from agentic_os.core.context import ExecutionContext, HumanIdentity
 from agentic_os.core.db import bind_tenant
 from agentic_os.core.errors import Conflict, ValidationError
 from agentic_os.core.ids import prefixed_id
 from agentic_os.runtime import workflow_engine as we
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
 from tests.conftest import requires_db
 
 pytestmark = [pytest.mark.integration, requires_db]
@@ -40,17 +40,13 @@ def wctx(db: Session, tenant_id: str, organization_id: str) -> ExecutionContext:
 
 
 def _register(db: Session, ctx: ExecutionContext, key: str, steps: list[dict]) -> str:
-    we.register_workflow(
-        db, ctx, workflow_key=key, name=key, definition={"steps": steps}, owner_team="test"
-    )
+    we.register_workflow(db, ctx, workflow_key=key, name=key, definition={"steps": steps}, owner_team="test")
     return key
 
 
 # ------------------------------------------------------------------ validation
 def test_definition_requires_steps() -> None:
-    assert we.validate_definition({"steps": []}) == [
-        "workflow definition must contain at least one step"
-    ]
+    assert we.validate_definition({"steps": []}) == ["workflow definition must contain at least one step"]
 
 
 def test_definition_rejects_unknown_step_type() -> None:
@@ -59,16 +55,17 @@ def test_definition_rejects_unknown_step_type() -> None:
 
 
 def test_definition_rejects_duplicate_keys() -> None:
-    problems = we.validate_definition(
-        {"steps": [{"key": "a", "type": "NOOP"}, {"key": "a", "type": "NOOP"}]}
-    )
+    problems = we.validate_definition({"steps": [{"key": "a", "type": "NOOP"}, {"key": "a", "type": "NOOP"}]})
     assert any("duplicate step key" in p for p in problems)
 
 
 def test_registering_an_invalid_definition_raises(db: Session, wctx) -> None:
     with pytest.raises(ValidationError):
         we.register_workflow(
-            db, wctx, workflow_key="bad", name="bad",
+            db,
+            wctx,
+            workflow_key="bad",
+            name="bad",
             definition={"steps": [{"key": "x", "type": "NOPE"}]},
         )
 
@@ -76,7 +73,9 @@ def test_registering_an_invalid_definition_raises(db: Session, wctx) -> None:
 # ------------------------------------------------------------------- happy path
 def test_workflow_runs_to_completion(db: Session, wctx) -> None:
     key = _register(
-        db, wctx, prefixed_id("wf_ok"),
+        db,
+        wctx,
+        prefixed_id("wf_ok"),
         [
             {"key": "first", "type": "NOOP"},
             {"key": "second", "type": "NOOP"},
@@ -89,10 +88,14 @@ def test_workflow_runs_to_completion(db: Session, wctx) -> None:
     assert state.state["first"]["noop"] is True
     assert state.state["third"]["key"] == "third"
 
-    steps = db.execute(
-        text("SELECT status FROM workflow_steps WHERE workflow_run_id = CAST(:i AS uuid)"),
-        {"i": run_id},
-    ).scalars().all()
+    steps = (
+        db.execute(
+            text("SELECT status FROM workflow_steps WHERE workflow_run_id = CAST(:i AS uuid)"),
+            {"i": run_id},
+        )
+        .scalars()
+        .all()
+    )
     assert all(s == "SUCCEEDED" for s in steps)
 
 
@@ -106,13 +109,15 @@ def test_start_is_idempotent(db: Session, wctx) -> None:
 
 def test_completed_step_is_never_re_executed(db: Session, wctx) -> None:
     """Re-advancing a run must not repeat work that already produced a result."""
-    key = _register(db, wctx, prefixed_id("wf_once"), [{"key": "a", "type": "NOOP"},
-                                                      {"key": "b", "type": "NOOP"}])
+    key = _register(
+        db, wctx, prefixed_id("wf_once"), [{"key": "a", "type": "NOOP"}, {"key": "b", "type": "NOOP"}]
+    )
     run_id = we.start(db, wctx, key, {})
     we.advance(db, wctx, run_id)  # completes 'a'
     attempts_before = db.execute(
-        text("SELECT attempt FROM workflow_steps WHERE workflow_run_id = CAST(:i AS uuid) "
-             "AND step_key = 'a'"),
+        text(
+            "SELECT attempt FROM workflow_steps WHERE workflow_run_id = CAST(:i AS uuid) AND step_key = 'a'"
+        ),
         {"i": run_id},
     ).scalar_one()
 
@@ -122,8 +127,9 @@ def test_completed_step_is_never_re_executed(db: Session, wctx) -> None:
     )
     we.advance(db, wctx, run_id)
     attempts_after = db.execute(
-        text("SELECT attempt FROM workflow_steps WHERE workflow_run_id = CAST(:i AS uuid) "
-             "AND step_key = 'a'"),
+        text(
+            "SELECT attempt FROM workflow_steps WHERE workflow_run_id = CAST(:i AS uuid) AND step_key = 'a'"
+        ),
         {"i": run_id},
     ).scalar_one()
     assert attempts_after == attempts_before
@@ -132,7 +138,9 @@ def test_completed_step_is_never_re_executed(db: Session, wctx) -> None:
 # --------------------------------------------------------------------- retries
 def test_retryable_failure_retries_then_dead_letters(db: Session, wctx) -> None:
     key = _register(
-        db, wctx, prefixed_id("wf_retry"),
+        db,
+        wctx,
+        prefixed_id("wf_retry"),
         [
             {
                 "key": "flaky",
@@ -169,9 +177,17 @@ def test_retryable_failure_retries_then_dead_letters(db: Session, wctx) -> None:
 
 def test_non_retryable_failure_does_not_retry(db: Session, wctx) -> None:
     key = _register(
-        db, wctx, prefixed_id("wf_hard"),
-        [{"key": "bad", "type": "FAIL", "max_attempts": 5,
-          "input": {"error_class": "VALIDATION", "message": "not retryable"}}],
+        db,
+        wctx,
+        prefixed_id("wf_hard"),
+        [
+            {
+                "key": "bad",
+                "type": "FAIL",
+                "max_attempts": 5,
+                "input": {"error_class": "VALIDATION", "message": "not retryable"},
+            }
+        ],
     )
     run_id = we.start(db, wctx, key, {})
     state = we.advance(db, wctx, run_id)
@@ -186,14 +202,17 @@ def test_non_retryable_failure_does_not_retry(db: Session, wctx) -> None:
 # ---------------------------------------------------------------- compensation
 def test_failure_compensates_completed_steps_in_reverse(db: Session, wctx) -> None:
     key = _register(
-        db, wctx, prefixed_id("wf_comp"),
+        db,
+        wctx,
+        prefixed_id("wf_comp"),
         [
             {
                 "key": "reserve",
                 "type": "TASK",
                 "input": {"title": "reserve capacity"},
                 "compensation": {
-                    "key": "release", "type": "TASK",
+                    "key": "release",
+                    "type": "TASK",
                     "input": {"title": "COMPENSATION: release capacity"},
                 },
             },
@@ -231,7 +250,9 @@ def test_approval_step_parks_the_run_and_resumes_on_approval(db: Session, wctx) 
     from agentic_os.control.approval_engine import decide
 
     key = _register(
-        db, wctx, prefixed_id("wf_appr"),
+        db,
+        wctx,
+        prefixed_id("wf_appr"),
         [
             {
                 "key": "gate",
@@ -249,14 +270,18 @@ def test_approval_step_parks_the_run_and_resumes_on_approval(db: Session, wctx) 
     state = we.run_to_completion(db, wctx, run_id)
     assert state.status == "AWAITING_APPROVAL"
 
-    paused = db.execute(
-        text("SELECT paused, state FROM workflow_runs WHERE id = CAST(:i AS uuid)"),
-        {"i": run_id},
-    ).mappings().one()
+    paused = (
+        db.execute(
+            text("SELECT paused, state FROM workflow_runs WHERE id = CAST(:i AS uuid)"),
+            {"i": run_id},
+        )
+        .mappings()
+        .one()
+    )
     assert paused["paused"] is True
-    approval_id = (
-        paused["state"] if isinstance(paused["state"], dict) else json.loads(paused["state"])
-    )["_awaiting_approval_id"]
+    approval_id = (paused["state"] if isinstance(paused["state"], dict) else json.loads(paused["state"]))[
+        "_awaiting_approval_id"
+    ]
 
     decide(db, wctx, approval_id, "APPROVED", comment="inspection evidence reviewed")
     assert we.resume(db, wctx, run_id) is True
@@ -270,12 +295,20 @@ def test_rejected_approval_fails_the_run(db: Session, wctx) -> None:
     from agentic_os.control.approval_engine import decide
 
     key = _register(
-        db, wctx, prefixed_id("wf_reject"),
+        db,
+        wctx,
+        prefixed_id("wf_reject"),
         [
-            {"key": "gate", "type": "APPROVAL",
-             "max_attempts": 1,
-             "input": {"action": "assets.decommission", "reason": "obsolete",
-                       "consequences": "the asset is permanently removed"}},
+            {
+                "key": "gate",
+                "type": "APPROVAL",
+                "max_attempts": 1,
+                "input": {
+                    "action": "assets.decommission",
+                    "reason": "obsolete",
+                    "consequences": "the asset is permanently removed",
+                },
+            },
             {"key": "after", "type": "NOOP"},
         ],
     )
@@ -294,8 +327,9 @@ def test_rejected_approval_fails_the_run(db: Session, wctx) -> None:
 
 # ------------------------------------------------------------------- lifecycle
 def test_cancel_stops_the_run(db: Session, wctx) -> None:
-    key = _register(db, wctx, prefixed_id("wf_cancel"),
-                    [{"key": "a", "type": "NOOP"}, {"key": "b", "type": "NOOP"}])
+    key = _register(
+        db, wctx, prefixed_id("wf_cancel"), [{"key": "a", "type": "NOOP"}, {"key": "b", "type": "NOOP"}]
+    )
     run_id = we.start(db, wctx, key, {})
     assert we.cancel(db, wctx, run_id) is True
     state = we.advance(db, wctx, run_id)
@@ -305,8 +339,12 @@ def test_cancel_stops_the_run(db: Session, wctx) -> None:
 def test_concurrency_limit_is_enforced(db: Session, wctx) -> None:
     key = prefixed_id("wf_conc")
     we.register_workflow(
-        db, wctx, workflow_key=key, name=key,
-        definition={"steps": [{"key": "a", "type": "NOOP"}]}, max_concurrent_runs=2,
+        db,
+        wctx,
+        workflow_key=key,
+        name=key,
+        definition={"steps": [{"key": "a", "type": "NOOP"}]},
+        max_concurrent_runs=2,
     )
     we.start(db, wctx, key, {})
     we.start(db, wctx, key, {})

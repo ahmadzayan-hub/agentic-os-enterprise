@@ -12,18 +12,13 @@ it. A failure here is a security regression, not a flaky test.
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-
 from agentic_os.ai.context_firewall import TrustTier, envelope, screen
 from agentic_os.control import risk_engine
 from agentic_os.control.planner import Plan, PlanStep, validate_plan
 from agentic_os.core.context import AgentIdentity, ExecutionContext, HumanIdentity
 from agentic_os.core.errors import (
     AuthorizationError,
-    ContractViolation,
     NotImplementedCapability,
-    PolicyDenied,
     ValidationError,
 )
 from agentic_os.core.ids import prefixed_id
@@ -34,6 +29,9 @@ from agentic_os.identity.authz import (
     authorize,
 )
 from agentic_os.tools.gateway import ToolGateway
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
 from tests.conftest import requires_db
 
 pytestmark = [pytest.mark.redteam, pytest.mark.security]
@@ -107,8 +105,12 @@ def test_hijacked_plan_naming_a_foreign_tool_is_rejected() -> None:
         steps=[
             PlanStep(index=0, key="s1", agent="knowledge", skill="search", tool="knowledge.search"),
             PlanStep(
-                index=1, key="s2", agent="knowledge", skill="draft",
-                tool="finance.execute_payment", requires_approval=False,
+                index=1,
+                key="s2",
+                agent="knowledge",
+                skill="draft",
+                tool="finance.execute_payment",
+                requires_approval=False,
             ),
         ],
     )
@@ -136,7 +138,8 @@ def test_agent_cannot_exceed_its_autonomy_ceiling() -> None:
         agent_key="knowledge", max_autonomy="A1", allowed_tools=frozenset({"knowledge.search"})
     )
     ctx = ExecutionContext(
-        tenant_id="t", organization_id="o",
+        tenant_id="t",
+        organization_id="o",
         human=HumanIdentity(user_id="u", email="u@x", permissions=frozenset({"tools:invoke"})),
         agent=AgentIdentity(agent_id="knowledge", agent_version="3.1.0", autonomy_level="A1"),
     )
@@ -163,16 +166,12 @@ def test_no_contract_grants_autonomous_a4() -> None:
 
 # ------------------------------------------------------------- tool misuse
 @requires_db
-def test_agent_cannot_invoke_a_tool_outside_its_contract(
-    db: Session, attacker_ctx: ExecutionContext
-) -> None:
+def test_agent_cannot_invoke_a_tool_outside_its_contract(db: Session, attacker_ctx: ExecutionContext) -> None:
     ctx = attacker_ctx.with_agent(
         AgentIdentity(agent_id="knowledge", agent_version="3.1.0", autonomy_level="A1")
     )
     with pytest.raises(AuthorizationError):
-        ToolGateway(db).invoke(
-            ctx, "tasks.create", {"title": "escalation"}, idempotency_key=prefixed_id("t")
-        )
+        ToolGateway(db).invoke(ctx, "tasks.create", {"title": "escalation"}, idempotency_key=prefixed_id("t"))
 
 
 @requires_db
@@ -183,9 +182,7 @@ def test_unimplemented_tool_never_returns_fabricated_data(
         AgentIdentity(agent_id="finance", agent_version="3.1.0", autonomy_level="A2")
     )
     with pytest.raises(NotImplementedCapability):
-        ToolGateway(db).invoke(
-            ctx, "finance.read_invoices", {"limit": 5}, idempotency_key=prefixed_id("t")
-        )
+        ToolGateway(db).invoke(ctx, "finance.read_invoices", {"limit": 5}, idempotency_key=prefixed_id("t"))
 
 
 @pytest.mark.unit
@@ -209,12 +206,11 @@ def test_sandboxed_evaluator_refuses_code_execution() -> None:
 @pytest.mark.unit
 def test_principal_cannot_self_grant_a_permission() -> None:
     ctx = ExecutionContext(
-        tenant_id="t", organization_id="o",
+        tenant_id="t",
+        organization_id="o",
         human=HumanIdentity(user_id="u", email="u@x", permissions=frozenset({"runs:read"})),
     )
-    decision = authorize(
-        ctx, AuthorizationRequest(action="users:write", resource=Resource("user", "u2"))
-    )
+    decision = authorize(ctx, AuthorizationRequest(action="users:write", resource=Resource("user", "u2")))
     assert not decision.allowed
     assert decision.failed_stage == "PERMISSION"
 
@@ -225,7 +221,6 @@ def test_forged_token_claims_do_not_grant_access(db: Session, tenant_id: str) ->
     import time
 
     import jwt
-
     from agentic_os.core.config import get_settings
     from agentic_os.core.errors import AuthenticationError
     from agentic_os.identity.authn import verify_access_token
@@ -233,9 +228,16 @@ def test_forged_token_claims_do_not_grant_access(db: Session, tenant_id: str) ->
     settings = get_settings()
     forged = jwt.encode(
         {
-            "iss": settings.jwt_issuer, "aud": settings.jwt_audience, "sub": "attacker",
-            "tid": tenant_id, "perms": ["*"], "roles": ["platform_admin"], "clr": "RESTRICTED",
-            "mfa": True, "iat": int(time.time()), "exp": int(time.time()) + 3600,
+            "iss": settings.jwt_issuer,
+            "aud": settings.jwt_audience,
+            "sub": "attacker",
+            "tid": tenant_id,
+            "perms": ["*"],
+            "roles": ["platform_admin"],
+            "clr": "RESTRICTED",
+            "mfa": True,
+            "iat": int(time.time()),
+            "exp": int(time.time()) + 3600,
         },
         "attacker-controlled-signing-key",
         algorithm="HS256",
@@ -289,7 +291,9 @@ def test_memory_poisoning_language_is_detected() -> None:
 def test_injected_context_forces_a4_regardless_of_score() -> None:
     assessment = risk_engine.assess(
         risk_engine.RiskInput(
-            action="tasks.create", side_effect="READ", reversibility="REVERSIBLE",
+            action="tasks.create",
+            side_effect="READ",
+            reversibility="REVERSIBLE",
             injection_detected=True,
         )
     )
@@ -301,8 +305,11 @@ def test_injected_context_forces_a4_regardless_of_score() -> None:
 def test_financial_actions_are_always_critical_and_a4() -> None:
     assessment = risk_engine.assess(
         risk_engine.RiskInput(
-            action="finance.issue_refund", side_effect="FINANCIAL",
-            reversibility="REVERSIBLE", financial_impact_usd=1.0, confidence=1.0,
+            action="finance.issue_refund",
+            side_effect="FINANCIAL",
+            reversibility="REVERSIBLE",
+            financial_impact_usd=1.0,
+            confidence=1.0,
         )
     )
     assert assessment.risk_class == "CRITICAL"
@@ -312,9 +319,7 @@ def test_financial_actions_are_always_critical_and_a4() -> None:
 @pytest.mark.unit
 def test_irreversible_actions_are_always_a4() -> None:
     assessment = risk_engine.assess(
-        risk_engine.RiskInput(
-            action="assets.decommission", side_effect="WRITE", reversibility="IRREVERSIBLE"
-        )
+        risk_engine.RiskInput(action="assets.decommission", side_effect="WRITE", reversibility="IRREVERSIBLE")
     )
     assert assessment.required_autonomy == "A4"
 
@@ -362,9 +367,12 @@ def test_the_same_person_cannot_satisfy_a_dual_approval(
         ),
     )
     approval_id = request_approval(
-        db, approver,
+        db,
+        approver,
         ApprovalCard(action="assets.decommission", reason="obsolete", consequences="irreversible"),
-        mode="DUAL", required_approvals=2, approver_roles=["approver", "approver"],
+        mode="DUAL",
+        required_approvals=2,
+        approver_roles=["approver", "approver"],
     )
     decide(db, approver, approval_id, "APPROVED", comment="first")
     with pytest.raises(Conflict):
@@ -382,8 +390,7 @@ def test_secrets_never_survive_audit_redaction() -> None:
         "note": "the AWS key is AKIAIOSFODNN7EXAMPLE",
     }
     serialised = str(redact_payload(payload))
-    for secret in ("sk-live-abcdefghijklmnopqrstuvwxyz", "sk-live-0123456789abcdef",
-                   "AKIAIOSFODNN7EXAMPLE"):
+    for secret in ("sk-live-abcdefghijklmnopqrstuvwxyz", "sk-live-0123456789abcdef", "AKIAIOSFODNN7EXAMPLE"):
         assert secret not in serialised
 
 
@@ -412,9 +419,7 @@ def test_agent_budget_stops_at_the_limit() -> None:
     from agentic_os.core.errors import BudgetExceeded
     from agentic_os.runtime.agent_runtime import AgentBudget
 
-    budget = AgentBudget(
-        token_budget=100, cost_budget_usd=1.0, max_runtime_seconds=60, max_tool_calls=2
-    )
+    budget = AgentBudget(token_budget=100, cost_budget_usd=1.0, max_runtime_seconds=60, max_tool_calls=2)
     budget.check()
     budget.tokens_used = 100
     with pytest.raises(BudgetExceeded):
@@ -426,8 +431,7 @@ def test_plan_length_and_tool_budget_are_bounded() -> None:
     plan = Plan(
         objective="x",
         steps=[
-            PlanStep(index=i, key=f"s{i}", agent="knowledge", skill="search",
-                     tool="knowledge.search")
+            PlanStep(index=i, key=f"s{i}", agent="knowledge", skill="search", tool="knowledge.search")
             for i in range(40)
         ],
     )
@@ -441,9 +445,7 @@ def test_plan_length_and_tool_budget_are_bounded() -> None:
 def test_conductor_cannot_be_given_tool_authority_by_a_plan() -> None:
     plan = Plan(
         objective="x",
-        steps=[
-            PlanStep(index=0, key="s", agent="conductor", skill="analyse", tool="knowledge.search")
-        ],
+        steps=[PlanStep(index=0, key="s", agent="conductor", skill="analyse", tool="knowledge.search")],
     )
     result = validate_plan(plan, executing_agent="conductor")
     assert not result.valid

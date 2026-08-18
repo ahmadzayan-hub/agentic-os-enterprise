@@ -29,6 +29,9 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Standalone output so the container image carries the server and its traced
+  // dependencies rather than the whole node_modules tree.
+  output: "standalone",
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

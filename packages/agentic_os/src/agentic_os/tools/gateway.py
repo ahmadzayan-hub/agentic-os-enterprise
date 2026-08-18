@@ -129,9 +129,7 @@ class ToolGateway:
         started = time.perf_counter()
         result = ToolCallResult(tool_key=tool_key, decision="DENIED")
         try:
-            result = self._invoke_inner(
-                ctx, tool_key, parameters, idempotency_key, run_step_id, approval_id
-            )
+            result = self._invoke_inner(ctx, tool_key, parameters, idempotency_key, run_step_id, approval_id)
         except AgenticError as exc:
             result = ToolCallResult(
                 tool_key=tool_key,
@@ -161,8 +159,6 @@ class ToolGateway:
         run_step_id: str | None,
         approval_id: str,
     ) -> ToolCallResult:
-        registries = load_registries()
-
         # 1 identity ---------------------------------------------------------
         if ctx.human is None and not ctx.service_principal:
             raise AuthorizationError(
@@ -205,9 +201,7 @@ class ToolGateway:
         # classification of the data this call will touch, and the ceiling is
         # enforced separately below.
         request_classification = str(ctx.attributes.get("classification", "INTERNAL"))
-        if classification_rank(request_classification) > classification_rank(
-            str(tool["max_classification"])
-        ):
+        if classification_rank(request_classification) > classification_rank(str(tool["max_classification"])):
             raise PolicyDenied(
                 f"tool '{tool_key}' is cleared to handle at most "
                 f"{tool['max_classification']} data, but this call carries "
@@ -228,7 +222,9 @@ class ToolGateway:
             AuthorizationRequest(
                 action="tools:invoke",
                 resource=Resource(
-                    "tool", tool_key, tenant_id=ctx.tenant_id,
+                    "tool",
+                    tool_key,
+                    tenant_id=ctx.tenant_id,
                     classification=request_classification,
                 ),
                 required_autonomy=str(tool["min_autonomy"]),
@@ -260,9 +256,7 @@ class ToolGateway:
                 "mcp_trust_class": tool.get("mcp_trust_class", ""),
             },
         )
-        policy_decision = policy.evaluate_and_record(
-            ctx, policy_request, run_step_id=run_step_id
-        )
+        policy_decision = policy.evaluate_and_record(ctx, policy_request, run_step_id=run_step_id)
         if policy_decision.effect == "DENY":
             raise PolicyDenied(
                 policy_decision.reason,
@@ -326,9 +320,7 @@ class ToolGateway:
         except AgenticError:
             raise
         except Exception as exc:  # noqa: BLE001 - converted to a typed error
-            raise ValidationError(
-                f"tool '{tool_key}' failed: {exc}", details={"stage": "EXECUTION"}
-            ) from exc
+            raise ValidationError(f"tool '{tool_key}' failed: {exc}", details={"stage": "EXECUTION"}) from exc
         latency_ms = int((time.perf_counter() - started) * 1000)
 
         # 13 output sanitization ----------------------------------------------
@@ -349,10 +341,14 @@ class ToolGateway:
 
     # -- helpers -----------------------------------------------------------
     def _resolve_tool(self, ctx: ExecutionContext, tool_key: str) -> dict[str, Any]:
-        row = self._session.execute(
-            text("SELECT * FROM tools WHERE tenant_id = :t AND tool_key = :k"),
-            {"t": ctx.tenant_id, "k": tool_key},
-        ).mappings().first()
+        row = (
+            self._session.execute(
+                text("SELECT * FROM tools WHERE tenant_id = :t AND tool_key = :k"),
+                {"t": ctx.tenant_id, "k": tool_key},
+            )
+            .mappings()
+            .first()
+        )
         if row is None:
             raise NotFound(
                 f"tool '{tool_key}' is not registered in this tenant",
@@ -386,32 +382,30 @@ class ToolGateway:
             schema = json.loads(schema)
         if not schema:
             return
-        errors = sorted(
-            Draft202012Validator(schema).iter_errors(parameters), key=lambda e: list(e.path)
-        )
+        errors = sorted(Draft202012Validator(schema).iter_errors(parameters), key=lambda e: list(e.path))
         if errors:
             raise ValidationError(
                 f"parameters for '{tool['tool_key']}' failed schema validation",
                 details={
                     "stage": "PARAMETERS",
-                    "errors": [
-                        {"path": list(e.path), "message": e.message} for e in errors[:10]
-                    ],
+                    "errors": [{"path": list(e.path), "message": e.message} for e in errors[:10]],
                 },
             )
 
-    def _approval_satisfied(
-        self, ctx: ExecutionContext, approval_id: str, tool_key: str
-    ) -> bool:
+    def _approval_satisfied(self, ctx: ExecutionContext, approval_id: str, tool_key: str) -> bool:
         if not approval_id:
             return False
-        row = self._session.execute(
-            text(
-                "SELECT status, action, expires_at FROM approvals "
-                "WHERE tenant_id = :t AND id = CAST(:i AS uuid)"
-            ),
-            {"t": ctx.tenant_id, "i": approval_id},
-        ).mappings().first()
+        row = (
+            self._session.execute(
+                text(
+                    "SELECT status, action, expires_at FROM approvals "
+                    "WHERE tenant_id = :t AND id = CAST(:i AS uuid)"
+                ),
+                {"t": ctx.tenant_id, "i": approval_id},
+            )
+            .mappings()
+            .first()
+        )
         if row is None or row["status"] != "APPROVED":
             return False
         # An approval authorises one action, not any action.
@@ -420,13 +414,17 @@ class ToolGateway:
     def _existing_call(
         self, ctx: ExecutionContext, tool_key: str, idempotency_key: str
     ) -> dict[str, Any] | None:
-        row = self._session.execute(
-            text(
-                "SELECT id, gateway_decision, result_redacted, verification_status "
-                "FROM tool_calls WHERE tenant_id = :t AND tool_key = :k AND idempotency_key = :i"
-            ),
-            {"t": ctx.tenant_id, "k": tool_key, "i": idempotency_key},
-        ).mappings().first()
+        row = (
+            self._session.execute(
+                text(
+                    "SELECT id, gateway_decision, result_redacted, verification_status "
+                    "FROM tool_calls WHERE tenant_id = :t AND tool_key = :k AND idempotency_key = :i"
+                ),
+                {"t": ctx.tenant_id, "k": tool_key, "i": idempotency_key},
+            )
+            .mappings()
+            .first()
+        )
         return dict(row) if row else None
 
     @staticmethod
@@ -439,9 +437,7 @@ class ToolGateway:
         """
         return redact_payload(result)
 
-    def _verify(
-        self, tool: dict[str, Any], ctx: ExecutionContext, result: dict[str, Any]
-    ) -> str:
+    def _verify(self, tool: dict[str, Any], ctx: ExecutionContext, result: dict[str, Any]) -> str:
         """Confirm the side effect actually happened, where the tool declares how."""
         mode = tool.get("verification_mode", "NONE")
         if mode == "NONE":

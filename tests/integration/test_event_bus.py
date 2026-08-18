@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-
 from agentic_os.core.context import ExecutionContext, HumanIdentity
 from agentic_os.core.db import bind_tenant
 from agentic_os.core.ids import prefixed_id
 from agentic_os.runtime import events
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
 from tests.conftest import requires_db
 
 pytestmark = [pytest.mark.integration, requires_db]
@@ -58,9 +58,7 @@ def test_outbox_commits_with_the_state_change(db: Session, ectx) -> None:
         text("INSERT INTO tasks (tenant_id, title) VALUES (:t, :title)"),
         {"t": ectx.tenant_id, "title": marker},
     )
-    events.publish(
-        db, ectx, events.Event(event_type="Document.Uploaded", payload={"marker": marker})
-    )
+    events.publish(db, ectx, events.Event(event_type="Document.Uploaded", payload={"marker": marker}))
     db.rollback()
 
     task_rows = db.execute(
@@ -68,10 +66,7 @@ def test_outbox_commits_with_the_state_change(db: Session, ectx) -> None:
         {"t": ectx.tenant_id, "m": marker},
     ).scalar_one()
     outbox_rows = db.execute(
-        text(
-            "SELECT count(*) FROM outbox_events "
-            "WHERE tenant_id = :t AND payload->>'marker' = :m"
-        ),
+        text("SELECT count(*) FROM outbox_events WHERE tenant_id = :t AND payload->>'marker' = :m"),
         {"t": ectx.tenant_id, "m": marker},
     ).scalar_one()
     assert task_rows == 0
@@ -82,13 +77,17 @@ def test_published_event_is_queued_for_dispatch(db: Session, ectx) -> None:
     marker = prefixed_id("evt")
     events.publish(db, ectx, events.Event(event_type="Risk.Detected", payload={"marker": marker}))
     db.flush()
-    row = db.execute(
-        text(
-            "SELECT status, attempts, event_type FROM outbox_events "
-            "WHERE tenant_id = :t AND payload->>'marker' = :m"
-        ),
-        {"t": ectx.tenant_id, "m": marker},
-    ).mappings().one()
+    row = (
+        db.execute(
+            text(
+                "SELECT status, attempts, event_type FROM outbox_events "
+                "WHERE tenant_id = :t AND payload->>'marker' = :m"
+            ),
+            {"t": ectx.tenant_id, "m": marker},
+        )
+        .mappings()
+        .one()
+    )
     assert row["status"] == "PENDING"
     assert row["attempts"] == 0
     assert row["event_type"] == "Risk.Detected"
@@ -113,26 +112,25 @@ def test_handler_failure_retries_with_backoff_then_dead_letters(db: Session, ect
 
     events.subscribe("Security.Alert", always_fails)
     marker = prefixed_id("evt")
-    events.publish(
-        db, ectx, events.Event(event_type="Security.Alert", payload={"marker": marker})
-    )
+    events.publish(db, ectx, events.Event(event_type="Security.Alert", payload={"marker": marker}))
     db.flush()
     db.execute(
-        text(
-            "UPDATE outbox_events SET max_attempts = 2 "
-            "WHERE tenant_id = :t AND payload->>'marker' = :m"
-        ),
+        text("UPDATE outbox_events SET max_attempts = 2 WHERE tenant_id = :t AND payload->>'marker' = :m"),
         {"t": ectx.tenant_id, "m": marker},
     )
 
     events.dispatch_pending(db, tenant_id=ectx.tenant_id)
-    first = db.execute(
-        text(
-            "SELECT status, attempts, last_error FROM outbox_events "
-            "WHERE tenant_id = :t AND payload->>'marker' = :m"
-        ),
-        {"t": ectx.tenant_id, "m": marker},
-    ).mappings().one()
+    first = (
+        db.execute(
+            text(
+                "SELECT status, attempts, last_error FROM outbox_events "
+                "WHERE tenant_id = :t AND payload->>'marker' = :m"
+            ),
+            {"t": ectx.tenant_id, "m": marker},
+        )
+        .mappings()
+        .one()
+    )
     assert first["status"] == "FAILED"
     assert first["attempts"] == 1
     assert "handler is down" in first["last_error"]
@@ -145,13 +143,16 @@ def test_handler_failure_retries_with_backoff_then_dead_letters(db: Session, ect
         {"t": ectx.tenant_id, "m": marker},
     )
     events.dispatch_pending(db, tenant_id=ectx.tenant_id)
-    second = db.execute(
-        text(
-            "SELECT status, attempts FROM outbox_events "
-            "WHERE tenant_id = :t AND payload->>'marker' = :m"
-        ),
-        {"t": ectx.tenant_id, "m": marker},
-    ).mappings().one()
+    second = (
+        db.execute(
+            text(
+                "SELECT status, attempts FROM outbox_events WHERE tenant_id = :t AND payload->>'marker' = :m"
+            ),
+            {"t": ectx.tenant_id, "m": marker},
+        )
+        .mappings()
+        .one()
+    )
     assert second["status"] == "DEAD"
     assert second["attempts"] == 2
 
@@ -165,9 +166,7 @@ def test_dead_letters_can_be_replayed(db: Session, ectx) -> None:
     events.publish(db, ectx, events.Event(event_type="Policy.Violated", payload={"marker": marker}))
     db.flush()
     outbox_id = db.execute(
-        text(
-            "SELECT id FROM outbox_events WHERE tenant_id = :t AND payload->>'marker' = :m"
-        ),
+        text("SELECT id FROM outbox_events WHERE tenant_id = :t AND payload->>'marker' = :m"),
         {"t": ectx.tenant_id, "m": marker},
     ).scalar_one()
     db.execute(
@@ -176,9 +175,11 @@ def test_dead_letters_can_be_replayed(db: Session, ectx) -> None:
     )
 
     assert events.replay_dead_letter(db, ectx.tenant_id, str(outbox_id)) is True
-    row = db.execute(
-        text("SELECT status, attempts FROM outbox_events WHERE id = :i"), {"i": outbox_id}
-    ).mappings().one()
+    row = (
+        db.execute(text("SELECT status, attempts FROM outbox_events WHERE id = :i"), {"i": outbox_id})
+        .mappings()
+        .one()
+    )
     assert row["status"] == "PENDING"
     assert row["attempts"] == 0
     db.rollback()
@@ -193,9 +194,7 @@ def test_dispatch_is_tenant_scoped(db: Session, db_other: Session, ectx, other_t
 
     events.dispatch_pending(db_other, tenant_id=other_tenant_id, batch_size=100)
     remaining = db.execute(
-        text(
-            "SELECT status FROM outbox_events WHERE tenant_id = :t AND payload->>'marker' = :m"
-        ),
+        text("SELECT status FROM outbox_events WHERE tenant_id = :t AND payload->>'marker' = :m"),
         {"t": ectx.tenant_id, "m": marker},
     ).scalar_one()
     assert remaining == "PENDING", "another tenant's dispatcher must not touch this event"

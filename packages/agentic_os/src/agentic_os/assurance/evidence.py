@@ -155,7 +155,9 @@ def parse_junit(junit_path: Path) -> dict[str, TestOutcome]:
         raise FileNotFoundError(f"no JUnit report at {junit_path}")
 
     outcomes: dict[str, TestOutcome] = {}
-    root = ET.parse(junit_path).getroot()
+    # The report is written by the test run this process just started, not
+    # accepted from a caller, and ElementTree resolves no external entities.
+    root = ET.parse(junit_path).getroot()  # noqa: S314
     for case in root.iter("testcase"):
         classname = (case.get("classname") or "").replace(".", "/")
         name = (case.get("name") or "").split("[")[0]
@@ -192,7 +194,7 @@ def parse_junit(junit_path: Path) -> dict[str, TestOutcome]:
 
 
 def junit_summary(junit_path: Path) -> dict[str, int]:
-    root = ET.parse(junit_path).getroot()
+    root = ET.parse(junit_path).getroot()  # noqa: S314
     suite = root if root.tag == "testsuite" else root.find("testsuite")
     if suite is None:
         return {}
@@ -212,9 +214,7 @@ def load_controls(path: Path | None = None) -> dict[str, Any]:
     return yaml.safe_load(source.read_text(encoding="utf-8"))
 
 
-def evaluate_controls(
-    catalogue: dict[str, Any], outcomes: dict[str, TestOutcome]
-) -> list[ControlEvidence]:
+def evaluate_controls(catalogue: dict[str, Any], outcomes: dict[str, TestOutcome]) -> list[ControlEvidence]:
     """Derive each control's status from the test results. No manual input."""
     evidence: list[ControlEvidence] = []
     for control in catalogue["controls"]:
@@ -291,9 +291,7 @@ def calculate_maturity(
     score = round(verified / total * 100, 2) if total else 0.0
 
     blockers = sorted(
-        c.control_id
-        for c in applicable
-        if c.critical and (c.status in BLOCKING_STATUSES or not c.counts)
+        c.control_id for c in applicable if c.critical and (c.status in BLOCKING_STATUSES or not c.counts)
     )
 
     domain_scores: dict[str, dict[str, Any]] = {}
@@ -459,9 +457,10 @@ def record_certification(
 
 def latest_report(session: Session, tenant_id: str) -> dict[str, Any] | None:
     """Reconstruct the current maturity picture from stored evidence."""
-    rows = session.execute(
-        text(
-            """
+    rows = (
+        session.execute(
+            text(
+                """
             SELECT DISTINCT ON (c.control_id)
                    c.control_id, c.domain, c.title, c.weight, c.critical, c.applicable,
                    e.status, e.test_id, e.actual_result, e.collected_at, e.expires_at,
@@ -472,9 +471,12 @@ def latest_report(session: Session, tenant_id: str) -> dict[str, Any] | None:
             WHERE c.tenant_id = :t
             ORDER BY c.control_id, e.collected_at DESC NULLS LAST
             """
-        ),
-        {"t": tenant_id},
-    ).mappings().all()
+            ),
+            {"t": tenant_id},
+        )
+        .mappings()
+        .all()
+    )
     if not rows:
         return None
 
@@ -507,8 +509,12 @@ def latest_report(session: Session, tenant_id: str) -> dict[str, Any] | None:
 # ---------------------------------------------------------------------------
 def current_commit_sha() -> str:
     try:
-        return subprocess.run(  # noqa: S603
-            ["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, capture_output=True, text=True, timeout=10
+        return subprocess.run(  # noqa: S603, S607 - git resolved from PATH by design
+            ["git", "rev-parse", "HEAD"],  # noqa: S607 - resolved from PATH by design
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=10,
         ).stdout.strip()
     except Exception:  # pragma: no cover
         return ""

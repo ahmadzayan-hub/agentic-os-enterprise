@@ -7,13 +7,13 @@ to retrieve, rank, count or infer the existence of content they cannot read.
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-
 from agentic_os.core.context import ExecutionContext, HumanIdentity
 from agentic_os.core.errors import AuthorizationError
 from agentic_os.knowledge import retrieval
 from agentic_os.knowledge.embeddings import DeterministicHashEmbedder, cosine
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
 from tests.conftest import requires_db
 
 pytestmark = [pytest.mark.integration, pytest.mark.rag, requires_db]
@@ -51,8 +51,7 @@ def user_id(db: Session, tenant_id: str) -> str:
 def test_hybrid_retrieval_finds_the_relevant_document(
     db: Session, tenant_id: str, organization_id: str, user_id: str
 ) -> None:
-    ctx = make_ctx(tenant_id, organization_id, clearance="INTERNAL",
-                   roles={"operator"}, user_id=user_id)
+    ctx = make_ctx(tenant_id, organization_id, clearance="INTERNAL", roles={"operator"}, user_id=user_id)
     result = retrieval.search(db, ctx, "escalator step chain failure mode", top_k=5)
     assert result.chunks, "expected results from the seeded corpus"
     assert any("Escalator" in c.document_title for c in result.chunks)
@@ -62,8 +61,7 @@ def test_hybrid_retrieval_finds_the_relevant_document(
 def test_semantic_and_lexical_strategies_both_work(
     db: Session, tenant_id: str, organization_id: str, user_id: str
 ) -> None:
-    ctx = make_ctx(tenant_id, organization_id, clearance="INTERNAL",
-                   roles={"operator"}, user_id=user_id)
+    ctx = make_ctx(tenant_id, organization_id, clearance="INTERNAL", roles={"operator"}, user_id=user_id)
     for strategy in ("semantic", "lexical", "hybrid"):
         result = retrieval.search(db, ctx, "brake pad wear", strategy=strategy, top_k=5)
         assert result.chunks, f"{strategy} returned nothing"
@@ -73,8 +71,7 @@ def test_semantic_and_lexical_strategies_both_work(
 def test_results_carry_resolvable_citations(
     db: Session, tenant_id: str, organization_id: str, user_id: str
 ) -> None:
-    ctx = make_ctx(tenant_id, organization_id, clearance="INTERNAL",
-                   roles={"operator"}, user_id=user_id)
+    ctx = make_ctx(tenant_id, organization_id, clearance="INTERNAL", roles={"operator"}, user_id=user_id)
     result = retrieval.search(db, ctx, "rolling stock availability target", top_k=3)
     for chunk in result.chunks:
         citation = chunk.citation()
@@ -104,8 +101,7 @@ def test_restricted_content_is_visible_at_the_right_clearance(
     db: Session, tenant_id: str, organization_id: str, user_id: str
 ) -> None:
     """The negative tests are only meaningful if the positive case works."""
-    ctx = make_ctx(tenant_id, organization_id, clearance="RESTRICTED",
-                   roles={"executive"}, user_id=user_id)
+    ctx = make_ctx(tenant_id, organization_id, clearance="RESTRICTED", roles={"executive"}, user_id=user_id)
     result = retrieval.search(db, ctx, RESTRICTED_QUERY, top_k=20)
     assert RESTRICTED_TITLE in {c.document_title for c in result.chunks}
 
@@ -114,8 +110,7 @@ def test_acl_filters_by_role_not_only_clearance(
     db: Session, tenant_id: str, organization_id: str, user_id: str
 ) -> None:
     """A RESTRICTED clearance without the granted role still sees nothing."""
-    ctx = make_ctx(tenant_id, organization_id, clearance="RESTRICTED",
-                   roles={"builder"}, user_id=user_id)
+    ctx = make_ctx(tenant_id, organization_id, clearance="RESTRICTED", roles={"builder"}, user_id=user_id)
     result = retrieval.search(db, ctx, RESTRICTED_QUERY, top_k=20)
     assert RESTRICTED_TITLE not in {c.document_title for c in result.chunks}
 
@@ -128,8 +123,7 @@ def test_fetch_document_denies_unauthorised_and_hides_existence(
         {"t": tenant_id, "ti": RESTRICTED_TITLE},
     ).scalar_one()
 
-    ctx = make_ctx(tenant_id, organization_id, clearance="INTERNAL",
-                   roles={"operator"}, user_id=user_id)
+    ctx = make_ctx(tenant_id, organization_id, clearance="INTERNAL", roles={"operator"}, user_id=user_id)
     with pytest.raises(AuthorizationError) as denied:
         retrieval.fetch_document(db, ctx, str(restricted_id))
 
@@ -147,8 +141,13 @@ def test_cross_tenant_retrieval_returns_nothing(
     other_user = db_other.execute(
         text("SELECT id FROM users WHERE tenant_id = :t LIMIT 1"), {"t": other_tenant_id}
     ).scalar_one()
-    ctx = make_ctx(other_tenant_id, organization_id, clearance="RESTRICTED",
-                   roles={"platform_admin"}, user_id=str(other_user))
+    ctx = make_ctx(
+        other_tenant_id,
+        organization_id,
+        clearance="RESTRICTED",
+        roles={"platform_admin"},
+        user_id=str(other_user),
+    )
     result = retrieval.search(db_other, ctx, "escalator step chain failure", top_k=20)
     assert result.chunks == []
     assert result.candidates_before_acl == 0, "the other tenant's corpus must be invisible"
@@ -164,14 +163,11 @@ def test_agent_ceiling_further_restricts_a_cleared_human(
     db: Session, tenant_id: str, organization_id: str, user_id: str
 ) -> None:
     """An agent can never widen what the human could see, only narrow it."""
-    ctx = make_ctx(tenant_id, organization_id, clearance="RESTRICTED",
-                   roles={"executive"}, user_id=user_id)
+    ctx = make_ctx(tenant_id, organization_id, clearance="RESTRICTED", roles={"executive"}, user_id=user_id)
     unrestricted = retrieval.search(db, ctx, RESTRICTED_QUERY, top_k=20)
     assert RESTRICTED_TITLE in {c.document_title for c in unrestricted.chunks}
 
-    via_agent = retrieval.search(
-        db, ctx, RESTRICTED_QUERY, top_k=20, agent_clearance_ceiling="INTERNAL"
-    )
+    via_agent = retrieval.search(db, ctx, RESTRICTED_QUERY, top_k=20, agent_clearance_ceiling="INTERNAL")
     assert RESTRICTED_TITLE not in {c.document_title for c in via_agent.chunks}
     assert via_agent.clearance_ceiling == "INTERNAL"
 
@@ -179,8 +175,7 @@ def test_agent_ceiling_further_restricts_a_cleared_human(
 def test_acl_filtering_is_measured_and_reported(
     db: Session, tenant_id: str, organization_id: str, user_id: str
 ) -> None:
-    ctx = make_ctx(tenant_id, organization_id, clearance="INTERNAL",
-                   roles={"operator"}, user_id=user_id)
+    ctx = make_ctx(tenant_id, organization_id, clearance="INTERNAL", roles={"operator"}, user_id=user_id)
     result = retrieval.search(db, ctx, RESTRICTED_QUERY, top_k=20)
     assert result.candidates_before_acl >= result.candidates_after_acl
     # The RESTRICTED workforce note is in the corpus but must be withheld here.
@@ -190,8 +185,7 @@ def test_acl_filtering_is_measured_and_reported(
 def test_retrieval_is_recorded_for_audit(
     db: Session, tenant_id: str, organization_id: str, user_id: str
 ) -> None:
-    ctx = make_ctx(tenant_id, organization_id, clearance="INTERNAL",
-                   roles={"operator"}, user_id=user_id)
+    ctx = make_ctx(tenant_id, organization_id, clearance="INTERNAL", roles={"operator"}, user_id=user_id)
     before = db.execute(text("SELECT count(*) FROM retrieval_queries")).scalar_one()
     retrieval.search(db, ctx, "point machine obsolescence", top_k=3)
     after = db.execute(text("SELECT count(*) FROM retrieval_queries")).scalar_one()

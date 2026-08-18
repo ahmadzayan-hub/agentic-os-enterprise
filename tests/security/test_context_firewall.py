@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from agentic_os.ai.context_firewall import (
     ScreenedContext,
     TrustTier,

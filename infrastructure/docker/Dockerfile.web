@@ -1,0 +1,29 @@
+# Next.js operator console. Standalone output so the runtime image carries the
+# server and its traced dependencies rather than the whole node_modules tree.
+
+FROM node:22-alpine AS deps
+WORKDIR /app
+COPY apps/web/package.json apps/web/package-lock.json* ./
+RUN npm install --no-audit --no-fund
+
+FROM node:22-alpine AS build
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+COPY --from=deps /app/node_modules ./node_modules
+COPY apps/web ./
+RUN npm run build
+
+FROM node:22-alpine AS runtime
+WORKDIR /app
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000
+RUN addgroup -g 10002 -S agentic && adduser -u 10002 -S agentic -G agentic
+COPY --from=build --chown=agentic:agentic /app/.next/standalone ./
+COPY --from=build --chown=agentic:agentic /app/.next/static ./.next/static
+COPY --from=build --chown=agentic:agentic /app/public ./public
+USER 10002
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:3000/login >/dev/null 2>&1 || exit 1
+CMD ["node", "server.js"]

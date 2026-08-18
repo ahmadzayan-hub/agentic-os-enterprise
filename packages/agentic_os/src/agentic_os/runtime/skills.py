@@ -18,8 +18,9 @@ from __future__ import annotations
 
 import re
 import statistics
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 from jsonschema import Draft202012Validator
 from sqlalchemy.orm import Session
@@ -184,9 +185,7 @@ def _skill_optimise(ctx: ExecutionContext, params: dict, deps: dict) -> dict[str
         selected.reverse()
         method = "exact_dynamic_programming"
     else:
-        ordered = sorted(
-            items, key=lambda i: float(i["value"]) / max(float(i["cost"]), 1e-9), reverse=True
-        )
+        ordered = sorted(items, key=lambda i: float(i["value"]) / max(float(i["cost"]), 1e-9), reverse=True)
         selected, remaining = [], budget
         for item in ordered:
             if float(item["cost"]) <= remaining:
@@ -256,8 +255,7 @@ def _skill_validate(ctx: ExecutionContext, params: dict, deps: dict) -> dict[str
     return {
         "valid": not errors,
         "errors": [
-            {"path": list(e.path), "message": e.message, "validator": e.validator}
-            for e in errors[:50]
+            {"path": list(e.path), "message": e.message, "validator": e.validator} for e in errors[:50]
         ],
     }
 
@@ -320,9 +318,7 @@ def _skill_extract(ctx: ExecutionContext, params: dict, deps: dict) -> dict[str,
     values: dict[str, Any] = {}
     spans: dict[str, list[int]] = {}
     for name in fields:
-        pattern = re.compile(
-            rf"{re.escape(name)}\s*[:=-]\s*(?P<value>[^\n,;]{{1,200}})", re.IGNORECASE
-        )
+        pattern = re.compile(rf"{re.escape(name)}\s*[:=-]\s*(?P<value>[^\n,;]{{1,200}})", re.IGNORECASE)
         match = pattern.search(text_value)
         if match:
             values[name] = match.group("value").strip()
@@ -401,9 +397,7 @@ class SkillExecutor:
 
         if skill_key in DETERMINISTIC_SKILLS:
             output = DETERMINISTIC_SKILLS[skill_key](ctx, params, deps)
-            result = SkillResult(
-                skill_key=skill_key, output=output, deterministic=True, confidence=1.0
-            )
+            result = SkillResult(skill_key=skill_key, output=output, deterministic=True, confidence=1.0)
         elif skill_key in MODEL_SKILLS:
             result = self._execute_with_model(ctx, skill_key, skill, params)
         else:
@@ -420,9 +414,7 @@ class SkillExecutor:
             raise ValidationError(
                 f"skill '{skill_key}' produced output that does not match its contract",
                 details={
-                    "errors": [
-                        {"path": list(e.path), "message": e.message} for e in output_errors[:10]
-                    ]
+                    "errors": [{"path": list(e.path), "message": e.message} for e in output_errors[:10]]
                 },
             )
         return result
@@ -506,9 +498,7 @@ class SkillExecutor:
             statement = body.get("answer", "")
             output = {
                 "findings": (
-                    [{"statement": statement, "support": body.get("citations", [])}]
-                    if statement
-                    else []
+                    [{"statement": statement, "support": body.get("citations", [])}] if statement else []
                 ),
                 "confidence": float(body.get("confidence", 0.0)),
             }

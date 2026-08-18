@@ -9,7 +9,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from agentic_os.api.deps import CtxDep, DbDep, require_permission
-from agentic_os.api.serialization import jsonify, row as json_row, rows as json_rows
+from agentic_os.api.serialization import jsonify
+from agentic_os.api.serialization import row as json_row
+from agentic_os.api.serialization import rows as json_rows
 from agentic_os.control.conductor import Conductor
 from agentic_os.core.errors import AgenticError, NotFound
 
@@ -69,21 +71,23 @@ def list_runs(
     return {"runs": json_rows(rows)}
 
 
-@router.get(
-    "/{run_id}", dependencies=[Depends(require_permission("runs:read", resource_type="run"))]
-)
+@router.get("/{run_id}", dependencies=[Depends(require_permission("runs:read", resource_type="run"))])
 def run_detail(run_id: str, ctx: CtxDep, db: DbDep) -> dict:
     """The complete governed record for one run."""
-    run = db.execute(
-        text(
-            """
+    run = (
+        db.execute(
+            text(
+                """
             SELECT r.*, u.email AS requested_by_email
             FROM runs r LEFT JOIN users u ON u.id = r.requested_by
             WHERE r.tenant_id = :t AND r.id = CAST(:i AS uuid)
             """
-        ),
-        {"t": ctx.tenant_id, "i": run_id},
-    ).mappings().first()
+            ),
+            {"t": ctx.tenant_id, "i": run_id},
+        )
+        .mappings()
+        .first()
+    )
     if run is None:
         raise HTTPException(status_code=404, detail=NotFound(f"run {run_id} not found").to_dict())
 

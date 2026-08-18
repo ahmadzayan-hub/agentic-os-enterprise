@@ -21,43 +21,93 @@ from agentic_os.core.registry import load_registries
 #: first, so a generic word cannot outvote a domain-defining one.
 _DOMAIN_SIGNALS: dict[str, tuple[tuple[str, float], ...]] = {
     "finance": (
-        ("invoice", 3.0), ("payment", 3.0), ("refund", 3.0), ("budget", 2.0),
-        ("reconcil", 3.0), ("cost", 1.5), ("expenditure", 2.0), ("variance", 2.0),
-        ("supplier payment", 3.0), ("financial", 2.5),
+        ("invoice", 3.0),
+        ("payment", 3.0),
+        ("refund", 3.0),
+        ("budget", 2.0),
+        ("reconcil", 3.0),
+        ("cost", 1.5),
+        ("expenditure", 2.0),
+        ("variance", 2.0),
+        ("supplier payment", 3.0),
+        ("financial", 2.5),
     ),
     "operations": (
-        ("work order", 3.0), ("maintenance", 3.0), ("asset", 2.5), ("failure", 2.5),
-        ("breakdown", 2.5), ("preventive", 3.0), ("backlog", 2.5), ("escalator", 2.0),
-        ("rolling stock", 3.0), ("track", 2.0), ("depot", 2.0), ("availability", 2.0),
-        ("downtime", 2.5), ("reliability", 2.0),
+        ("work order", 3.0),
+        ("maintenance", 3.0),
+        ("asset", 2.5),
+        ("failure", 2.5),
+        ("breakdown", 2.5),
+        ("preventive", 3.0),
+        ("backlog", 2.5),
+        ("escalator", 2.0),
+        ("rolling stock", 3.0),
+        ("track", 2.0),
+        ("depot", 2.0),
+        ("availability", 2.0),
+        ("downtime", 2.5),
+        ("reliability", 2.0),
     ),
     "engineering": (
-        ("design", 2.5), ("standard", 2.0), ("specification", 2.5), ("compliance", 2.0),
-        ("change impact", 3.0), ("obsolescence", 3.0), ("technical review", 3.0),
-        ("dependency", 2.5), ("interface", 2.0),
+        ("design", 2.5),
+        ("standard", 2.0),
+        ("specification", 2.5),
+        ("compliance", 2.0),
+        ("change impact", 3.0),
+        ("obsolescence", 3.0),
+        ("technical review", 3.0),
+        ("dependency", 2.5),
+        ("interface", 2.0),
     ),
     "knowledge": (
-        ("document", 2.5), ("procedure", 2.5), ("manual", 2.5), ("policy document", 2.5),
-        ("what does", 2.0), ("according to", 2.5), ("find in", 2.0), ("cite", 2.5),
+        ("document", 2.5),
+        ("procedure", 2.5),
+        ("manual", 2.5),
+        ("policy document", 2.5),
+        ("what does", 2.0),
+        ("according to", 2.5),
+        ("find in", 2.0),
+        ("cite", 2.5),
     ),
     "analytics": (
-        ("kpi", 3.0), ("trend", 2.5), ("forecast", 3.0), ("metric", 2.5),
-        ("dashboard", 2.0), ("data quality", 3.0), ("statistic", 2.5), ("correlation", 2.5),
+        ("kpi", 3.0),
+        ("trend", 2.5),
+        ("forecast", 3.0),
+        ("metric", 2.5),
+        ("dashboard", 2.0),
+        ("data quality", 3.0),
+        ("statistic", 2.5),
+        ("correlation", 2.5),
     ),
     "customer": (
-        ("complaint", 3.0), ("customer", 2.5), ("passenger", 2.5), ("case", 2.0),
-        ("satisfaction", 2.5), ("service quality", 2.5),
+        ("complaint", 3.0),
+        ("customer", 2.5),
+        ("passenger", 2.5),
+        ("case", 2.0),
+        ("satisfaction", 2.5),
+        ("service quality", 2.5),
     ),
     "communications": (
-        ("briefing", 3.0), ("announce", 2.5), ("notify", 2.5), ("stakeholder update", 3.0),
-        ("press", 2.5), ("bulletin", 2.5),
+        ("briefing", 3.0),
+        ("announce", 2.5),
+        ("notify", 2.5),
+        ("stakeholder update", 3.0),
+        ("press", 2.5),
+        ("bulletin", 2.5),
     ),
     "sales": (
-        ("pipeline", 3.0), ("contract renewal", 3.0), ("proposal", 2.0), ("tender", 2.5),
-        ("framework agreement", 3.0), ("opportunity", 2.0),
+        ("pipeline", 3.0),
+        ("contract renewal", 3.0),
+        ("proposal", 2.0),
+        ("tender", 2.5),
+        ("framework agreement", 3.0),
+        ("opportunity", 2.0),
     ),
     "marketing": (
-        ("campaign", 3.0), ("audience", 2.5), ("engagement rate", 2.5), ("brand", 2.5),
+        ("campaign", 3.0),
+        ("audience", 2.5),
+        ("engagement rate", 2.5),
+        ("brand", 2.5),
     ),
 }
 
@@ -73,14 +123,32 @@ _TASK_KINDS: dict[str, tuple[str, ...]] = {
 _SENSITIVE_TERMS = {
     "RESTRICTED": ("salary", "payroll", "medical", "disciplinary", "personal data", "national id"),
     "CONFIDENTIAL": (
-        "contract value", "tender price", "commercial", "supplier pricing", "incident",
-        "security", "safety case", "litigation",
+        "contract value",
+        "tender price",
+        "commercial",
+        "supplier pricing",
+        "incident",
+        "security",
+        "safety case",
+        "litigation",
     ),
 }
 
 _CONSEQUENTIAL_TERMS = (
-    "execute", "pay", "refund", "transfer", "delete", "remove", "decommission",
-    "publish", "send to", "close the work order", "sign", "commit", "authorise", "authorize",
+    "execute",
+    "pay",
+    "refund",
+    "transfer",
+    "delete",
+    "remove",
+    "decommission",
+    "publish",
+    "send to",
+    "close the work order",
+    "sign",
+    "commit",
+    "authorise",
+    "authorize",
 )
 
 
@@ -166,9 +234,8 @@ def interpret(objective: str, *, available_agents: set[str] | None = None) -> In
     ranked = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))
     if ranked:
         owner = ranked[0][0]
-        rationale = (
-            f"domain terms matched '{owner}' with score {ranked[0][1]:.1f}"
-            + (f"; runners-up {[a for a, _ in ranked[1:3]]}" if len(ranked) > 1 else "")
+        rationale = f"domain terms matched '{owner}' with score {ranked[0][1]:.1f}" + (
+            f"; runners-up {[a for a, _ in ranked[1:3]]}" if len(ranked) > 1 else ""
         )
     elif "knowledge" in available:
         owner = "knowledge"

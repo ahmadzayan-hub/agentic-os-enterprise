@@ -65,9 +65,7 @@ def sync_system_roles(session: Session) -> int:
                 "autonomy": role.max_autonomy,
             },
         ).one()
-        session.execute(
-            text("DELETE FROM role_permissions WHERE role_id = :rid"), {"rid": row.id}
-        )
+        session.execute(text("DELETE FROM role_permissions WHERE role_id = :rid"), {"rid": row.id})
         for pid in role.permissions:
             session.execute(
                 text(
@@ -80,14 +78,17 @@ def sync_system_roles(session: Session) -> int:
 
 
 def provision_tenant(
-    session: Session, org_slug: str, org_name: str, tenant_slug: str, tenant_name: str,
+    session: Session,
+    org_slug: str,
+    org_name: str,
+    tenant_slug: str,
+    tenant_name: str,
     region: str = "global",
 ) -> dict[str, str]:
     """Create (or fetch) an organization and tenant. Idempotent."""
     row = session.execute(
         text(
-            "SELECT out_organization_id, out_tenant_id "
-            "FROM platform_provision_tenant(:os, :on, :ts, :tn, :r)"
+            "SELECT out_organization_id, out_tenant_id FROM platform_provision_tenant(:os, :on, :ts, :tn, :r)"
         ),
         {"os": org_slug, "on": org_name, "ts": tenant_slug, "tn": tenant_name, "r": region},
     ).one()
@@ -154,8 +155,13 @@ def create_user(
 
 
 def assign_role(
-    session: Session, *, tenant_id: str, user_id: str, role_slug: str,
-    granted_by: str | None = None, expires_at: Any = None,
+    session: Session,
+    *,
+    tenant_id: str,
+    user_id: str,
+    role_slug: str,
+    granted_by: str | None = None,
+    expires_at: Any = None,
 ) -> None:
     role = session.execute(
         text(

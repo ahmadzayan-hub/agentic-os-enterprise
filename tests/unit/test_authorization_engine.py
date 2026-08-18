@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from agentic_os.core.context import AgentIdentity, ExecutionContext, HumanIdentity, ToolIdentity
 from agentic_os.identity.authz import (
     AgentAuthorizationProfile,
@@ -75,9 +74,7 @@ def test_wildcard_permission_grants_resource_family() -> None:
 def test_cross_tenant_resource_denied() -> None:
     decision = authorize(
         make_ctx(permissions={"runs:read"}),
-        AuthorizationRequest(
-            action="runs:read", resource=Resource("run", "r1", tenant_id=OTHER_TENANT)
-        ),
+        AuthorizationRequest(action="runs:read", resource=Resource("run", "r1", tenant_id=OTHER_TENANT)),
     )
     assert not decision.allowed
     assert decision.failed_stage == "TENANT"
@@ -85,9 +82,7 @@ def test_cross_tenant_resource_denied() -> None:
 
 def test_unauthenticated_request_denied() -> None:
     ctx = ExecutionContext(tenant_id=TENANT, organization_id="org")
-    decision = authorize(
-        ctx, AuthorizationRequest(action="runs:read", resource=Resource("run", "r1"))
-    )
+    decision = authorize(ctx, AuthorizationRequest(action="runs:read", resource=Resource("run", "r1")))
     assert not decision.allowed
     assert decision.failed_stage == "PERMISSION"
 
@@ -256,9 +251,7 @@ def test_a4_escalates_to_approval_rather_than_denying() -> None:
 
 
 def test_missing_tool_scope_denies() -> None:
-    ctx = make_ctx(
-        permissions={"tools:invoke"}, tool=ToolIdentity(tool_id="t", scopes=frozenset({"read"}))
-    )
+    ctx = make_ctx(permissions={"tools:invoke"}, tool=ToolIdentity(tool_id="t", scopes=frozenset({"read"})))
     decision = authorize(
         ctx,
         AuthorizationRequest(

@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agentic-worker
+  namespace: agentic-os
+  labels: { app.kubernetes.io/name: agentic-worker }
+spec:
+  # Safe to scale horizontally: workflow runs are leased and outbox rows are
+  # taken with FOR UPDATE SKIP LOCKED, so two workers never take the same work.
+  replicas: 2
+  selector:
+    matchLabels: { app.kubernetes.io/name: agentic-worker }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: agentic-worker }
+    spec:
+      serviceAccountName: agentic-worker
+      # A worker finishes the pass in flight on SIGTERM rather than abandoning
+      # a leased run, so give it room to do that.
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: worker
+          image: ghcr.io/rta/agentic-os-api:3.1.0
+          args: ["agentic-worker"]
+          envFrom:
+            - configMapRef: { name: agentic-config }
+            - secretRef: { name: agentic-secrets }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: "2", memory: 1Gi }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            - { name: data, mountPath: /app/.data }
+      volumes:
+        - { name: tmp, emptyDir: {} }
+        - { name: data, emptyDir: {} }

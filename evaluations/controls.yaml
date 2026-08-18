@@ -6,11 +6,19 @@
 # reported as NOT_EVIDENCED and contributes zero, however well implemented it
 # may be.
 #
-# Weights total 100 across sixteen domains, matching docs/governance/MATURITY_MODEL.md.
+# Weights total 107 across eighteen domains, matching
+# docs/governance/MATURITY_MODEL.md. The total is deliberately not normalised to
+# 100: the score is verified weight over total applicable weight, so a control
+# the platform cannot yet satisfy has to be *in* the catalogue to be counted
+# against it. Two of the eighteen domains — deployment and independent
+# assurance — exist for exactly that reason. Removing them would raise the
+# score without changing anything about the platform, which is the failure mode
+# this file is meant to prevent.
 #
 # critical: true means a failure blocks certification regardless of the score.
 
-version: 1.0.0
+version: 1.1.0
+total_weight: 107
 
 domains:
   business_architecture: 7
@@ -29,6 +37,8 @@ domains:
   devsecops: 4
   dr_resilience: 2
   business_value: 2
+  deployment: 4
+  independent_assurance: 3
 
 controls:
   # ------------------------------------------------ business architecture (7)
@@ -526,6 +536,73 @@ controls:
     weight: 2
     test: tests/integration/test_disaster_recovery.py::test_a_restore_is_performed_and_verified_end_to_end
     expected: A restore_tests row with outcome SUCCESS, a measured RPO and RTO, matching row counts and an intact audit chain in the restored copy.
+
+  # ---------------------------------------------------------- deployment (4)
+  - id: DEP-001
+    domain: deployment
+    title: Deployment manifests run workloads unprivileged with no inline secrets
+    requirement: >-
+      Every deployed workload runs as a non-root user with privilege escalation
+      disabled and all capabilities dropped, and no secret value is inlined in a
+      manifest.
+    implementation: infrastructure/kubernetes/base/*.yaml under restricted Pod Security.
+    weight: 1
+    test: tests/unit/test_deployables.py::test_kubernetes_workloads_run_unprivileged_and_carry_no_secrets
+    expected: Every Deployment, Job and CronJob is unprivileged and sources values from a ConfigMap or Secret reference.
+
+  - id: DEP-002
+    domain: deployment
+    title: The maintenance identity is confined to the recovery job
+    requirement: >-
+      The only identity able to create a database is mounted by the disaster
+      recovery job and by nothing else.
+    implementation: A separate agentic-maintenance-secrets Secret, referenced by one CronJob.
+    weight: 1
+    critical: true
+    test: tests/unit/test_deployables.py::test_only_the_dr_cronjob_mounts_the_maintenance_identity
+    expected: No workload other than agentic-dr-exercise references the maintenance secret.
+
+  - id: DEP-003
+    domain: deployment
+    title: The platform has been deployed to a cluster and verified there
+    requirement: >-
+      The manifests have been applied to a real cluster and the deployed
+      platform passed its readiness and smoke checks.
+    implementation: >-
+      NOT_IMPLEMENTED as evidence. The manifests, images and pipeline exist and
+      the pipeline fails rather than reporting success when a cluster
+      credential is absent, but no apply has been performed from this
+      repository: the build environment had no cluster and no registry access.
+    weight: 2
+    expected: A recorded apply into at least one environment, followed by a passing readiness check against the deployed API.
+
+  # ------------------------------------------------ independent assurance (3)
+  - id: IND-001
+    domain: independent_assurance
+    title: An independent security assessment has been performed
+    requirement: >-
+      A party other than the builder has tested the platform and its findings
+      have been triaged.
+    implementation: >-
+      NOT_IMPLEMENTED as evidence. The repository contains an automated
+      red-team suite, but a suite written by the same author as the control it
+      tests is not independent assurance and must not be reported as such.
+    weight: 2
+    expected: An assessment report from an independent party, with findings tracked to closure.
+
+  - id: IND-002
+    domain: independent_assurance
+    title: At least one control is proven by production operation
+    requirement: >-
+      Evidence exists from the platform running in production, not only from a
+      test environment.
+    implementation: >-
+      NOT_IMPLEMENTED as evidence. Every control that passes today is VERIFIED
+      by an automated test in a development environment; none is
+      PRODUCTION_PROVEN, and the evidence engine counts the two statuses
+      separately for precisely this reason.
+    weight: 1
+    expected: At least one control recorded with status PRODUCTION_PROVEN from a production environment.
 
   # ------------------------------------------------------- business value (2)
   - id: BVL-001

@@ -50,6 +50,7 @@ agentic-migrate = "agentic_os.core.migrate:main"
 agentic-seed = "agentic_os.core.seed:main"
 agentic-evidence = "agentic_os.assurance.cli:main"
 agentic-dr = "agentic_os.resilience.cli:main"
+agentic-worker = "agentic_os.worker.loop:main"
 
 [tool.setuptools.packages.find]
 where = ["packages/agentic_os/src"]
@@ -83,6 +84,16 @@ ignore = ["S101", "B008", "E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S", "B"]
+# S608 flags SQL assembled with an f-string. In these three modules the only
+# interpolated fragments are module-level constants — the ACL predicate, the
+# table/column pairs in SUBJECT_TABLES, an allow-listed aggregate function —
+# and every caller-supplied value is a bound parameter. The rule cannot see
+# that distinction and the diagnostic lands on the opening quote of a
+# multi-line string, where a noqa comment cannot go without ending up inside
+# the SQL itself.
+"packages/agentic_os/src/agentic_os/knowledge/retrieval.py" = ["S608"]
+"packages/agentic_os/src/agentic_os/privacy/dsar.py" = ["S608"]
+"packages/agentic_os/src/agentic_os/tools/builtin.py" = ["S608"]
 
 [tool.mypy]
 python_version = "3.11"

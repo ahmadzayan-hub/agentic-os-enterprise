@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import pytest
+from agentic_os.api.app import create_app
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from agentic_os.api.app import create_app
 from tests.conftest import requires_db
 
 pytestmark = [pytest.mark.integration, requires_db]
@@ -88,9 +88,7 @@ def test_login_returns_the_principal(client: TestClient, demo_password: str, see
     assert body["expires_in"] > 0
 
 
-def test_mfa_account_cannot_login_without_a_code(
-    client: TestClient, demo_password: str, seeded
-) -> None:
+def test_mfa_account_cannot_login_without_a_code(client: TestClient, demo_password: str, seeded) -> None:
     response = client.post(
         "/api/v1/auth/login",
         json={"email": "auditor@rta.example", "password": demo_password},
@@ -141,8 +139,17 @@ def test_run_detail_exposes_governance_record(client: TestClient, auth: dict) ->
     assert detail.status_code == 200
     body = detail.json()
     for section in (
-        "run", "plan", "steps", "policy_decisions", "risk_assessments",
-        "tool_calls", "approvals", "citations", "model_calls", "trace", "audit",
+        "run",
+        "plan",
+        "steps",
+        "policy_decisions",
+        "risk_assessments",
+        "tool_calls",
+        "approvals",
+        "citations",
+        "model_calls",
+        "trace",
+        "audit",
     ):
         assert section in body, f"run detail must expose '{section}'"
     assert body["run"]["objective"]
@@ -152,10 +159,7 @@ def test_run_detail_exposes_governance_record(client: TestClient, auth: dict) ->
 
 def test_run_list_is_tenant_scoped(client: TestClient, auth: dict, db, other_tenant_id) -> None:
     body = client.get("/api/v1/runs", headers=auth).json()
-    tenant_runs = {
-        str(r[0])
-        for r in db.execute(text("SELECT id FROM runs")).all()
-    }
+    tenant_runs = {str(r[0]) for r in db.execute(text("SELECT id FROM runs")).all()}
     for run in body["runs"]:
         assert str(run["id"]) in tenant_runs
 
@@ -189,9 +193,7 @@ def test_audit_read_requires_the_audit_permission(client: TestClient, auth: dict
     assert client.get("/api/v1/audit", headers=auth).status_code == 403
 
 
-def test_knowledge_search_is_acl_filtered_through_the_api(
-    client: TestClient, auth: dict
-) -> None:
+def test_knowledge_search_is_acl_filtered_through_the_api(client: TestClient, auth: dict) -> None:
     body = client.post(
         "/api/v1/knowledge/search",
         headers=auth,

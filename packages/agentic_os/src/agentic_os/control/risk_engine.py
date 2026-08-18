@@ -73,9 +73,7 @@ class RiskAssessment:
             "reversibility": self.reversibility,
             "financial_impact_usd": self.financial_impact_usd,
             "requires_approval": self.requires_approval,
-            "factors": [
-                {"name": f.name, "weight": f.weight, "detail": f.detail} for f in self.factors
-            ],
+            "factors": [{"name": f.name, "weight": f.weight, "detail": f.detail} for f in self.factors],
         }
 
 
@@ -117,24 +115,18 @@ def assess(inp: RiskInput) -> RiskAssessment:
 
     rank = classification_rank(inp.classification)
     if rank >= 2:
-        factors.append(
-            RiskFactor("classification", 0.1 * (rank - 1), f"data is {inp.classification}")
-        )
+        factors.append(RiskFactor("classification", 0.1 * (rank - 1), f"data is {inp.classification}"))
 
     if inp.affected_record_count > 100:
         weight = min(0.2, math.log10(inp.affected_record_count) / 25)
-        factors.append(
-            RiskFactor("blast_radius", round(weight, 3), f"{inp.affected_record_count} records")
-        )
+        factors.append(RiskFactor("blast_radius", round(weight, 3), f"{inp.affected_record_count} records"))
 
     if inp.confidence is not None and inp.confidence < 0.7:
         weight = round(0.25 * (0.7 - inp.confidence) / 0.7, 3)
         factors.append(RiskFactor("low_confidence", weight, f"confidence {inp.confidence:.2f}"))
 
     if inp.injection_detected:
-        factors.append(
-            RiskFactor("prompt_injection", 0.45, "injection indicators in the source context")
-        )
+        factors.append(RiskFactor("prompt_injection", 0.45, "injection indicators in the source context"))
 
     if inp.origin_trust_tier in (
         "EXTERNAL",
@@ -142,9 +134,7 @@ def assess(inp: RiskInput) -> RiskAssessment:
         "TOOL_GENERATED",
         "MODEL_GENERATED",
     ):
-        factors.append(
-            RiskFactor("untrusted_origin", 0.15, f"originates from {inp.origin_trust_tier}")
-        )
+        factors.append(RiskFactor("untrusted_origin", 0.15, f"originates from {inp.origin_trust_tier}"))
 
     if inp.external_recipients > 0:
         factors.append(
@@ -155,9 +145,7 @@ def assess(inp: RiskInput) -> RiskAssessment:
         factors.append(RiskFactor("safety_critical", 0.5, "action affects a safety-related system"))
 
     if inp.tool_implementation_status == "NOT_IMPLEMENTED":
-        factors.append(
-            RiskFactor("unimplemented_capability", 0.1, "target capability is not implemented")
-        )
+        factors.append(RiskFactor("unimplemented_capability", 0.1, "target capability is not implemented"))
 
     score = round(min(1.0, sum(f.weight for f in factors)), 4)
     risk_class = next(name for threshold, name in _THRESHOLDS if score >= threshold)
@@ -213,10 +201,7 @@ def record(
             "rc": assessment.risk_class,
             "score": assessment.score,
             "factors": json.dumps(
-                [
-                    {"name": f.name, "weight": f.weight, "detail": f.detail}
-                    for f in assessment.factors
-                ]
+                [{"name": f.name, "weight": f.weight, "detail": f.detail} for f in assessment.factors]
             ),
             "rev": assessment.reversibility,
             "fin": assessment.financial_impact_usd,

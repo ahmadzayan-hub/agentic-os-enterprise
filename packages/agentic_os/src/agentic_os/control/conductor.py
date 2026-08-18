@@ -30,7 +30,7 @@ from agentic_os.control.planner import Plan, Planner, ValidationResult, validate
 from agentic_os.control.policy_engine import PolicyEngine, PolicyRequest
 from agentic_os.core.context import ExecutionContext
 from agentic_os.core.errors import AgenticError, PolicyDenied, ValidationError
-from agentic_os.core.ids import prefixed_id, utcnow
+from agentic_os.core.ids import utcnow
 from agentic_os.core.registry import load_registries
 from agentic_os.runtime.agent_runtime import AgentRuntime
 from agentic_os.runtime.events import Event, publish
@@ -101,9 +101,7 @@ class Conductor:
         run_id = self._create_run(ctx, objective, intent, requested_autonomy, idempotency_key)
         run_ctx = ctx.with_run(run_id)
 
-        outcome = RunOutcome(
-            run_id=run_id, status="PLANNING", objective=objective, intent=intent.to_dict()
-        )
+        outcome = RunOutcome(run_id=run_id, status="PLANNING", objective=objective, intent=intent.to_dict())
         publish(
             self._session,
             run_ctx,
@@ -161,9 +159,7 @@ class Conductor:
             prompt = prompt_registry.resolve(self._session, ctx.tenant_id, "conductor.plan")
             system_prompt = prompt.body
         except Exception:
-            system_prompt = (
-                "You are the Conductor. Propose a plan using only the supplied capabilities."
-            )
+            system_prompt = "You are the Conductor. Propose a plan using only the supplied capabilities."
 
         # The objective is authenticated user input: analysable, never obeyed as
         # platform framing.
@@ -251,9 +247,7 @@ class Conductor:
                     financial_impact_usd=assessment.financial_impact_usd,
                     reversibility=assessment.reversibility,
                     confidence=plan.confidence,
-                    reason=(
-                        f"Step {index + 1} of the plan for objective: {intent.objective[:300]}"
-                    ),
+                    reason=(f"Step {index + 1} of the plan for objective: {intent.objective[:300]}"),
                     consequences=(
                         f"Executing '{step.tool or step.skill}' has a "
                         f"{tool.get('side_effect', 'WRITE')} side effect and is "
@@ -290,9 +284,7 @@ class Conductor:
         )
         return {"risk": highest.to_dict(), "approvals": approvals}
 
-    def _execute(
-        self, ctx: ExecutionContext, outcome: RunOutcome, intent: Intent, plan: Plan
-    ) -> RunOutcome:
+    def _execute(self, ctx: ExecutionContext, outcome: RunOutcome, intent: Intent, plan: Plan) -> RunOutcome:
         agent = self._runtime.open(ctx, intent.owner_agent)
         self._set_status(outcome.run_id, "RUNNING", started=True)
         outcome.status = "RUNNING"
@@ -322,8 +314,13 @@ class Conductor:
                 return self._fail(ctx, outcome, exc.error_class.value, exc.message)
 
             state[step.key] = result.output
-            self._complete_step(step_id, "SUCCEEDED", result.output, cost=result.cost_usd,
-                                tokens=(result.input_tokens, result.output_tokens))
+            self._complete_step(
+                step_id,
+                "SUCCEEDED",
+                result.output,
+                cost=result.cost_usd,
+                tokens=(result.input_tokens, result.output_tokens),
+            )
             outcome.steps.append(
                 {
                     "index": step.index,
@@ -349,9 +346,7 @@ class Conductor:
         return outcome
 
     # -- helpers -----------------------------------------------------------
-    def _materialise_params(
-        self, step: Any, intent: Intent, state: dict[str, Any]
-    ) -> dict[str, Any]:
+    def _materialise_params(self, step: Any, intent: Intent, state: dict[str, Any]) -> dict[str, Any]:
         """Build skill inputs from the objective and prior step outputs."""
         if step.skill == "search":
             return {"query": intent.objective, "top_k": 8}

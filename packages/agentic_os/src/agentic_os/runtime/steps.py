@@ -107,18 +107,20 @@ def approval_step(
     """
     awaiting = state.get("_awaiting_approval_id")
     if awaiting:
-        row = session.execute(
-            text("SELECT status FROM approvals WHERE tenant_id = :t AND id = CAST(:i AS uuid)"),
-            {"t": ctx.tenant_id, "i": awaiting},
-        ).mappings().first()
+        row = (
+            session.execute(
+                text("SELECT status FROM approvals WHERE tenant_id = :t AND id = CAST(:i AS uuid)"),
+                {"t": ctx.tenant_id, "i": awaiting},
+            )
+            .mappings()
+            .first()
+        )
         if row is None:
             raise NotFound(f"approval {awaiting} disappeared")
         if row["status"] == "PENDING":
             raise pause_for_approval(awaiting)
         if row["status"] != "APPROVED":
-            raise Conflict(
-                f"approval was {row['status']}", details={"approval_id": awaiting}
-            )
+            raise Conflict(f"approval was {row['status']}", details={"approval_id": awaiting})
         state["_approval_id"] = awaiting
         return {"approval_id": awaiting, "status": row["status"]}
 
@@ -136,9 +138,7 @@ def approval_step(
             reversibility=str(config.get("reversibility", "IRREVERSIBLE")),
             confidence=config.get("confidence"),
             reason=str(config.get("reason", "workflow step requires human authorisation")),
-            consequences=str(
-                config.get("consequences", "the following workflow steps will execute")
-            ),
+            consequences=str(config.get("consequences", "the following workflow steps will execute")),
             evidence=list(config.get("evidence", [])) or [{"workflow_step": step["key"]}],
             sources=list(config.get("sources", [])),
         ),

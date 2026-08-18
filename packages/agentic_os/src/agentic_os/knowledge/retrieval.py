@@ -138,13 +138,20 @@ _ACL_PREDICATE = """
 
 
 def _semantic_candidates(
-    session: Session, *, tenant_id: str, acl_keys: list[str], clearance_rank: int,
-    embedding: list[float], limit: int, filters: dict[str, Any],
+    session: Session,
+    *,
+    tenant_id: str,
+    acl_keys: list[str],
+    clearance_rank: int,
+    embedding: list[float],
+    limit: int,
+    filters: dict[str, Any],
 ) -> list[dict]:
     extra, params = _extra_filters(filters)
-    rows = session.execute(
-        text(
-            f"""
+    rows = (
+        session.execute(
+            text(
+                f"""
             SELECT c.id AS chunk_id, c.document_id, d.title, c.content, c.classification,
                    c.section_path, c.page_from, c.metadata,
                    1 - (e.embedding <=> CAST(:query_vec AS vector)) AS similarity
@@ -155,27 +162,37 @@ def _semantic_candidates(
             ORDER BY e.embedding <=> CAST(:query_vec AS vector)
             LIMIT :limit
             """
-        ),
-        {
-            "tenant": tenant_id,
-            "acl_keys": acl_keys,
-            "clearance_rank": clearance_rank,
-            "query_vec": str(embedding),
-            "limit": limit,
-            **params,
-        },
-    ).mappings().all()
+            ),
+            {
+                "tenant": tenant_id,
+                "acl_keys": acl_keys,
+                "clearance_rank": clearance_rank,
+                "query_vec": str(embedding),
+                "limit": limit,
+                **params,
+            },
+        )
+        .mappings()
+        .all()
+    )
     return [dict(r) for r in rows]
 
 
 def _lexical_candidates(
-    session: Session, *, tenant_id: str, acl_keys: list[str], clearance_rank: int,
-    query: str, limit: int, filters: dict[str, Any],
+    session: Session,
+    *,
+    tenant_id: str,
+    acl_keys: list[str],
+    clearance_rank: int,
+    query: str,
+    limit: int,
+    filters: dict[str, Any],
 ) -> list[dict]:
     extra, params = _extra_filters(filters)
-    rows = session.execute(
-        text(
-            f"""
+    rows = (
+        session.execute(
+            text(
+                f"""
             SELECT c.id AS chunk_id, c.document_id, d.title, c.content, c.classification,
                    c.section_path, c.page_from, c.metadata,
                    ts_rank_cd(to_tsvector('english', c.content),
@@ -187,16 +204,19 @@ def _lexical_candidates(
             ORDER BY similarity DESC
             LIMIT :limit
             """
-        ),
-        {
-            "tenant": tenant_id,
-            "acl_keys": acl_keys,
-            "clearance_rank": clearance_rank,
-            "query": query,
-            "limit": limit,
-            **params,
-        },
-    ).mappings().all()
+            ),
+            {
+                "tenant": tenant_id,
+                "acl_keys": acl_keys,
+                "clearance_rank": clearance_rank,
+                "query": query,
+                "limit": limit,
+                **params,
+            },
+        )
+        .mappings()
+        .all()
+    )
     return [dict(r) for r in rows]
 
 
@@ -220,7 +240,10 @@ def _extra_filters(filters: dict[str, Any]) -> tuple[str, dict[str, Any]]:
 
 
 def _corpus_visibility(
-    session: Session, tenant_id: str, acl_keys: list[str], clearance_rank: int,
+    session: Session,
+    tenant_id: str,
+    acl_keys: list[str],
+    clearance_rank: int,
     filters: dict[str, Any],
 ) -> tuple[int, int]:
     """Return (searchable chunks in the tenant, chunks visible to this caller).
@@ -327,9 +350,7 @@ def search(
         for row in fused[:top_k]
     ]
 
-    before_acl, after_acl = _corpus_visibility(
-        session, ctx.tenant_id, acl_keys, clearance_rank, filters
-    )
+    before_acl, after_acl = _corpus_visibility(session, ctx.tenant_id, acl_keys, clearance_rank, filters)
     latency_ms = int((time.perf_counter() - started) * 1000)
 
     if record_query:
@@ -392,14 +413,19 @@ def _fuse(semantic: list[dict], lexical: list[dict], strategy: str) -> list[dict
 
 
 def fetch_document(
-    session: Session, ctx: ExecutionContext, document_id: str, *, max_chars: int = 20000,
+    session: Session,
+    ctx: ExecutionContext,
+    document_id: str,
+    *,
+    max_chars: int = 20000,
     agent_clearance_ceiling: str | None = None,
 ) -> dict[str, Any]:
     """Fetch one document, enforcing the same ACL predicate as search."""
     clearance_rank = classification_rank(effective_clearance(ctx, agent_clearance_ceiling))
-    row = session.execute(
-        text(
-            """
+    row = (
+        session.execute(
+            text(
+                """
             SELECT d.id, d.title, d.classification, d.source_system, d.mime_type,
                    d.parse_confidence, d.unsupported_elements, d.page_count,
                    string_agg(c.content, E'\\n\\n' ORDER BY c.chunk_index) AS content
@@ -414,21 +440,22 @@ def fetch_document(
             GROUP BY d.id, d.title, d.classification, d.source_system, d.mime_type,
                      d.parse_confidence, d.unsupported_elements, d.page_count
             """
-        ),
-        {
-            "tenant": ctx.tenant_id,
-            "doc": document_id,
-            "acl_keys": principal_acl_keys(ctx),
-            "clearance_rank": clearance_rank,
-        },
-    ).mappings().first()
+            ),
+            {
+                "tenant": ctx.tenant_id,
+                "doc": document_id,
+                "acl_keys": principal_acl_keys(ctx),
+                "clearance_rank": clearance_rank,
+            },
+        )
+        .mappings()
+        .first()
+    )
 
     if row is None:
         # Deliberately indistinguishable from "does not exist": a caller must
         # not be able to probe for the existence of documents they cannot read.
-        raise AuthorizationError(
-            "document not found or not accessible", details={"document_id": document_id}
-        )
+        raise AuthorizationError("document not found or not accessible", details={"document_id": document_id})
 
     content = row["content"] or ""
     truncated = len(content) > max_chars
@@ -459,12 +486,35 @@ def verify_citations(
 
     def words(value: str) -> set[str]:
         stop = {
-            "the", "a", "an", "and", "or", "of", "in", "on", "to", "for", "is", "are",
-            "was", "were", "be", "been", "with", "that", "this", "at", "by", "from", "it",
+            "the",
+            "a",
+            "an",
+            "and",
+            "or",
+            "of",
+            "in",
+            "on",
+            "to",
+            "for",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "with",
+            "that",
+            "this",
+            "at",
+            "by",
+            "from",
+            "it",
         }
         return {w for w in re.findall(r"[a-z0-9']+", value.lower()) if w not in stop and len(w) > 2}
 
-    index = {str(s.get("id", s.get("chunk_id", ""))): str(s.get("text", s.get("content", ""))) for s in sources}
+    index = {
+        str(s.get("id", s.get("chunk_id", ""))): str(s.get("text", s.get("content", ""))) for s in sources
+    }
     verified: list[dict] = []
     unverified: list[dict] = []
 

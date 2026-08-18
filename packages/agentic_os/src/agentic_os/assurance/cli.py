@@ -1,8 +1,8 @@
 """Evidence Engine command line.
 
-    agentic-evidence collect --environment ci --output artifacts
-    agentic-evidence report --format markdown
-    agentic-evidence gate --min-score 70 --require-no-critical-blockers
+agentic-evidence collect --environment ci --output artifacts
+agentic-evidence report --format markdown
+agentic-evidence gate --min-score 70 --require-no-critical-blockers
 """
 
 from __future__ import annotations
@@ -71,7 +71,12 @@ def _render_markdown(report: evidence.MaturityReport) -> str:
             lines.append(f"- **{control_id}** — {control.title} ({control.status})")
         lines.append("")
 
-    lines += ["## Domain scores", "", "| Domain | Score | Weight | Verified | Failed | Not evidenced |", "|---|---:|---:|---:|---:|---:|"]
+    lines += [
+        "## Domain scores",
+        "",
+        "| Domain | Score | Weight | Verified | Failed | Not evidenced |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
     for domain in sorted(report.domain_scores):
         bucket = report.domain_scores[domain]
         lines.append(
@@ -79,7 +84,13 @@ def _render_markdown(report: evidence.MaturityReport) -> str:
             f"{bucket['passed']} | {bucket['failed']} | {bucket['not_evidenced']} |"
         )
 
-    lines += ["", "## Controls", "", "| Control | Domain | Weight | Critical | Status | Test |", "|---|---|---:|:---:|---|---|"]
+    lines += [
+        "",
+        "## Controls",
+        "",
+        "| Control | Domain | Weight | Critical | Status | Test |",
+        "|---|---|---:|:---:|---|---|",
+    ]
     for control in sorted(report.controls, key=lambda c: c.control_id):
         lines.append(
             f"| {control.control_id} | {control.domain} | {control.weight:g} | "
@@ -98,18 +109,23 @@ def cmd_collect(args: argparse.Namespace) -> int:
     (output / "MATURITY_REPORT.md").write_text(_render_markdown(report), encoding="utf-8")
 
     tenants = _tenants()
-    for tenant_id, organization_id, slug in tenants:
+    for tenant_id, organization_id, _slug in tenants:
         ctx = system_context(tenant_id, organization_id, "evidence-engine")
         with session_scope(ctx) as session:
             bind_tenant(session, tenant_id, actor="evidence-engine")
             evidence.apply_expiry(session, tenant_id)
             evidence.record_evidence(
-                session, ctx, report,
-                artifact_uri=str(junit_path), artifact_hash=bundle["bundle_hash"],
+                session,
+                ctx,
+                report,
+                artifact_uri=str(junit_path),
+                artifact_hash=bundle["bundle_hash"],
             )
             if args.certify:
                 evidence.record_certification(
-                    session, ctx, report,
+                    session,
+                    ctx,
+                    report,
                     release_tag=args.certify,
                     report_uri=str(output / "MATURITY_REPORT.md"),
                     bundle_hash=bundle["bundle_hash"],
@@ -142,9 +158,12 @@ def cmd_report(args: argparse.Namespace) -> int:
         print(json.dumps(payload, indent=2, default=str))
     else:
         report = evidence.calculate_maturity(
-            [evidence.ControlEvidence(**{k: v for k, v in c.items() if k in
-                                         evidence.ControlEvidence.__slots__})
-             for c in payload["controls"]],
+            [
+                evidence.ControlEvidence(
+                    **{k: v for k, v in c.items() if k in evidence.ControlEvidence.__slots__}
+                )
+                for c in payload["controls"]
+            ],
             environment=payload["environment"],
             commit_sha=payload["commit_sha"],
         )

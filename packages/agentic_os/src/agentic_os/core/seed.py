@@ -32,7 +32,10 @@ DEMO_TENANT_NAME = "Rail Maintenance Department"
 SECOND_TENANT_SLUG = "bus-operations"
 SECOND_TENANT_NAME = "Bus Operations Department"
 
-DEMO_PASSWORD = "AgenticOS-Demo-2026!"
+#: Development-only credential for the seeded demo users. It exists so a
+#: fresh checkout can be signed into; production tenants are provisioned
+#: without it and the seed refuses to run outside development.
+DEMO_PASSWORD = "AgenticOS-Demo-2026!"  # noqa: S105
 
 DEMO_USERS: tuple[dict, ...] = (
     {
@@ -205,9 +208,7 @@ def _enrol_privileged_users(session, tenant_id: str) -> dict[str, str]:
         ).first()
         if already is not None:
             continue
-        enrolment = enrol_totp(
-            session, tenant_id=tenant_id, user_id=str(row.id), account=row.email
-        )
+        enrolment = enrol_totp(session, tenant_id=tenant_id, user_id=str(row.id), account=row.email)
         secrets[row.email] = enrolment.secret
     return secrets
 

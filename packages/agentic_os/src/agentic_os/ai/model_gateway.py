@@ -148,8 +148,7 @@ def assert_ai_permitted(session: Session, ctx: ExecutionContext, model_key: str 
     for scope, target in checks:
         if kill_switch_engaged(session, ctx.tenant_id, scope, target):
             raise KillSwitchEngaged(
-                f"{scope} kill switch is engaged"
-                + (f" for '{target}'" if target else ""),
+                f"{scope} kill switch is engaged" + (f" for '{target}'" if target else ""),
                 details={"scope": scope, "target": target},
             )
 
@@ -228,9 +227,7 @@ def route(
             rejected[key] = "not permitted by the agent contract"
             continue
         if classification_rank(classification) > classification_rank(model["max_classification"]):
-            rejected[key] = (
-                f"cleared only to {model['max_classification']}, request is {classification}"
-            )
+            rejected[key] = f"cleared only to {model['max_classification']}, request is {classification}"
             continue
         if model.get("approval_state") not in ("APPROVED",):
             rejected[key] = f"approval state is {model.get('approval_state')}"
@@ -352,9 +349,7 @@ class ModelGateway:
         if allowed_models is None and ctx.agent is not None:
             contract = registries.agents.get(ctx.agent.agent_id)
             if contract is None:
-                raise ContractViolation(
-                    f"agent '{ctx.agent.agent_id}' has no registered contract"
-                )
+                raise ContractViolation(f"agent '{ctx.agent.agent_id}' has no registered contract")
             allowed_models = frozenset(contract["models"]["allowed"])
 
         state = _budget_state(self._session, ctx)
@@ -377,11 +372,7 @@ class ModelGateway:
 
         while attempts < max_attempts:
             attempts += 1
-            permitted = (
-                None
-                if allowed_models is None
-                else frozenset(allowed_models - excluded)
-            )
+            permitted = None if allowed_models is None else frozenset(allowed_models - excluded)
             if permitted is not None and not permitted:
                 break
             decision = route(

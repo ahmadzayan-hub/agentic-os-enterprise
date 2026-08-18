@@ -168,9 +168,10 @@ class PolicyEngine:
     def _load(self) -> list[dict[str, Any]]:
         if self._policies is not None:
             return self._policies
-        rows = self._session.execute(
-            text(
-                """
+        rows = (
+            self._session.execute(
+                text(
+                    """
                 SELECT p.policy_key, p.enforcement, p.status, pv.rules
                 FROM policies p
                 JOIN policy_versions pv
@@ -179,9 +180,12 @@ class PolicyEngine:
                   AND pv.effective_from <= now()
                 ORDER BY p.policy_key
                 """
-            ),
-            {"t": self._tenant_id},
-        ).mappings().all()
+                ),
+                {"t": self._tenant_id},
+            )
+            .mappings()
+            .all()
+        )
         self._policies = [
             {
                 "key": r["policy_key"],
@@ -226,10 +230,7 @@ class PolicyEngine:
         if not matched:
             return PolicyDecision(
                 effect="DENY",
-                reason=(
-                    f"no policy permits action '{request.action}'; the platform default "
-                    "is deny"
-                ),
+                reason=(f"no policy permits action '{request.action}'; the platform default is deny"),
             )
 
         winner = max(matched, key=lambda m: self._EFFECT_PRIORITY[m.effect])

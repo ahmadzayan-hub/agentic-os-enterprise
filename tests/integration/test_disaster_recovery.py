@@ -9,10 +9,9 @@ control NOT_EVIDENCED — when no maintenance identity is configured.
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import text
-
 from agentic_os.core.config import get_settings
 from agentic_os.resilience import RestoreNotConfigured, backup
+from sqlalchemy import text
 
 from tests.conftest import requires_db
 
@@ -35,9 +34,7 @@ def test_the_exercise_refuses_to_run_without_a_maintenance_identity(monkeypatch)
 @requires_dr_identity
 def test_a_restore_is_performed_and_verified_end_to_end(provisioning_db, seeded):
     """The control: a real restore, verified, with measured RPO and RTO."""
-    result = backup.run_exercise(
-        environment="test", executed_by="pytest", keep_artifact=False
-    )
+    result = backup.run_exercise(environment="test", executed_by="pytest", keep_artifact=False)
 
     assert result.outcome == "SUCCESS", result.notes
     assert result.mismatches == {}
@@ -53,25 +50,30 @@ def test_a_restore_is_performed_and_verified_end_to_end(provisioning_db, seeded)
     assert result.ledger["tenants"] > 0
 
     # The exercise leaves durable evidence behind.
-    row = provisioning_db.execute(
-        text(
-            "SELECT outcome, rpo_achieved_seconds, rto_achieved_seconds, verified_rows, notes "
-            "FROM restore_tests WHERE id = CAST(:i AS uuid)"
-        ),
-        {"i": result.restore_test_id},
-    ).mappings().one()
+    row = (
+        provisioning_db.execute(
+            text(
+                "SELECT outcome, rpo_achieved_seconds, rto_achieved_seconds, verified_rows, notes "
+                "FROM restore_tests WHERE id = CAST(:i AS uuid)"
+            ),
+            {"i": result.restore_test_id},
+        )
+        .mappings()
+        .one()
+    )
     assert row["outcome"] == "SUCCESS"
     assert row["rto_achieved_seconds"] is not None
     assert row["rpo_achieved_seconds"] is not None
     assert row["verified_rows"] == result.verified_rows
 
-    backup_row = provisioning_db.execute(
-        text(
-            "SELECT status, artifact_hash, size_bytes FROM backup_records "
-            "WHERE id = CAST(:i AS uuid)"
-        ),
-        {"i": result.backup_id},
-    ).mappings().one()
+    backup_row = (
+        provisioning_db.execute(
+            text("SELECT status, artifact_hash, size_bytes FROM backup_records WHERE id = CAST(:i AS uuid)"),
+            {"i": result.backup_id},
+        )
+        .mappings()
+        .one()
+    )
     assert backup_row["status"] == "COMPLETED"
     assert len(backup_row["artifact_hash"]) == 64
     assert backup_row["size_bytes"] > 0
@@ -80,9 +82,7 @@ def test_a_restore_is_performed_and_verified_end_to_end(provisioning_db, seeded)
 @requires_dr_identity
 def test_the_scratch_database_is_dropped_afterwards(provisioning_db):
     """A restore drill must not leave a second copy of production data behind."""
-    result = backup.run_exercise(
-        environment="test", executed_by="pytest", keep_artifact=False
-    )
+    result = backup.run_exercise(environment="test", executed_by="pytest", keep_artifact=False)
     leftovers = provisioning_db.execute(
         text("SELECT count(*) FROM pg_database WHERE datname LIKE 'agentic_restore_%'")
     ).scalar_one()

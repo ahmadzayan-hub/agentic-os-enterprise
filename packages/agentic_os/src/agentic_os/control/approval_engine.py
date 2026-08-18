@@ -178,20 +178,28 @@ def request_approval(
 
 
 def get_approval(session: Session, tenant_id: str, approval_id: str) -> dict[str, Any]:
-    row = session.execute(
-        text("SELECT * FROM approvals WHERE tenant_id = :t AND id = :i"),
-        {"t": tenant_id, "i": approval_id},
-    ).mappings().first()
+    row = (
+        session.execute(
+            text("SELECT * FROM approvals WHERE tenant_id = :t AND id = :i"),
+            {"t": tenant_id, "i": approval_id},
+        )
+        .mappings()
+        .first()
+    )
     if row is None:
         raise NotFound(f"approval {approval_id} not found")
-    steps = session.execute(
-        text(
-            "SELECT id, sequence, approver_user_id, approver_role, delegated_from, "
-            "decision, comment, decided_at FROM approval_steps "
-            "WHERE approval_id = :i ORDER BY sequence, created_at"
-        ),
-        {"i": approval_id},
-    ).mappings().all()
+    steps = (
+        session.execute(
+            text(
+                "SELECT id, sequence, approver_user_id, approver_role, delegated_from, "
+                "decision, comment, decided_at FROM approval_steps "
+                "WHERE approval_id = :i ORDER BY sequence, created_at"
+            ),
+            {"i": approval_id},
+        )
+        .mappings()
+        .all()
+    )
     payload = dict(row)
     payload["steps"] = [dict(s) for s in steps]
     return payload
@@ -226,9 +234,7 @@ def decide(
     if _expire_if_due(session, approval):
         raise Conflict("approval has expired", details={"approval_id": approval_id})
     if approval["status"] != "PENDING":
-        raise Conflict(
-            f"approval is already {approval['status']}", details={"approval_id": approval_id}
-        )
+        raise Conflict(f"approval is already {approval['status']}", details={"approval_id": approval_id})
 
     user_id = ctx.human.user_id
     already = [
@@ -237,9 +243,7 @@ def decide(
         if s["decision"] != "PENDING" and str(s["approver_user_id"] or "") == user_id
     ]
     if already:
-        raise Conflict(
-            "this approver has already decided; separation of duties requires distinct approvers"
-        )
+        raise Conflict("this approver has already decided; separation of duties requires distinct approvers")
 
     # Find a slot this principal may fill: their own named slot, or the
     # lowest-sequence open role slot they hold.
@@ -256,9 +260,7 @@ def decide(
             (
                 s
                 for s in approval["steps"]
-                if s["decision"] == "PENDING"
-                and s["approver_role"]
-                and s["approver_role"] in ctx.human.roles
+                if s["decision"] == "PENDING" and s["approver_role"] and s["approver_role"] in ctx.human.roles
             ),
             None,
         )
@@ -270,9 +272,7 @@ def decide(
 
     if approval["mode"] == "SEQUENTIAL":
         open_before = [
-            s
-            for s in approval["steps"]
-            if s["decision"] == "PENDING" and s["sequence"] < slot["sequence"]
+            s for s in approval["steps"] if s["decision"] == "PENDING" and s["sequence"] < slot["sequence"]
         ]
         if open_before:
             raise Conflict(
@@ -305,8 +305,7 @@ def decide(
     if final != "PENDING":
         session.execute(
             text(
-                "UPDATE approvals SET status = CAST(:s AS approval_status), decided_at = now() "
-                "WHERE id = :i"
+                "UPDATE approvals SET status = CAST(:s AS approval_status), decided_at = now() WHERE id = :i"
             ),
             {"s": final, "i": approval_id},
         )
@@ -337,9 +336,7 @@ def decide(
     }
 
 
-def delegate(
-    session: Session, ctx: ExecutionContext, approval_id: str, to_user_id: str
-) -> None:
+def delegate(session: Session, ctx: ExecutionContext, approval_id: str, to_user_id: str) -> None:
     """Hand a named approver slot to another user, recording the chain."""
     if ctx.human is None:
         raise ValidationError("only a human principal may delegate an approval")
@@ -348,18 +345,14 @@ def delegate(
         (
             s
             for s in approval["steps"]
-            if s["decision"] == "PENDING"
-            and str(s["approver_user_id"] or "") == ctx.human.user_id
+            if s["decision"] == "PENDING" and str(s["approver_user_id"] or "") == ctx.human.user_id
         ),
         None,
     )
     if slot is None:
         raise ValidationError("principal holds no open named slot on this approval")
     session.execute(
-        text(
-            "UPDATE approval_steps SET approver_user_id = :to, delegated_from = :from_ "
-            "WHERE id = :i"
-        ),
+        text("UPDATE approval_steps SET approver_user_id = :to, delegated_from = :from_ WHERE id = :i"),
         {"to": to_user_id, "from_": ctx.human.user_id, "i": slot["id"]},
     )
     AuditLedger(session).append(

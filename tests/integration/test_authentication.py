@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-
 from agentic_os.core.config import get_settings
 from agentic_os.core.crypto import LocalKms
 from agentic_os.core.db import bind_tenant, get_session_factory
@@ -18,6 +15,9 @@ from agentic_os.identity.authn import (
     verify_access_token,
 )
 from agentic_os.identity.mfa import totp_now
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
 from tests.conftest import requires_db
 
 pytestmark = [pytest.mark.integration, pytest.mark.security, requires_db]
@@ -44,13 +44,9 @@ def _totp_for(session: Session, email: str) -> str:
     The test owns this user, so it resets the counter to establish a known
     precondition rather than depending on wall-clock luck.
     """
-    row = session.execute(
-        text("SELECT id, tenant_id FROM auth_bootstrap_user(:e)"), {"e": email}
-    ).one()
+    row = session.execute(text("SELECT id, tenant_id FROM auth_bootstrap_user(:e)"), {"e": email}).one()
     bind_tenant(session, str(row.tenant_id))
-    session.execute(
-        text("UPDATE user_mfa SET last_counter = 0 WHERE user_id = :u"), {"u": row.id}
-    )
+    session.execute(text("UPDATE user_mfa SET last_counter = 0 WHERE user_id = :u"), {"u": row.id})
     session.commit()
     ciphertext = session.execute(
         text("SELECT secret_ciphertext FROM auth_bootstrap_mfa(:u)"), {"u": row.id}
@@ -89,9 +85,7 @@ def test_email_is_case_insensitive(session: Session, demo_password: str) -> None
     assert principal.email == NON_MFA_USER
 
 
-def test_mfa_required_account_fails_closed_without_a_code(
-    session: Session, demo_password: str
-) -> None:
+def test_mfa_required_account_fails_closed_without_a_code(session: Session, demo_password: str) -> None:
     with pytest.raises(AuthenticationError) as excinfo:
         authenticate_password(session, MFA_USER, demo_password)
     assert excinfo.value.details.get("mfa_required") is True
@@ -102,9 +96,7 @@ def test_mfa_required_account_rejects_a_wrong_code(session: Session, demo_passwo
         authenticate_password(session, MFA_USER, demo_password, mfa_code="000000")
 
 
-def test_mfa_code_authenticates_and_cannot_be_replayed(
-    session: Session, demo_password: str
-) -> None:
+def test_mfa_code_authenticates_and_cannot_be_replayed(session: Session, demo_password: str) -> None:
     code = _totp_for(session, MFA_USER)
     principal = authenticate_password(session, MFA_USER, demo_password, mfa_code=code)
     session.commit()
@@ -195,9 +187,7 @@ def test_repeated_failures_lock_the_account(session: Session, demo_password: str
     assert "locked" in excinfo.value.message.lower()
 
     # Reset so the fixture-shared account stays usable for other tests.
-    row = session.execute(
-        text("SELECT id, tenant_id FROM auth_bootstrap_user(:e)"), {"e": email}
-    ).one()
+    row = session.execute(text("SELECT id, tenant_id FROM auth_bootstrap_user(:e)"), {"e": email}).one()
     bind_tenant(session, str(row.tenant_id))
     session.execute(
         text("UPDATE users SET failed_login_count = 0, locked_until = NULL WHERE id = :i"),

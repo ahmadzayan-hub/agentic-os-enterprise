@@ -31,9 +31,7 @@ class Settings(BaseSettings):
 
     # --- data plane -------------------------------------------------------
     database_url: str = "postgresql+psycopg://agentic_app:agentic_app@127.0.0.1:5432/agentic"
-    database_owner_url: str = (
-        "postgresql+psycopg://agentic_owner:agentic_owner@127.0.0.1:5432/agentic"
-    )
+    database_owner_url: str = "postgresql+psycopg://agentic_owner:agentic_owner@127.0.0.1:5432/agentic"
     db_pool_size: int = 10
     db_max_overflow: int = 20
     db_echo: bool = False
@@ -58,8 +56,10 @@ class Settings(BaseSettings):
     password_min_length: int = 12
     mfa_required_roles: tuple[str, ...] = ("platform_admin", "security_admin", "auditor")
 
-    secret_backend: Literal["env", "file", "vault"] = "env"
-    secret_file_path: str = "./.data/secrets.json"
+    # Names of backends and paths, not credentials. Every actual secret is
+    # read from the chosen backend at run time and never has a default here.
+    secret_backend: Literal["env", "file", "vault"] = "env"  # noqa: S105
+    secret_file_path: str = "./.data/secrets.json"  # noqa: S105
     vault_addr: str = ""
     kms_backend: Literal["local", "aws-kms", "azure-kv", "gcp-kms"] = "local"
     kms_local_key: str = Field(default="", description="Base64 32-byte local data key")
@@ -131,10 +131,8 @@ class Settings(BaseSettings):
             if self.model_allow_external_providers and not (
                 self.anthropic_api_key or self.openai_api_key or self.local_model_base_url
             ):
-                problems.append(
-                    "external model providers are enabled but no provider is configured"
-                )
-            if self.secret_backend == "env":
+                problems.append("external model providers are enabled but no provider is configured")
+            if self.secret_backend == "env":  # noqa: S105
                 problems.append("AGENTIC_SECRET_BACKEND must be 'file' or 'vault' in production")
             if "*" in self.cors_allowed_origins:
                 problems.append("Wildcard CORS origin is not permitted in production")

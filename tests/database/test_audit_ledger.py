@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import pytest
+from agentic_os.assurance.audit import AuditEntry, AuditLedger, redact_payload
+from agentic_os.core.context import ExecutionContext, HumanIdentity
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
-from agentic_os.assurance.audit import AuditEntry, AuditLedger, redact_payload
-from agentic_os.core.context import ExecutionContext, HumanIdentity
 from tests.conftest import requires_db
 
 pytestmark = [pytest.mark.integration, pytest.mark.security, requires_db]
@@ -79,10 +79,14 @@ def test_sequence_numbers_are_gapless_per_tenant(db: Session, tenant_id: str) ->
     for i in range(5):
         ledger.append(ctx, AuditEntry(category="SECURITY", action=f"test.seq.{i}"))
     db.flush()
-    rows = db.execute(
-        text("SELECT sequence_no FROM audit_events WHERE tenant_id = :t ORDER BY sequence_no"),
-        {"t": tenant_id},
-    ).scalars().all()
+    rows = (
+        db.execute(
+            text("SELECT sequence_no FROM audit_events WHERE tenant_id = :t ORDER BY sequence_no"),
+            {"t": tenant_id},
+        )
+        .scalars()
+        .all()
+    )
     assert rows == list(range(1, len(rows) + 1))
 
 
@@ -131,20 +135,22 @@ def test_ledger_records_all_four_identities(db: Session, tenant_id: str) -> None
         organization_id="org",
         human=HumanIdentity(user_id="00000000-0000-0000-0000-000000000001", email="a@b.test"),
         agent=AgentIdentity(agent_id="operations", agent_version="3.1.0", autonomy_level="A2"),
-        workflow=WorkflowIdentity(
-            workflow_id="wf", workflow_run_id="00000000-0000-0000-0000-0000000000ff"
-        ),
+        workflow=WorkflowIdentity(workflow_id="wf", workflow_run_id="00000000-0000-0000-0000-0000000000ff"),
         tool=ToolIdentity(tool_id="knowledge.search"),
     )
     result = AuditLedger(db).append(ctx, AuditEntry(category="TOOL_CALL", action="test.identities"))
     db.flush()
-    row = db.execute(
-        text(
-            "SELECT human_id, agent_id, agent_version, workflow_run_id, tool_id "
-            "FROM audit_events WHERE tenant_id = :t AND sequence_no = :s"
-        ),
-        {"t": tenant_id, "s": result["sequence_no"]},
-    ).mappings().one()
+    row = (
+        db.execute(
+            text(
+                "SELECT human_id, agent_id, agent_version, workflow_run_id, tool_id "
+                "FROM audit_events WHERE tenant_id = :t AND sequence_no = :s"
+            ),
+            {"t": tenant_id, "s": result["sequence_no"]},
+        )
+        .mappings()
+        .one()
+    )
     assert row["agent_id"] == "operations"
     assert row["agent_version"] == "3.1.0"
     assert row["tool_id"] == "knowledge.search"

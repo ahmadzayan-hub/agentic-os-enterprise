@@ -28,9 +28,10 @@ class ResolvedPrompt:
 
 
 def resolve(session: Session, tenant_id: str, prompt_key: str) -> ResolvedPrompt:
-    row = session.execute(
-        text(
-            """
+    row = (
+        session.execute(
+            text(
+                """
             SELECT p.prompt_key, pv.version, pv.body, pv.body_hash,
                    p.owning_agent_key, pv.deployment_status
             FROM prompts p
@@ -39,9 +40,12 @@ def resolve(session: Session, tenant_id: str, prompt_key: str) -> ResolvedPrompt
             ORDER BY pv.effective_from DESC NULLS LAST
             LIMIT 1
             """
-        ),
-        {"t": tenant_id, "k": prompt_key},
-    ).mappings().first()
+            ),
+            {"t": tenant_id, "k": prompt_key},
+        )
+        .mappings()
+        .first()
+    )
     if row is None:
         raise NotFound(f"no deployed version of prompt '{prompt_key}'")
 

@@ -19,7 +19,6 @@ from sqlalchemy import text
 from agentic_os.core.context import ExecutionContext, HumanIdentity
 from agentic_os.core.crypto import sha256_hex
 from agentic_os.core.db import bind_tenant, provisioning_session_scope
-from agentic_os.core.ids import utcnow
 
 DOCUMENTS: tuple[dict[str, Any], ...] = (
     {
@@ -27,13 +26,15 @@ DOCUMENTS: tuple[dict[str, Any], ...] = (
         "title": "Escalator Maintenance Procedure (DOC-221)",
         "classification": "INTERNAL",
         "owner_team": "electromechanical",
-        "acl": [{"principal_type": "ROLE", "principal_id": "operator"},
-                {"principal_type": "ROLE", "principal_id": "analyst"},
-                {"principal_type": "ROLE", "principal_id": "executive"},
-                {"principal_type": "ROLE", "principal_id": "auditor"},
-                {"principal_type": "AGENT", "principal_id": "operations"},
-                {"principal_type": "AGENT", "principal_id": "knowledge"},
-                {"principal_type": "AGENT", "principal_id": "engineering"}],
+        "acl": [
+            {"principal_type": "ROLE", "principal_id": "operator"},
+            {"principal_type": "ROLE", "principal_id": "analyst"},
+            {"principal_type": "ROLE", "principal_id": "executive"},
+            {"principal_type": "ROLE", "principal_id": "auditor"},
+            {"principal_type": "AGENT", "principal_id": "operations"},
+            {"principal_type": "AGENT", "principal_id": "knowledge"},
+            {"principal_type": "AGENT", "principal_id": "engineering"},
+        ],
         "body": """# Escalator Maintenance Procedure (DOC-221)
 
 ## Scope
@@ -74,13 +75,15 @@ affects station throughput during peak periods.
         "title": "Rolling Stock Reliability Standard (DOC-334)",
         "classification": "INTERNAL",
         "owner_team": "rolling_stock",
-        "acl": [{"principal_type": "ROLE", "principal_id": "operator"},
-                {"principal_type": "ROLE", "principal_id": "analyst"},
-                {"principal_type": "ROLE", "principal_id": "executive"},
-                {"principal_type": "ROLE", "principal_id": "auditor"},
-                {"principal_type": "AGENT", "principal_id": "operations"},
-                {"principal_type": "AGENT", "principal_id": "knowledge"},
-                {"principal_type": "AGENT", "principal_id": "analytics"}],
+        "acl": [
+            {"principal_type": "ROLE", "principal_id": "operator"},
+            {"principal_type": "ROLE", "principal_id": "analyst"},
+            {"principal_type": "ROLE", "principal_id": "executive"},
+            {"principal_type": "ROLE", "principal_id": "auditor"},
+            {"principal_type": "AGENT", "principal_id": "operations"},
+            {"principal_type": "AGENT", "principal_id": "knowledge"},
+            {"principal_type": "AGENT", "principal_id": "analytics"},
+        ],
         "body": """# Rolling Stock Reliability Standard (DOC-334)
 
 ## Availability target
@@ -117,11 +120,13 @@ report to the department director within ten working days.
         "title": "Asset Criticality and Obsolescence Policy (DOC-410)",
         "classification": "CONFIDENTIAL",
         "owner_team": "engineering",
-        "acl": [{"principal_type": "ROLE", "principal_id": "operator"},
-                {"principal_type": "ROLE", "principal_id": "executive"},
-                {"principal_type": "ROLE", "principal_id": "auditor"},
-                {"principal_type": "AGENT", "principal_id": "engineering"},
-                {"principal_type": "AGENT", "principal_id": "operations"}],
+        "acl": [
+            {"principal_type": "ROLE", "principal_id": "operator"},
+            {"principal_type": "ROLE", "principal_id": "executive"},
+            {"principal_type": "ROLE", "principal_id": "auditor"},
+            {"principal_type": "AGENT", "principal_id": "engineering"},
+            {"principal_type": "AGENT", "principal_id": "operations"},
+        ],
         "body": """# Asset Criticality and Obsolescence Policy (DOC-410)
 
 ## Criticality classification
@@ -219,8 +224,16 @@ def _system_ctx(tenant_id: str, organization_id: str, user_id: str) -> Execution
 
 
 def _ingest_dataset(
-    session, ctx: ExecutionContext, *, dataset_key: str, name: str, description: str,
-    csv_text: str, primary_key: str, owner_team: str, classification: str = "INTERNAL",
+    session,
+    ctx: ExecutionContext,
+    *,
+    dataset_key: str,
+    name: str,
+    description: str,
+    csv_text: str,
+    primary_key: str,
+    owner_team: str,
+    classification: str = "INTERNAL",
 ) -> int:
     reader = csv.DictReader(io.StringIO(csv_text))
     rows = list(reader)
@@ -242,8 +255,14 @@ def _ingest_dataset(
             """
         ),
         {
-            "t": ctx.tenant_id, "k": dataset_key, "n": name, "d": description, "o": owner_team,
-            "c": classification, "fields": json.dumps(fields), "pk": primary_key,
+            "t": ctx.tenant_id,
+            "k": dataset_key,
+            "n": name,
+            "d": description,
+            "o": owner_team,
+            "c": classification,
+            "fields": json.dumps(fields),
+            "pk": primary_key,
             "rc": len(rows),
         },
     ).one()
@@ -265,16 +284,17 @@ def _ingest_dataset(
             """
         ),
         {
-            "t": ctx.tenant_id, "d": dataset.id, "f": f"{dataset_key}.csv",
-            "h": sha256_hex(csv_text), "rc": len(rows),
+            "t": ctx.tenant_id,
+            "d": dataset.id,
+            "f": f"{dataset_key}.csv",
+            "h": sha256_hex(csv_text),
+            "rc": len(rows),
             "by": ctx.human.user_id if ctx.human else None,
         },
     ).one()
 
     for number, row in enumerate(rows, start=1):
-        typed = {
-            k: (float(v) if _is_number(v) else (None if v == "" else v)) for k, v in row.items()
-        }
+        typed = {k: (float(v) if _is_number(v) else (None if v == "" else v)) for k, v in row.items()}
         flags = [k for k, v in row.items() if v == ""]
         session.execute(
             text(
@@ -285,8 +305,11 @@ def _ingest_dataset(
                 """
             ),
             {
-                "t": ctx.tenant_id, "d": dataset.id, "b": batch.id,
-                "rk": str(row.get(primary_key, "")), "n": number,
+                "t": ctx.tenant_id,
+                "d": dataset.id,
+                "b": batch.id,
+                "rk": str(row.get(primary_key, "")),
+                "n": number,
                 "data": json.dumps(typed, default=str),
                 "flags": [f"missing:{f}" for f in flags],
             },
@@ -335,7 +358,8 @@ def seed_corpus(tenant_id: str, organization_id: str) -> dict[str, int]:
                 summary["chunks"] += result.chunk_count
 
         summary["dataset_rows"] += _ingest_dataset(
-            session, ctx,
+            session,
+            ctx,
             dataset_key="maintenance.work_orders",
             name="Work Orders (Maximo export)",
             description="Corrective and preventive work orders with downtime and cost.",
@@ -344,7 +368,8 @@ def seed_corpus(tenant_id: str, organization_id: str) -> dict[str, int]:
             owner_team="rail_maintenance",
         )
         summary["dataset_rows"] += _ingest_dataset(
-            session, ctx,
+            session,
+            ctx,
             dataset_key="assets.register",
             name="Asset Register (Maximo export)",
             description="Asset register with criticality, support status and spares cover.",

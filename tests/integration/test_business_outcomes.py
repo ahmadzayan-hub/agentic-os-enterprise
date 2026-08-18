@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import pytest
+from agentic_os.core.context import ExecutionContext, HumanIdentity
+from agentic_os.core.errors import ValidationError
+from agentic_os.outcomes import engine
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from agentic_os.core.context import ExecutionContext, HumanIdentity
-from agentic_os.core.errors import ValidationError
-from agentic_os.outcomes import engine
 from tests.conftest import requires_db
 
 pytestmark = [pytest.mark.integration, requires_db]
@@ -30,9 +30,7 @@ def test_measured_outcome_requires_evidence(db: Session, octx) -> None:
         engine.record(
             db,
             octx,
-            engine.Outcome(
-                outcome_type="COST_AVOIDED", quantity=1000, basis="MEASURED", evidence_refs=[]
-            ),
+            engine.Outcome(outcome_type="COST_AVOIDED", quantity=1000, basis="MEASURED", evidence_refs=[]),
         )
 
     with pytest.raises(IntegrityError):
@@ -69,16 +67,23 @@ def test_estimated_outcome_is_accepted_but_labelled(db: Session, octx) -> None:
 
 def test_roi_excludes_estimated_outcomes(db: Session, octx) -> None:
     engine.record(
-        db, octx,
+        db,
+        octx,
         engine.Outcome(
-            outcome_type="COST_AVOIDED", quantity=1, monetary_value_usd=50_000,
-            basis="ESTIMATED", calculation={"method": "assumed"},
+            outcome_type="COST_AVOIDED",
+            quantity=1,
+            monetary_value_usd=50_000,
+            basis="ESTIMATED",
+            calculation={"method": "assumed"},
         ),
     )
     engine.record(
-        db, octx,
+        db,
+        octx,
         engine.Outcome(
-            outcome_type="COST_AVOIDED", quantity=1, monetary_value_usd=100,
+            outcome_type="COST_AVOIDED",
+            quantity=1,
+            monetary_value_usd=100,
             basis="MEASURED",
             evidence_refs=[{"type": "invoice", "id": "INV-1"}],
             calculation={"method": "recorded"},
@@ -110,13 +115,17 @@ def test_run_automation_outcome_is_measured_from_recorded_data(db: Session, octx
 
     outcome_id = engine.measure_run_automation(db, octx, str(run_id), baseline_minutes=45)
     assert outcome_id is not None
-    row = db.execute(
-        text(
-            "SELECT basis, quantity, monetary_value_usd, calculation, evidence_refs "
-            "FROM business_outcomes WHERE id = CAST(:i AS uuid)"
-        ),
-        {"i": outcome_id},
-    ).mappings().one()
+    row = (
+        db.execute(
+            text(
+                "SELECT basis, quantity, monetary_value_usd, calculation, evidence_refs "
+                "FROM business_outcomes WHERE id = CAST(:i AS uuid)"
+            ),
+            {"i": outcome_id},
+        )
+        .mappings()
+        .one()
+    )
     assert row["basis"] == "MEASURED"
     assert float(row["quantity"]) == pytest.approx((45 - 1) / 60, rel=1e-3)
     assert float(row["monetary_value_usd"]) == 0.0, (
@@ -153,6 +162,4 @@ def test_baseline_must_be_supplied_by_the_organisation(db: Session, octx) -> Non
 
 def test_unknown_outcome_type_is_rejected(db: Session, octx) -> None:
     with pytest.raises(ValidationError):
-        engine.record(
-            db, octx, engine.Outcome(outcome_type="VIBES_IMPROVED", quantity=1)
-        )
+        engine.record(db, octx, engine.Outcome(outcome_type="VIBES_IMPROVED", quantity=1))

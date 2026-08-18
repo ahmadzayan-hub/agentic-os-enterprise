@@ -32,7 +32,6 @@ from agentic_os.core.context import ExecutionContext
 from agentic_os.core.crypto import content_hash
 from agentic_os.core.errors import (
     AuthorizationError,
-    Conflict,
     NotFound,
     PolicyDenied,
     UpstreamTimeout,
@@ -114,10 +113,20 @@ def register_server(
             """
         ),
         {
-            "t": ctx.tenant_id, "k": server_key, "n": name, "p": provider, "o": owner_team,
-            "e": endpoint, "tr": transport, "tc": trust_class, "am": authorization_method,
-            "dc": data_classification, "nd": network_destinations or [],
-            "aa": allowed_agents or [], "ar": allowed_roles or [], "sc": scopes or [],
+            "t": ctx.tenant_id,
+            "k": server_key,
+            "n": name,
+            "p": provider,
+            "o": owner_team,
+            "e": endpoint,
+            "tr": transport,
+            "tc": trust_class,
+            "am": authorization_method,
+            "dc": data_classification,
+            "nd": network_destinations or [],
+            "aa": allowed_agents or [],
+            "ar": allowed_roles or [],
+            "sc": scopes or [],
             "fut": forward_user_token,
         },
     ).one()
@@ -163,10 +172,14 @@ def classify_server(
 
 
 def get_server(session: Session, ctx: ExecutionContext, server_key: str) -> McpServerRecord:
-    row = session.execute(
-        text("SELECT * FROM mcp_servers WHERE tenant_id = :t AND server_key = :k"),
-        {"t": ctx.tenant_id, "k": server_key},
-    ).mappings().first()
+    row = (
+        session.execute(
+            text("SELECT * FROM mcp_servers WHERE tenant_id = :t AND server_key = :k"),
+            {"t": ctx.tenant_id, "k": server_key},
+        )
+        .mappings()
+        .first()
+    )
     if row is None:
         raise NotFound(f"MCP server '{server_key}' is not registered")
     return McpServerRecord(
@@ -229,13 +242,16 @@ def record_discovered_tools(
         name = str(tool["name"])
         schema = tool.get("inputSchema") or tool.get("input_schema") or {}
         schema_hash = content_hash(schema)
-        existing = session.execute(
-            text(
-                "SELECT schema_hash, approved FROM mcp_tools "
-                "WHERE mcp_server_id = :s AND tool_name = :n"
-            ),
-            {"s": server.id, "n": name},
-        ).mappings().first()
+        existing = (
+            session.execute(
+                text(
+                    "SELECT schema_hash, approved FROM mcp_tools WHERE mcp_server_id = :s AND tool_name = :n"
+                ),
+                {"s": server.id, "n": name},
+            )
+            .mappings()
+            .first()
+        )
 
         if existing is None:
             added.append(name)
@@ -259,9 +275,12 @@ def record_discovered_tools(
                 """
             ),
             {
-                "t": ctx.tenant_id, "s": server.id, "n": name,
+                "t": ctx.tenant_id,
+                "s": server.id,
+                "n": name,
                 "d": str(tool.get("description", ""))[:2000],
-                "sc": json.dumps(schema, default=str), "h": schema_hash,
+                "sc": json.dumps(schema, default=str),
+                "h": schema_hash,
             },
         )
 
@@ -294,9 +313,7 @@ def record_discovered_tools(
     return {"discovered": len(tools), "added": added, "schema_changed": changed}
 
 
-def approve_tool(
-    session: Session, ctx: ExecutionContext, server_key: str, tool_name: str
-) -> None:
+def approve_tool(session: Session, ctx: ExecutionContext, server_key: str, tool_name: str) -> None:
     if ctx.human is None:
         raise AuthorizationError("MCP tool approval requires a human principal")
     result = session.execute(
@@ -332,16 +349,13 @@ class McpGateway:
         self._session = session
         self._ledger = AuditLedger(session)
 
-    def authorize_call(
-        self, ctx: ExecutionContext, server_key: str, tool_name: str
-    ) -> McpServerRecord:
+    def authorize_call(self, ctx: ExecutionContext, server_key: str, tool_name: str) -> McpServerRecord:
         """Run every admission check. Raises on the first failure."""
         server = get_server(self._session, ctx, server_key)
 
         if not server.invocable:
             raise PolicyDenied(
-                f"MCP server '{server_key}' is {server.trust_class}/{server.status} and "
-                "may not be invoked",
+                f"MCP server '{server_key}' is {server.trust_class}/{server.status} and may not be invoked",
                 details={"trust_class": server.trust_class, "status": server.status},
             )
 
@@ -361,31 +375,30 @@ class McpGateway:
             agent_key = ctx.agent.agent_id if ctx.agent else ""
             if agent_key not in server.allowed_agents:
                 raise AuthorizationError(
-                    f"agent '{agent_key or '(none)'}' is not on the allowlist for MCP server "
-                    f"'{server_key}'"
+                    f"agent '{agent_key or '(none)'}' is not on the allowlist for MCP server '{server_key}'"
                 )
         if server.allowed_roles:
             roles = ctx.human.roles if ctx.human else frozenset()
             if not (set(server.allowed_roles) & set(roles)):
-                raise AuthorizationError(
-                    f"principal holds no role permitted on MCP server '{server_key}'"
-                )
+                raise AuthorizationError(f"principal holds no role permitted on MCP server '{server_key}'")
 
-        approved = self._session.execute(
-            text(
-                """
+        approved = (
+            self._session.execute(
+                text(
+                    """
                 SELECT mt.approved, mt.input_schema, mt.schema_hash
                 FROM mcp_tools mt
                 JOIN mcp_servers s ON s.id = mt.mcp_server_id
                 WHERE s.tenant_id = :t AND s.server_key = :k AND mt.tool_name = :n
                 """
-            ),
-            {"t": ctx.tenant_id, "k": server_key, "n": tool_name},
-        ).mappings().first()
-        if approved is None:
-            raise NotFound(
-                f"MCP tool '{tool_name}' has not been discovered on server '{server_key}'"
+                ),
+                {"t": ctx.tenant_id, "k": server_key, "n": tool_name},
             )
+            .mappings()
+            .first()
+        )
+        if approved is None:
+            raise NotFound(f"MCP tool '{tool_name}' has not been discovered on server '{server_key}'")
         if not approved["approved"]:
             raise PolicyDenied(
                 f"MCP tool '{tool_name}' on '{server_key}' is not approved for use",
@@ -407,8 +420,7 @@ class McpGateway:
 
         if server.transport != "http":
             raise UpstreamUnavailable(
-                f"MCP transport '{server.transport}' is declared but not implemented; "
-                "only http is wired",
+                f"MCP transport '{server.transport}' is declared but not implemented; only http is wired",
                 details={"server": server_key, "transport": server.transport},
             )
 

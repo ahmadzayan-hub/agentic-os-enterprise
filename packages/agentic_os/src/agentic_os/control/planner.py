@@ -191,16 +191,12 @@ def validate_plan(
 
     if len(plan.steps) > max_steps:
         issues.append(
-            ValidationIssue(
-                None, "TOO_MANY_STEPS", f"plan has {len(plan.steps)} steps, limit is {max_steps}"
-            )
+            ValidationIssue(None, "TOO_MANY_STEPS", f"plan has {len(plan.steps)} steps, limit is {max_steps}")
         )
 
     contract = registries.agents.get(executing_agent)
     if contract is None:
-        issues.append(
-            ValidationIssue(None, "UNKNOWN_AGENT", f"no contract for agent '{executing_agent}'")
-        )
+        issues.append(ValidationIssue(None, "UNKNOWN_AGENT", f"no contract for agent '{executing_agent}'"))
         return ValidationResult(valid=False, issues=issues)
 
     allowed_skills = set(contract["skills"]["allowed"])
@@ -221,8 +217,7 @@ def validate_plan(
                 ValidationIssue(
                     step.index,
                     "AGENT_MISMATCH",
-                    f"step names agent '{step.agent}' but the run is dispatched to "
-                    f"'{executing_agent}'",
+                    f"step names agent '{step.agent}' but the run is dispatched to '{executing_agent}'",
                 )
             )
 
@@ -234,9 +229,7 @@ def validate_plan(
         if step.skill:
             if step.skill not in registries.skills:
                 issues.append(
-                    ValidationIssue(
-                        step.index, "UNKNOWN_SKILL", f"skill '{step.skill}' is not registered"
-                    )
+                    ValidationIssue(step.index, "UNKNOWN_SKILL", f"skill '{step.skill}' is not registered")
                 )
             elif step.skill not in allowed_skills:
                 issues.append(
@@ -251,9 +244,7 @@ def validate_plan(
             tool_call_count += 1
             if step.tool not in registries.tools:
                 issues.append(
-                    ValidationIssue(
-                        step.index, "UNKNOWN_TOOL", f"tool '{step.tool}' is not registered"
-                    )
+                    ValidationIssue(step.index, "UNKNOWN_TOOL", f"tool '{step.tool}' is not registered")
                 )
             elif step.tool in denied_tools or "*" in denied_tools:
                 issues.append(

@@ -1,0 +1,110 @@
+# Migration runs as a Job, not as an init container on the API: it must happen
+# once per release, not once per replica, and a failed migration must stop the
+# rollout rather than crash-loop three pods.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: agentic-migrate
+  namespace: agentic-os
+  annotations:
+    # Ordering hint for GitOps controllers that honour sync waves.
+    argocd.argoproj.io/hook: PreSync
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      serviceAccountName: agentic-maintenance
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: migrate
+          image: ghcr.io/rta/agentic-os-api:3.1.0
+          args: ["agentic-migrate"]
+          envFrom:
+            - configMapRef: { name: agentic-config }
+            - secretRef: { name: agentic-secrets }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+      volumes: [{ name: tmp, emptyDir: {} }]
+---
+# Disaster recovery exercise. It runs on its own schedule and with its own
+# identity because it needs the maintenance DSN, which no other workload has.
+# Without that secret it exits NOT_RUN rather than recording false evidence.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: agentic-dr-exercise
+  namespace: agentic-os
+spec:
+  schedule: "0 3 * * 0"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 8
+  failedJobsHistoryLimit: 8
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          serviceAccountName: agentic-maintenance
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            seccompProfile: { type: RuntimeDefault }
+          containers:
+            - name: dr
+              image: ghcr.io/rta/agentic-os-api:3.1.0
+              args: ["agentic-dr", "run", "--environment", "production", "--discard-artifact"]
+              envFrom:
+                - configMapRef: { name: agentic-config }
+                - secretRef: { name: agentic-secrets }
+                - secretRef: { name: agentic-maintenance-secrets }
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities: { drop: ["ALL"] }
+              resources:
+                requests: { cpu: 500m, memory: 1Gi }
+                limits: { cpu: "2", memory: 4Gi }
+              volumeMounts: [{ name: scratch, mountPath: /app/.data }]
+          volumes: [{ name: scratch, emptyDir: { sizeLimit: 20Gi } }]
+---
+# Evidence collection. Maturity is derived from an executed test run, so it is
+# scheduled work rather than a number someone types in.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: agentic-evidence
+  namespace: agentic-os
+spec:
+  schedule: "0 4 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          restartPolicy: Never
+          serviceAccountName: agentic-maintenance
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            seccompProfile: { type: RuntimeDefault }
+          containers:
+            - name: evidence
+              image: ghcr.io/rta/agentic-os-api:3.1.0
+              args: ["agentic-evidence", "report"]
+              envFrom:
+                - configMapRef: { name: agentic-config }
+                - secretRef: { name: agentic-secrets }
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: ["ALL"] }
+              volumeMounts: [{ name: tmp, mountPath: /tmp }]
+          volumes: [{ name: tmp, emptyDir: {} }]

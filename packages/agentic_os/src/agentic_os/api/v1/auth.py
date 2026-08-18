@@ -35,9 +35,7 @@ class TokenResponse(BaseModel):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(
-    payload: LoginRequest, request: Request, db: Annotated[Session, Depends(get_db)]
-) -> TokenResponse:
+def login(payload: LoginRequest, request: Request, db: Annotated[Session, Depends(get_db)]) -> TokenResponse:
     try:
         principal = authenticate_password(
             db,

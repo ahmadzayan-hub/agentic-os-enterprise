@@ -1,7 +1,7 @@
 """Operator entry point for the disaster recovery exercise.
 
-    agentic-dr run --environment staging --executed-by "ops@rta"
-    agentic-dr latest
+agentic-dr run --environment staging --executed-by "ops@rta"
+agentic-dr latest
 """
 
 from __future__ import annotations

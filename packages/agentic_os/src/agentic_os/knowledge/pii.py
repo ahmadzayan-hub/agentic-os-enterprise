@@ -119,9 +119,7 @@ _PHONE_CANDIDATE = re.compile(r"(?<![\w.-])\+?\d[\d\s().-]{5,18}\d(?![\w-])")
 #: keeps ordinary operational text (``closed on 2026-03-12``) from being
 #: mislabelled as personal data, which would wrongly raise the record's
 #: classification and restrict access to it.
-_DATE_SHAPED = re.compile(
-    r"^\s*(?:\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})\s*$"
-)
+_DATE_SHAPED = re.compile(r"^\s*(?:\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})\s*$")
 
 DETECTORS = tuple(name for _, name, _, _ in _PATTERNS) + (
     "luhn_payment_card",
@@ -241,9 +239,7 @@ _CLASSIFICATION_FLOOR = {
 _ORDER = ("PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED")
 
 
-def classify(
-    text: str, *, declared_classification: str = "INTERNAL"
-) -> dict[str, Any]:
+def classify(text: str, *, declared_classification: str = "INTERNAL") -> dict[str, Any]:
     """DLP classification: raise the declared level to at least the PII floor."""
     findings = resolve_overlaps(scan(text))
     floor = declared_classification

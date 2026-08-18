@@ -8,16 +8,15 @@ from sqlalchemy import text
 
 from agentic_os.ai import prompt_registry
 from agentic_os.api.deps import CtxDep, DbDep, require_permission
-from agentic_os.api.serialization import jsonify, row as json_row, rows as json_rows
+from agentic_os.api.serialization import jsonify
+from agentic_os.api.serialization import rows as json_rows
 from agentic_os.core.errors import AgenticError
 from agentic_os.tools import mcp
 
 router = APIRouter(tags=["catalog"])
 
 
-@router.get(
-    "/agents", dependencies=[Depends(require_permission("agents:read", resource_type="agent"))]
-)
+@router.get("/agents", dependencies=[Depends(require_permission("agents:read", resource_type="agent"))])
 def list_agents(ctx: CtxDep, db: DbDep) -> dict:
     rows = db.execute(
         text(
@@ -49,16 +48,20 @@ def list_agents(ctx: CtxDep, db: DbDep) -> dict:
     dependencies=[Depends(require_permission("agents:read", resource_type="agent"))],
 )
 def agent_detail(agent_key: str, ctx: CtxDep, db: DbDep) -> dict:
-    row = db.execute(
-        text(
-            "SELECT a.agent_key, a.name, a.owner_team, a.risk_class, a.max_autonomy, a.status, "
-            "a.current_version, av.contract, av.contract_hash, av.published_at "
-            "FROM agents a JOIN agent_versions av "
-            "  ON av.agent_id = a.id AND av.version = a.current_version "
-            "WHERE a.tenant_id = :t AND a.agent_key = :k"
-        ),
-        {"t": ctx.tenant_id, "k": agent_key},
-    ).mappings().first()
+    row = (
+        db.execute(
+            text(
+                "SELECT a.agent_key, a.name, a.owner_team, a.risk_class, a.max_autonomy, a.status, "
+                "a.current_version, av.contract, av.contract_hash, av.published_at "
+                "FROM agents a JOIN agent_versions av "
+                "  ON av.agent_id = a.id AND av.version = a.current_version "
+                "WHERE a.tenant_id = :t AND a.agent_key = :k"
+            ),
+            {"t": ctx.tenant_id, "k": agent_key},
+        )
+        .mappings()
+        .first()
+    )
     if row is None:
         raise HTTPException(status_code=404, detail={"error": "NOT_FOUND", "message": agent_key})
 
@@ -84,9 +87,7 @@ def agent_detail(agent_key: str, ctx: CtxDep, db: DbDep) -> dict:
     }
 
 
-@router.get(
-    "/skills", dependencies=[Depends(require_permission("skills:read", resource_type="skill"))]
-)
+@router.get("/skills", dependencies=[Depends(require_permission("skills:read", resource_type="skill"))])
 def list_skills(ctx: CtxDep, db: DbDep) -> dict:
     rows = db.execute(
         text(
@@ -101,9 +102,7 @@ def list_skills(ctx: CtxDep, db: DbDep) -> dict:
     return {"skills": json_rows(rows)}
 
 
-@router.get(
-    "/models", dependencies=[Depends(require_permission("models:read", resource_type="model"))]
-)
+@router.get("/models", dependencies=[Depends(require_permission("models:read", resource_type="model"))])
 def list_models(ctx: CtxDep, db: DbDep) -> dict:
     rows = db.execute(
         text(
@@ -126,9 +125,7 @@ def list_models(ctx: CtxDep, db: DbDep) -> dict:
     return {"models": json_rows(rows), "usage": json_rows(usage)}
 
 
-@router.get(
-    "/prompts", dependencies=[Depends(require_permission("prompts:read", resource_type="prompt"))]
-)
+@router.get("/prompts", dependencies=[Depends(require_permission("prompts:read", resource_type="prompt"))])
 def list_prompts(ctx: CtxDep, db: DbDep) -> dict:
     return jsonify({"prompts": prompt_registry.list_prompts(db, ctx.tenant_id)})
 
@@ -164,9 +161,7 @@ def prompt_detail(prompt_key: str, ctx: CtxDep, db: DbDep) -> dict:
     }
 
 
-@router.get(
-    "/tools", dependencies=[Depends(require_permission("tools:read", resource_type="tool"))]
-)
+@router.get("/tools", dependencies=[Depends(require_permission("tools:read", resource_type="tool"))])
 def list_tools(ctx: CtxDep, db: DbDep) -> dict:
     rows = db.execute(
         text(
@@ -181,9 +176,7 @@ def list_tools(ctx: CtxDep, db: DbDep) -> dict:
     return {"tools": json_rows(rows)}
 
 
-@router.get(
-    "/tools/calls", dependencies=[Depends(require_permission("tools:read", resource_type="tool"))]
-)
+@router.get("/tools/calls", dependencies=[Depends(require_permission("tools:read", resource_type="tool"))])
 def tool_calls(ctx: CtxDep, db: DbDep, limit: int = 100) -> dict:
     rows = db.execute(
         text(
@@ -231,9 +224,7 @@ class McpClassifyRequest(BaseModel):
     "/mcp/{server_key}/classify",
     dependencies=[Depends(require_permission("mcp:write", resource_type="mcp"))],
 )
-def classify_mcp_server(
-    server_key: str, payload: McpClassifyRequest, ctx: CtxDep, db: DbDep
-) -> dict:
+def classify_mcp_server(server_key: str, payload: McpClassifyRequest, ctx: CtxDep, db: DbDep) -> dict:
     try:
         mcp.classify_server(db, ctx, server_key, payload.trust_class, reason=payload.reason)
     except AgenticError as exc:

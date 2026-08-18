@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from agentic_os.core.registry import load_registries, validate_registries
 from agentic_os.identity.permissions import (
     CATALOGUE_BY_ID,

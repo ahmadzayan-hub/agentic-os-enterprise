@@ -245,9 +245,7 @@ class DeterministicProvider:
         values: dict[str, Any] = {}
         spans: dict[str, list[int]] = {}
         for name in fields:
-            pattern = re.compile(
-                rf"{re.escape(name)}\s*[:=-]\s*(?P<value>[^\n,;]{{1,200}})", re.IGNORECASE
-            )
+            pattern = re.compile(rf"{re.escape(name)}\s*[:=-]\s*(?P<value>[^\n,;]{{1,200}})", re.IGNORECASE)
             match = pattern.search(text)
             if match:
                 values[name] = match.group("value").strip()
@@ -297,10 +295,7 @@ class DeterministicProvider:
         if not summary.get("supported"):
             return {
                 "supported": True,
-                "answer": (
-                    "The authorised evidence available does not support an answer to this "
-                    "question."
-                ),
+                "answer": ("The authorised evidence available does not support an answer to this question."),
                 "citations": [],
                 "grounded": False,
                 "confidence": 0.0,
@@ -353,7 +348,12 @@ class DeterministicProvider:
             "retrieve": ("retrieve", "fetch", "open", "read", "get"),
             "analyse": ("analyse", "analyze", "assess", "evaluate", "review", "investigate", "why"),
             "calculate": (
-                "calculate", "comput", "total", "average", "percentage", "how much",
+                "calculate",
+                "comput",
+                "total",
+                "average",
+                "percentage",
+                "how much",
                 "how many",
             ),
             "compare": ("compare", "versus", "against", "rank", "prioritise", "prioritize"),
@@ -376,18 +376,14 @@ class DeterministicProvider:
 
         def triggered(triggers: tuple[str, ...]) -> bool:
             return any(
-                any(word.startswith(trigger) for word in words)
-                if " " not in trigger
-                else trigger in lowered
+                any(word.startswith(trigger) for word in words) if " " not in trigger else trigger in lowered
                 for trigger in triggers
             )
 
         matched = [
             skill
             for skill, triggers in verbs.items()
-            if skill in available_skills
-            and skill in self.PROSE_DERIVABLE_SKILLS
-            and triggered(triggers)
+            if skill in available_skills and skill in self.PROSE_DERIVABLE_SKILLS and triggered(triggers)
         ]
 
         # Grounded work always starts by retrieving evidence.
@@ -556,9 +552,7 @@ class OpenAICompatibleProvider(_HttpProviderBase):
 
         base, key = self._resolve()
         if not self.available():
-            raise UpstreamUnavailable(
-                "OpenAI-compatible provider is not configured or not permitted"
-            )
+            raise UpstreamUnavailable("OpenAI-compatible provider is not configured or not permitted")
         started = time.perf_counter()
         headers = {"content-type": "application/json"}
         if key:

@@ -9,7 +9,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from agentic_os.api.deps import CtxDep, DbDep, require_permission
-from agentic_os.api.serialization import jsonify, row as json_row, rows as json_rows
+from agentic_os.api.serialization import jsonify
+from agentic_os.api.serialization import rows as json_rows
 from agentic_os.core.errors import AgenticError
 from agentic_os.knowledge import graph, ingestion, retrieval
 
@@ -28,9 +29,7 @@ class SearchRequest(BaseModel):
 )
 def search(payload: SearchRequest, ctx: CtxDep, db: DbDep) -> dict:
     try:
-        result = retrieval.search(
-            db, ctx, payload.query, top_k=payload.top_k, strategy=payload.strategy
-        )
+        result = retrieval.search(db, ctx, payload.query, top_k=payload.top_k, strategy=payload.strategy)
     except AgenticError as exc:
         raise HTTPException(status_code=exc.http_status, detail=exc.to_dict()) from exc
     return jsonify(result.to_dict())
@@ -143,11 +142,7 @@ def query_graph(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> dict:
     try:
-        return jsonify(
-            graph.query(
-                db, ctx, node_key=node_key, node_type=node_type, depth=depth, limit=limit
-            )
-        )
+        return jsonify(graph.query(db, ctx, node_key=node_key, node_type=node_type, depth=depth, limit=limit))
     except AgenticError as exc:
         raise HTTPException(status_code=exc.http_status, detail=exc.to_dict()) from exc
 
@@ -164,8 +159,6 @@ def impact(
     direction: str = "downstream",
 ) -> dict:
     try:
-        return jsonify(
-            graph.impact_analysis(db, ctx, node_key=node_key, depth=depth, direction=direction)
-        )
+        return jsonify(graph.impact_analysis(db, ctx, node_key=node_key, depth=depth, direction=direction))
     except AgenticError as exc:
         raise HTTPException(status_code=exc.http_status, detail=exc.to_dict()) from exc

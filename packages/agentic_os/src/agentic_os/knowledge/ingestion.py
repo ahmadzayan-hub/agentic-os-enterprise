@@ -111,8 +111,7 @@ def scan_for_malware(data: bytes, mime_type: str) -> StageResult:
             "scanner": "structural-signature-v1",
             "external_scanner_configured": False,
             "note": (
-                "structural checks only; connect an ICAP or ClamAV scanner for "
-                "signature-based detection"
+                "structural checks only; connect an ICAP or ClamAV scanner for signature-based detection"
             ),
         },
     )
@@ -166,26 +165,26 @@ def ingest(
     if ctx.human is not None and not any(
         e["principal_type"] == "USER" and e["principal_id"] == ctx.human.user_id for e in acl
     ):
-        acl.append(
-            {"principal_type": "USER", "principal_id": ctx.human.user_id, "permission": "OWNER"}
-        )
+        acl.append({"principal_type": "USER", "principal_id": ctx.human.user_id, "permission": "OWNER"})
     if not acl:
         raise ValidationError("a document must have at least one access control entry")
 
-    existing = session.execute(
-        text(
-            "SELECT id, ingest_status FROM documents "
-            "WHERE tenant_id = :t AND content_hash = :h AND deleted_at IS NULL"
-        ),
-        {"t": ctx.tenant_id, "h": content_hash},
-    ).mappings().first()
+    existing = (
+        session.execute(
+            text(
+                "SELECT id, ingest_status FROM documents "
+                "WHERE tenant_id = :t AND content_hash = :h AND deleted_at IS NULL"
+            ),
+            {"t": ctx.tenant_id, "h": content_hash},
+        )
+        .mappings()
+        .first()
+    )
     if existing is not None:
         return IngestionResult(
             document_id=str(existing["id"]),
             status=str(existing["ingest_status"]),
-            stages=[
-                StageResult("deduplication", True, {"reason": "identical content already ingested"})
-            ],
+            stages=[StageResult("deduplication", True, {"reason": "identical content already ingested"})],
         )
 
     # -- stage 1: quarantine ------------------------------------------------
@@ -248,14 +247,10 @@ def ingest(
                 payload={"stage": stage.stage, "detail": stage.detail},
             ),
         )
-        return IngestionResult(
-            document_id=document_id, status=status, stages=stages, rejection_reason=reason
-        )
+        return IngestionResult(document_id=document_id, status=status, stages=stages, rejection_reason=reason)
 
     # -- stage 2: malware scan ---------------------------------------------
-    session.execute(
-        text("UPDATE documents SET ingest_status = 'SCANNING' WHERE id = :i"), {"i": document_id}
-    )
+    session.execute(text("UPDATE documents SET ingest_status = 'SCANNING' WHERE id = :i"), {"i": document_id})
     scan = scan_for_malware(data, mime_type)
     session.execute(
         text("UPDATE documents SET malware_scan_status = :s WHERE id = :i"),
@@ -272,9 +267,7 @@ def ingest(
     stages.append(validation)
 
     # -- stage 4: parse -----------------------------------------------------
-    session.execute(
-        text("UPDATE documents SET ingest_status = 'PARSING' WHERE id = :i"), {"i": document_id}
-    )
+    session.execute(text("UPDATE documents SET ingest_status = 'PARSING' WHERE id = :i"), {"i": document_id})
     try:
         parsed = parse(data, mime_type)
     except Exception as exc:
@@ -352,9 +345,7 @@ def ingest(
     stages.append(StageResult("acl_inheritance", True, {"principals": acl_principals}))
 
     # -- stage 7: chunk, embed, index --------------------------------------
-    session.execute(
-        text("UPDATE documents SET ingest_status = 'INDEXING' WHERE id = :i"), {"i": document_id}
-    )
+    session.execute(text("UPDATE documents SET ingest_status = 'INDEXING' WHERE id = :i"), {"i": document_id})
     chunks = chunk_text(parsed.text)
     if not chunks:
         return fail(StageResult("chunking", False, {"error": "document produced no chunks"}))
@@ -459,10 +450,7 @@ def ingest(
             "cls": classification,
             "labels": dlp["labels"],
             "pii": json.dumps(
-                [
-                    {"pii_type": f["pii_type"], "confidence": f["confidence"]}
-                    for f in dlp["findings"]
-                ]
+                [{"pii_type": f["pii_type"], "confidence": f["confidence"]} for f in dlp["findings"]]
             ),
             "conf": parsed.confidence,
             "unsupported": parsed.unsupported_elements,

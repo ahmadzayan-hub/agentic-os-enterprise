@@ -75,10 +75,7 @@ def migrate(directory: Path = MIGRATIONS_DIR, *, dry_run: bool = False) -> list[
         with engine.begin() as conn:
             conn.execute(text(sql))
             conn.execute(
-                text(
-                    "INSERT INTO schema_migrations (version, checksum, duration_ms) "
-                    "VALUES (:v, :c, :d)"
-                ),
+                text("INSERT INTO schema_migrations (version, checksum, duration_ms) VALUES (:v, :c, :d)"),
                 {
                     "v": version,
                     "c": digest,
@@ -92,9 +89,7 @@ def migrate(directory: Path = MIGRATIONS_DIR, *, dry_run: bool = False) -> list[
 
 def status(directory: Path = MIGRATIONS_DIR) -> list[tuple[str, str]]:
     already = applied_versions(get_owner_engine())
-    return [
-        (p.stem, "applied" if p.stem in already else "pending") for p in discover(directory)
-    ]
+    return [(p.stem, "applied" if p.stem in already else "pending") for p in discover(directory)]
 
 
 def main(argv: list[str] | None = None) -> int:

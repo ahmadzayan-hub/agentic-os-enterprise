@@ -10,7 +10,11 @@ from enum import Enum
 from typing import Any
 
 
-class ErrorClass(str, Enum):
+# Kept as (str, Enum) rather than StrEnum: the members are serialised
+# explicitly through ``.value`` everywhere, and StrEnum would additionally
+# change ``str()`` and f-string rendering of a member, which is a wire-format
+# change for anything that interpolates one by accident.
+class ErrorClass(str, Enum):  # noqa: UP042
     VALIDATION = "VALIDATION"
     AUTHENTICATION = "AUTHENTICATION"
     AUTHORIZATION = "AUTHORIZATION"

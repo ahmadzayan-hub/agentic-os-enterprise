@@ -12,34 +12,51 @@ consumer can deduplicate on it.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import timedelta
-from typing import Any, Callable
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from agentic_os.core.context import ExecutionContext
-from agentic_os.core.ids import utcnow
 
 #: Canonical event types. Publishing an unknown type is allowed but logged, so
 #: the taxonomy can grow without a deployment while staying visible.
 KNOWN_EVENT_TYPES = frozenset(
     {
-        "Customer.Created", "Customer.Updated",
-        "Invoice.Created", "Invoice.Paid", "Invoice.Overdue",
-        "Document.Uploaded", "Document.Processed", "Document.Approved", "Document.Rejected",
+        "Customer.Created",
+        "Customer.Updated",
+        "Invoice.Created",
+        "Invoice.Paid",
+        "Invoice.Overdue",
+        "Document.Uploaded",
+        "Document.Processed",
+        "Document.Approved",
+        "Document.Rejected",
         "Email.Received",
         "Risk.Detected",
-        "Agent.Started", "Agent.Completed", "Agent.Failed",
-        "Run.Started", "Run.Completed", "Run.Failed",
-        "Workflow.Started", "Workflow.Completed", "Workflow.Failed", "Workflow.StepFailed",
-        "Approval.Required", "Approval.Granted", "Approval.Rejected", "Approval.Expired",
+        "Agent.Started",
+        "Agent.Completed",
+        "Agent.Failed",
+        "Run.Started",
+        "Run.Completed",
+        "Run.Failed",
+        "Workflow.Started",
+        "Workflow.Completed",
+        "Workflow.Failed",
+        "Workflow.StepFailed",
+        "Approval.Required",
+        "Approval.Granted",
+        "Approval.Rejected",
+        "Approval.Expired",
         "Policy.Violated",
         "Security.Alert",
         "Dataset.Ingested",
-        "KillSwitch.Engaged", "KillSwitch.Released",
-        "Budget.Threshold", "Budget.Exceeded",
+        "KillSwitch.Engaged",
+        "KillSwitch.Released",
+        "Budget.Threshold",
+        "Budget.Exceeded",
     }
 )
 
@@ -121,9 +138,7 @@ def _matching_handlers(event_type: str) -> list[Callable[[Session, dict[str, Any
     return handlers
 
 
-def dispatch_pending(
-    session: Session, *, tenant_id: str, batch_size: int = 50
-) -> dict[str, int]:
+def dispatch_pending(session: Session, *, tenant_id: str, batch_size: int = 50) -> dict[str, int]:
     """Deliver a batch of due outbox entries for one tenant.
 
     ``FOR UPDATE SKIP LOCKED`` means two dispatchers never pick the same row,
@@ -131,9 +146,10 @@ def dispatch_pending(
     the same reason as the workflow claim: RLS has no bypass, and per-tenant
     batches keep one busy tenant from starving the rest.
     """
-    rows = session.execute(
-        text(
-            """
+    rows = (
+        session.execute(
+            text(
+                """
             SELECT id, tenant_id, event_type, payload, attempts, max_attempts
             FROM outbox_events
             WHERE tenant_id = CAST(:tenant AS uuid)
@@ -142,9 +158,12 @@ def dispatch_pending(
             LIMIT :limit
             FOR UPDATE SKIP LOCKED
             """
-        ),
-        {"limit": batch_size, "tenant": tenant_id},
-    ).mappings().all()
+            ),
+            {"limit": batch_size, "tenant": tenant_id},
+        )
+        .mappings()
+        .all()
+    )
 
     dispatched = failed = dead = 0
     for row in rows:
@@ -217,9 +236,7 @@ def replay_dead_letter(session: Session, tenant_id: str, outbox_id: str) -> bool
 
 def backlog(session: Session, tenant_id: str) -> dict[str, int]:
     rows = session.execute(
-        text(
-            "SELECT status, count(*) AS n FROM outbox_events WHERE tenant_id = :t GROUP BY status"
-        ),
+        text("SELECT status, count(*) AS n FROM outbox_events WHERE tenant_id = :t GROUP BY status"),
         {"t": tenant_id},
     ).all()
     return {str(r.status): int(r.n) for r in rows}

@@ -30,7 +30,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: infrastructure/docker/Dockerfile.api
+          file: infrastructure/docker/Dockerfile
+          target: api
           push: true
           tags: ghcr.io/${{ github.repository }}/api:${{ inputs.release_tag }}
           provenance: true
@@ -48,10 +49,27 @@ jobs:
     environment: staging
     steps:
       - uses: actions/checkout@v4
+      # A deploy step that prints what it would have done is worse than no
+      # deploy step: the run goes green and nothing shipped. This fails when
+      # the cluster credential is absent, so an unconfigured pipeline is
+      # visible rather than silently successful.
+      - name: Require a cluster credential
+        run: |
+          if [ -z "${{ secrets.STAGING_KUBECONFIG }}" ]; then
+            echo "::error::STAGING_KUBECONFIG is not configured; cannot deploy."
+            exit 1
+          fi
+      - name: Configure kubectl
+        run: |
+          install -d -m 700 "$HOME/.kube"
+          printf '%s' "${{ secrets.STAGING_KUBECONFIG }}" > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
       - name: Apply manifests
         run: |
-          echo "kubectl apply -k infrastructure/kubernetes/overlays/staging"
-          echo "Deployment requires a configured cluster context."
+          kubectl apply -k infrastructure/kubernetes/overlays/staging
+          kubectl -n agentic-os-staging rollout status deployment/agentic-api --timeout=5m
+          kubectl -n agentic-os-staging rollout status deployment/agentic-worker --timeout=5m
+          kubectl -n agentic-os-staging rollout status deployment/agentic-web --timeout=5m
 
   validate-staging:
     name: Post-deployment verification
@@ -59,10 +77,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Smoke checks
+      - name: Readiness
+        env:
+          STAGING_URL: ${{ vars.STAGING_URL }}
         run: |
-          echo "curl -fsS \"$STAGING_URL/ready\""
-          echo "agentic-evidence collect --environment staging"
+          if [ -z "$STAGING_URL" ]; then
+            echo "::error::STAGING_URL is not configured; cannot verify the deployment."
+            exit 1
+          fi
+          curl -fsS "$STAGING_URL/ready" | tee /tmp/ready.json
+          grep -q '"ready": *true' /tmp/ready.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Collect evidence against staging
+        env:
+          AGENTIC_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          AGENTIC_DATABASE_OWNER_URL: ${{ secrets.STAGING_DATABASE_OWNER_URL }}
+        run: |
+          pip install -e ".[dev,parsers]"
+          agentic-evidence collect --environment staging
 
   approve-production:
     name: Human approval
@@ -78,7 +112,38 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - run: echo "Promote 10 percent of traffic, hold, then verify SLOs."
+      - uses: actions/checkout@v4
+      - name: Require a cluster credential
+        run: |
+          if [ -z "${{ secrets.PRODUCTION_KUBECONFIG }}" ]; then
+            echo "::error::PRODUCTION_KUBECONFIG is not configured; cannot deploy."
+            exit 1
+          fi
+          install -d -m 700 "$HOME/.kube"
+          printf '%s' "${{ secrets.PRODUCTION_KUBECONFIG }}" > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+      # A canary is one replica of the new version alongside the current ones.
+      # Traffic-weighted canarying needs a service mesh or an ingress that
+      # supports it; that is NOT_IMPLEMENTED here and must not be claimed.
+      - name: Roll one replica and hold
+        run: |
+          kubectl -n agentic-os-production set image deployment/agentic-api \
+            api=ghcr.io/${{ github.repository }}/api:${{ inputs.release_tag }}
+          kubectl -n agentic-os-production patch deployment/agentic-api \
+            -p '{"spec":{"strategy":{"rollingUpdate":{"maxSurge":1,"maxUnavailable":0}}}}'
+          kubectl -n agentic-os-production rollout status deployment/agentic-api --timeout=10m
+      - name: Verify service objectives before continuing
+        env:
+          PRODUCTION_URL: ${{ vars.PRODUCTION_URL }}
+        run: |
+          if [ -z "$PRODUCTION_URL" ]; then
+            echo "::error::PRODUCTION_URL is not configured; cannot verify the canary."
+            exit 1
+          fi
+          for _ in $(seq 1 30); do
+            curl -fsS "$PRODUCTION_URL/ready" | grep -q '"ready": *true' || exit 1
+            sleep 10
+          done
 
   production:
     name: Production
@@ -86,11 +151,39 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - run: echo "Complete rollout after canary verification."
+      - uses: actions/checkout@v4
+      - name: Configure kubectl
+        run: |
+          if [ -z "${{ secrets.PRODUCTION_KUBECONFIG }}" ]; then
+            echo "::error::PRODUCTION_KUBECONFIG is not configured; cannot deploy."
+            exit 1
+          fi
+          install -d -m 700 "$HOME/.kube"
+          printf '%s' "${{ secrets.PRODUCTION_KUBECONFIG }}" > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+      - name: Complete the rollout
+        run: |
+          kubectl apply -k infrastructure/kubernetes/overlays/production
+          for workload in agentic-api agentic-worker agentic-web; do
+            kubectl -n agentic-os-production rollout status "deployment/$workload" --timeout=10m
+          done
 
   post-deployment-evidence:
     name: Post-deployment evidence update
     needs: production
     runs-on: ubuntu-latest
     steps:
-      - run: echo "agentic-evidence collect --environment production --certify ${{ inputs.release_tag }}"
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # Certification is recorded from an executed collection against the
+      # deployed environment. If the run does not reach 100 with no critical
+      # blocker, the engine refuses to certify and this step fails.
+      - name: Collect and certify
+        env:
+          AGENTIC_DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          AGENTIC_DATABASE_OWNER_URL: ${{ secrets.PRODUCTION_DATABASE_OWNER_URL }}
+        run: |
+          pip install -e ".[dev,parsers]"
+          agentic-evidence collect --environment production --certify "${{ inputs.release_tag }}"

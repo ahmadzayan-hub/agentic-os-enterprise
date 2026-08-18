@@ -61,33 +61,33 @@ class SecretBroker:
     def _from_database(self, connector_key: str, credential_key: str, tenant_id: str) -> str | None:
         if self._session is None:
             return None
-        row = self._session.execute(
-            text(
-                """
+        row = (
+            self._session.execute(
+                text(
+                    """
                 SELECT cc.ciphertext, cc.kms_backend, cc.expires_at
                 FROM connector_credentials cc
                 JOIN connectors c ON c.id = cc.connector_id
                 WHERE cc.tenant_id = :t AND c.connector_key = :ck
                   AND cc.credential_key = :credk
                 """
-            ),
-            {"t": tenant_id, "ck": connector_key, "credk": credential_key},
-        ).mappings().first()
+                ),
+                {"t": tenant_id, "ck": connector_key, "credk": credential_key},
+            )
+            .mappings()
+            .first()
+        )
         if row is None:
             return None
         from agentic_os.core.ids import utcnow
 
         if row["expires_at"] is not None and row["expires_at"] <= utcnow():
-            raise NotFound(
-                f"credential '{credential_key}' for connector '{connector_key}' has expired"
-            )
+            raise NotFound(f"credential '{credential_key}' for connector '{connector_key}' has expired")
         kms = LocalKms.from_config(self._settings.kms_local_key)
         return kms.decrypt(row["ciphertext"], aad=f"{connector_key}:{credential_key}").decode("utf-8")
 
     # -- public surface ----------------------------------------------------
-    def resolve(
-        self, key: str, *, tenant_id: str = "", connector_key: str = ""
-    ) -> tuple[str, SecretHandle]:
+    def resolve(self, key: str, *, tenant_id: str = "", connector_key: str = "") -> tuple[str, SecretHandle]:
         """Return (value, handle). Only the gateway calls this."""
         backend = self._settings.secret_backend
         value: str | None = None

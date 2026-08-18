@@ -98,13 +98,17 @@ class DsarResult:
 
 
 def _subject(session: Session, tenant_id: str, email: str) -> dict[str, Any] | None:
-    row = session.execute(
-        text(
-            "SELECT id, email, display_name, clearance, status, created_at "
-            "FROM users WHERE tenant_id = :t AND email = :e"
-        ),
-        {"t": tenant_id, "e": email.strip().lower()},
-    ).mappings().first()
+    row = (
+        session.execute(
+            text(
+                "SELECT id, email, display_name, clearance, status, created_at "
+                "FROM users WHERE tenant_id = :t AND email = :e"
+            ),
+            {"t": tenant_id, "e": email.strip().lower()},
+        )
+        .mappings()
+        .first()
+    )
     return dict(row) if row else None
 
 
@@ -168,13 +172,17 @@ def raise_request(
 
 def process(session: Session, ctx: ExecutionContext, request_id: str) -> DsarResult:
     """Execute a recorded request."""
-    request = session.execute(
-        text(
-            "SELECT id, request_type, subject_email, subject_user_id, status "
-            "FROM data_subject_requests WHERE tenant_id = :t AND id = CAST(:i AS uuid)"
-        ),
-        {"t": ctx.tenant_id, "i": request_id},
-    ).mappings().first()
+    request = (
+        session.execute(
+            text(
+                "SELECT id, request_type, subject_email, subject_user_id, status "
+                "FROM data_subject_requests WHERE tenant_id = :t AND id = CAST(:i AS uuid)"
+            ),
+            {"t": ctx.tenant_id, "i": request_id},
+        )
+        .mappings()
+        .first()
+    )
     if request is None:
         raise NotFound(f"data subject request {request_id} not found")
     if request["status"] in ("COMPLETED", "REJECTED"):
@@ -209,33 +217,44 @@ def _collect(session: Session, tenant_id: str, user_id: str) -> dict[str, list[d
     """Every record attributable to the subject, table by table."""
     collected: dict[str, list[dict]] = {}
     for table, column, _ in SUBJECT_TABLES:
-        rows = session.execute(
-            text(f"SELECT * FROM {table} WHERE tenant_id = :t AND {column} = CAST(:u AS uuid)"),  # noqa: S608
-            {"t": tenant_id, "u": user_id},
-        ).mappings().all()
+        rows = (
+            session.execute(
+                text(f"SELECT * FROM {table} WHERE tenant_id = :t AND {column} = CAST(:u AS uuid)"),  # noqa: S608
+                {"t": tenant_id, "u": user_id},
+            )
+            .mappings()
+            .all()
+        )
         if rows:
             collected[table] = [
-                {k: (str(v) if not isinstance(v, (int, float, bool, type(None))) else v)
-                 for k, v in dict(r).items()
-                 if k not in SENSITIVE_COLUMNS}
+                {
+                    k: (str(v) if not isinstance(v, (int, float, bool, type(None))) else v)
+                    for k, v in dict(r).items()
+                    if k not in SENSITIVE_COLUMNS
+                }
                 for r in rows
             ]
-    ledger = session.execute(
-        text(
-            "SELECT sequence_no, category, action, outcome, occurred_at FROM audit_events "
-            "WHERE tenant_id = :t AND human_id = CAST(:u AS uuid) ORDER BY sequence_no"
-        ),
-        {"t": tenant_id, "u": user_id},
-    ).mappings().all()
+    ledger = (
+        session.execute(
+            text(
+                "SELECT sequence_no, category, action, outcome, occurred_at FROM audit_events "
+                "WHERE tenant_id = :t AND human_id = CAST(:u AS uuid) ORDER BY sequence_no"
+            ),
+            {"t": tenant_id, "u": user_id},
+        )
+        .mappings()
+        .all()
+    )
     if ledger:
-        collected["audit_events"] = [
-            {k: str(v) for k, v in dict(r).items()} for r in ledger
-        ]
+        collected["audit_events"] = [{k: str(v) for k, v in dict(r).items()} for r in ledger]
     return collected
 
 
 def _access(
-    session: Session, ctx: ExecutionContext, request_id: str, request_type: str,
+    session: Session,
+    ctx: ExecutionContext,
+    request_id: str,
+    request_type: str,
     subject: dict[str, Any],
 ) -> DsarResult:
     collected = _collect(session, ctx.tenant_id, str(subject["id"]))
@@ -264,7 +283,10 @@ def _access(
 
 
 def _erase(
-    session: Session, ctx: ExecutionContext, request_id: str, request_type: str,
+    session: Session,
+    ctx: ExecutionContext,
+    request_id: str,
+    request_type: str,
     subject: dict[str, Any],
 ) -> DsarResult:
     holds = _active_holds(session, ctx.tenant_id)
@@ -309,8 +331,7 @@ def _erase(
             statement = f"DELETE FROM {table} WHERE tenant_id = :t AND {column} = CAST(:u AS uuid)"  # noqa: S608
         else:
             statement = (  # noqa: S608
-                f"UPDATE {table} SET {column} = NULL "
-                f"WHERE tenant_id = :t AND {column} = CAST(:u AS uuid)"
+                f"UPDATE {table} SET {column} = NULL WHERE tenant_id = :t AND {column} = CAST(:u AS uuid)"
             )
         result = session.execute(text(statement), {"t": ctx.tenant_id, "u": user_id})
         if result.rowcount:
@@ -337,8 +358,7 @@ def _erase(
     )
     session.execute(
         text(
-            "DELETE FROM pii_inventory WHERE tenant_id = :t AND resource_type = 'user' "
-            "AND resource_id = :u"
+            "DELETE FROM pii_inventory WHERE tenant_id = :t AND resource_type = 'user' AND resource_id = :u"
         ),
         {"t": ctx.tenant_id, "u": user_id},
     )
@@ -370,7 +390,10 @@ def _erase(
 
 
 def _rectify(
-    session: Session, ctx: ExecutionContext, request_id: str, request_type: str,
+    session: Session,
+    ctx: ExecutionContext,
+    request_id: str,
+    request_type: str,
     subject: dict[str, Any],
 ) -> DsarResult:
     """Rectification records what must change; the correction itself is an
@@ -398,7 +421,10 @@ def _rectify(
 
 
 def _finish(
-    session: Session, ctx: ExecutionContext, request_id: str, status: str,
+    session: Session,
+    ctx: ExecutionContext,
+    request_id: str,
+    status: str,
     affected: dict[str, int],
 ) -> None:
     session.execute(
@@ -431,9 +457,7 @@ def apply_retention(session: Session, ctx: ExecutionContext) -> dict[str, int]:
         removed["documents"] = result.rowcount
 
     result = session.execute(
-        text(
-            "DELETE FROM sessions WHERE tenant_id = :t AND expires_at < now() - interval '30 days'"
-        ),
+        text("DELETE FROM sessions WHERE tenant_id = :t AND expires_at < now() - interval '30 days'"),
         {"t": ctx.tenant_id},
     )
     if result.rowcount:

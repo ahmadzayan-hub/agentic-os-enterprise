@@ -6,11 +6,11 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
+from agentic_os.assurance import evidence
+from agentic_os.core.ids import utcnow
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from agentic_os.assurance import evidence
-from agentic_os.core.ids import utcnow
 from tests.conftest import requires_db
 
 pytestmark = pytest.mark.integration
@@ -36,23 +36,55 @@ def test_maturity_is_derived_only_from_test_results() -> None:
     """A control whose test did not pass can never reach VERIFIED."""
     catalogue = {
         "controls": [
-            {"id": "C1", "domain": "security", "title": "passing", "requirement": "r",
-             "weight": 1, "test": "tests/x.py::test_pass", "expected": "e"},
-            {"id": "C2", "domain": "security", "title": "failing", "requirement": "r",
-             "weight": 1, "test": "tests/x.py::test_fail", "expected": "e"},
-            {"id": "C3", "domain": "security", "title": "unmapped", "requirement": "r",
-             "weight": 1, "expected": "e"},
-            {"id": "C4", "domain": "security", "title": "missing", "requirement": "r",
-             "weight": 1, "test": "tests/x.py::test_never_ran", "expected": "e"},
-            {"id": "C5", "domain": "security", "title": "skipped", "requirement": "r",
-             "weight": 1, "test": "tests/x.py::test_skip", "expected": "e"},
+            {
+                "id": "C1",
+                "domain": "security",
+                "title": "passing",
+                "requirement": "r",
+                "weight": 1,
+                "test": "tests/x.py::test_pass",
+                "expected": "e",
+            },
+            {
+                "id": "C2",
+                "domain": "security",
+                "title": "failing",
+                "requirement": "r",
+                "weight": 1,
+                "test": "tests/x.py::test_fail",
+                "expected": "e",
+            },
+            {
+                "id": "C3",
+                "domain": "security",
+                "title": "unmapped",
+                "requirement": "r",
+                "weight": 1,
+                "expected": "e",
+            },
+            {
+                "id": "C4",
+                "domain": "security",
+                "title": "missing",
+                "requirement": "r",
+                "weight": 1,
+                "test": "tests/x.py::test_never_ran",
+                "expected": "e",
+            },
+            {
+                "id": "C5",
+                "domain": "security",
+                "title": "skipped",
+                "requirement": "r",
+                "weight": 1,
+                "test": "tests/x.py::test_skip",
+                "expected": "e",
+            },
         ]
     }
     outcomes = {
         "tests/x.py::test_pass": evidence.TestOutcome("tests/x.py::test_pass", True, False, 5),
-        "tests/x.py::test_fail": evidence.TestOutcome(
-            "tests/x.py::test_fail", False, False, 5, "boom"
-        ),
+        "tests/x.py::test_fail": evidence.TestOutcome("tests/x.py::test_fail", False, False, 5, "boom"),
         "tests/x.py::test_skip": evidence.TestOutcome("tests/x.py::test_skip", False, True, 0),
     }
     controls = {c.control_id: c for c in evidence.evaluate_controls(catalogue, outcomes)}
@@ -216,8 +248,28 @@ def test_bundle_is_written_and_hashed(tmp_path: Path) -> None:
 
 # ------------------------------------------------- catalogue is loadable
 @pytest.mark.unit
-def test_the_shipped_control_catalogue_loads_and_totals_one_hundred() -> None:
+def test_the_shipped_control_catalogue_is_internally_consistent() -> None:
+    """The catalogue declares its own total rather than being pinned to 100.
+
+    Pinning the total would mean a new control the platform cannot yet satisfy
+    could only be admitted by shrinking an existing one — which would raise the
+    score without changing the platform.
+    """
     catalogue = evidence.load_controls()
-    assert sum(c["weight"] for c in catalogue["controls"]) == 100
-    assert sum(catalogue["domains"].values()) == 100
+    declared = catalogue["total_weight"]
+    assert sum(c["weight"] for c in catalogue["controls"]) == declared
+    assert sum(catalogue["domains"].values()) == declared
     assert any(c.get("critical") for c in catalogue["controls"])
+
+
+@pytest.mark.unit
+def test_the_catalogue_admits_what_the_platform_has_not_earned() -> None:
+    """Controls with no test must exist and must score zero.
+
+    Deployment to a cluster, independent assessment and production operation
+    are unevidenced. They are in the catalogue so the score reflects their
+    absence instead of quietly omitting them.
+    """
+    catalogue = evidence.load_controls()
+    unevidenced = {c["id"] for c in catalogue["controls"] if not c.get("test")}
+    assert {"DEP-003", "IND-001", "IND-002"} <= unevidenced

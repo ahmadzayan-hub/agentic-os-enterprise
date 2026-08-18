@@ -121,13 +121,17 @@ def verify_totp(session: Session, user_id: str, code: str | None) -> bool:
     """Verify a TOTP code, rejecting replays and unenrolled users."""
     if not code or not code.strip().isdigit():
         return False
-    row = session.execute(
-        text(
-            "SELECT method, secret_ciphertext, kms_backend, digits, period_seconds, "
-            "last_counter FROM auth_bootstrap_mfa(:u)"
-        ),
-        {"u": user_id},
-    ).mappings().first()
+    row = (
+        session.execute(
+            text(
+                "SELECT method, secret_ciphertext, kms_backend, digits, period_seconds, "
+                "last_counter FROM auth_bootstrap_mfa(:u)"
+            ),
+            {"u": user_id},
+        )
+        .mappings()
+        .first()
+    )
     if row is None or not row["secret_ciphertext"]:
         # Enrolment is required before a factor can be presented. Failing here
         # is the fail-closed path for an account that must use MFA.

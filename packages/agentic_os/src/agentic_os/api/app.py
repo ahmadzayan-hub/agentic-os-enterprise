@@ -8,9 +8,8 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict, deque
-from typing import Any
-
 from decimal import Decimal
+from typing import Any
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -45,6 +44,7 @@ class NumericJSONResponse(JSONResponse):
         return json.dumps(
             content, ensure_ascii=False, allow_nan=False, separators=(",", ":"), default=default
         ).encode("utf-8")
+
 
 #: The API returns JSON only, so its policy is maximally restrictive. The web
 #: application ships its own policy suited to rendering.
@@ -163,9 +163,7 @@ def create_app(*, include_docs: bool = True) -> FastAPI:
         # The response class must be passed here as well as on the app: a router
         # created with a bare APIRouter() carries its own JSONResponse default,
         # which would otherwise win and re-introduce Decimal-as-string.
-        app.include_router(
-            router, prefix=API_PREFIX, default_response_class=NumericJSONResponse
-        )
+        app.include_router(router, prefix=API_PREFIX, default_response_class=NumericJSONResponse)
 
     @app.get("/health", tags=["platform"])
     def health() -> dict[str, Any]:
@@ -195,9 +193,7 @@ def create_app(*, include_docs: bool = True) -> FastAPI:
         from agentic_os.core.registry import load_registries
 
         registries = load_registries()
-        implemented = [
-            k for k, t in registries.tools.items() if t["implementation_status"] == "IMPLEMENTED"
-        ]
+        implemented = [k for k, t in registries.tools.items() if t["implementation_status"] == "IMPLEMENTED"]
         declared_only = [
             k for k, t in registries.tools.items() if t["implementation_status"] != "IMPLEMENTED"
         ]
@@ -205,14 +201,10 @@ def create_app(*, include_docs: bool = True) -> FastAPI:
             "agents": sorted(registries.agents),
             "skills": {
                 "deterministic": sorted(
-                    k
-                    for k, s in registries.skills.items()
-                    if s["execution_mode"] == "DETERMINISTIC"
+                    k for k, s in registries.skills.items() if s["execution_mode"] == "DETERMINISTIC"
                 ),
                 "model_backed": sorted(
-                    k
-                    for k, s in registries.skills.items()
-                    if s["execution_mode"] != "DETERMINISTIC"
+                    k for k, s in registries.skills.items() if s["execution_mode"] != "DETERMINISTIC"
                 ),
             },
             "tools": {

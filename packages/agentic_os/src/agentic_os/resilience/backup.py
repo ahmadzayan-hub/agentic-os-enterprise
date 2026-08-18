@@ -122,8 +122,7 @@ def _run(command: list[str], env: dict[str, str], *, what: str) -> str:
     )
     if completed.returncode != 0:
         raise RuntimeError(
-            f"{what} failed with exit code {completed.returncode}: "
-            f"{completed.stderr.strip()[:2000]}"
+            f"{what} failed with exit code {completed.returncode}: {completed.stderr.strip()[:2000]}"
         )
     return completed.stdout
 
@@ -189,9 +188,7 @@ def _verify_ledger(engine_url: URL) -> dict[str, Any]:
             broken: list[str] = []
             for tenant_id in tenants:
                 row = conn.execute(
-                    text(
-                        "SELECT checked, broken_at FROM audit_verify_chain(CAST(:t AS uuid))"
-                    ),
+                    text("SELECT checked, broken_at FROM audit_verify_chain(CAST(:t AS uuid))"),
                     {"t": tenant_id},
                 ).one()
                 checked += int(row.checked)
@@ -299,14 +296,30 @@ def run_exercise(
 
     try:
         _run(
-            ["psql", *admin_args, "-d", admin.database or "postgres", "-v", "ON_ERROR_STOP=1",
-             "-c", f'CREATE DATABASE "{scratch}"'],
+            [
+                "psql",
+                *admin_args,
+                "-d",
+                admin.database or "postgres",
+                "-v",
+                "ON_ERROR_STOP=1",
+                "-c",
+                f'CREATE DATABASE "{scratch}"',
+            ],
             admin_env,
             what="CREATE DATABASE",
         )
         _run(
-            ["pg_restore", *admin_args, "-d", scratch, "--no-owner", "--no-password",
-             "--exit-on-error", str(artifact)],
+            [
+                "pg_restore",
+                *admin_args,
+                "-d",
+                scratch,
+                "--no-owner",
+                "--no-password",
+                "--exit-on-error",
+                str(artifact),
+            ],
             admin_env,
             what="pg_restore",
         )
@@ -404,9 +417,15 @@ def run_exercise(
 def _drop_database(admin: URL, args: list[str], env: dict[str, str], name: str) -> None:
     if not _SAFE_DB_NAME.match(name):  # pragma: no cover - defensive
         raise RuntimeError(f"refusing to drop database with unexpected name '{name}'")
-    subprocess.run(  # noqa: S603 - fixed argv, validated name, no shell
-        ["psql", *args, "-d", admin.database or "postgres", "-c",
-         f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'],
+    subprocess.run(  # noqa: S603, S607 - fixed argv, validated name, no shell
+        [  # noqa: S607 - psql resolved from PATH by design
+            "psql",
+            *args,
+            "-d",
+            admin.database or "postgres",
+            "-c",
+            f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)',
+        ],
         env=env,
         capture_output=True,
         text=True,
@@ -417,11 +436,15 @@ def _drop_database(admin: URL, args: list[str], env: dict[str, str], name: str) 
 def latest_result() -> dict[str, Any] | None:
     """The most recent recorded exercise, for the operations surface."""
     with provisioning_session_scope() as session:
-        row = session.execute(
-            text(
-                "SELECT outcome, rpo_achieved_seconds, rto_achieved_seconds, verified_rows, "
-                "notes, executed_by, executed_at FROM restore_tests "
-                "ORDER BY executed_at DESC LIMIT 1"
+        row = (
+            session.execute(
+                text(
+                    "SELECT outcome, rpo_achieved_seconds, rto_achieved_seconds, verified_rows, "
+                    "notes, executed_by, executed_at FROM restore_tests "
+                    "ORDER BY executed_at DESC LIMIT 1"
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
         return dict(row) if row else None

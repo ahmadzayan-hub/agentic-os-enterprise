@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agentic-config
+data:
+  AGENTIC_APP_ENV: test
+  AGENTIC_POLICY_MODE: enforce
+  AGENTIC_SECRET_BACKEND: env

@@ -20,9 +20,10 @@ Guarantees:
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Callable
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -30,7 +31,7 @@ from sqlalchemy.orm import Session
 from agentic_os.core.context import ExecutionContext, WorkflowIdentity
 from agentic_os.core.crypto import content_hash
 from agentic_os.core.errors import AgenticError, Conflict, NotFound, ValidationError
-from agentic_os.core.ids import prefixed_id, utcnow
+from agentic_os.core.ids import utcnow
 from agentic_os.runtime.events import Event, publish
 
 LEASE_SECONDS = 60
@@ -81,16 +82,13 @@ def validate_definition(definition: dict[str, Any]) -> list[str]:
         step_type = step.get("type")
         if step_type not in _STEP_HANDLERS:
             problems.append(
-                f"step '{key}' has unknown type '{step_type}'; "
-                f"registered types are {sorted(_STEP_HANDLERS)}"
+                f"step '{key}' has unknown type '{step_type}'; registered types are {sorted(_STEP_HANDLERS)}"
             )
         if int(step.get("max_attempts", DEFAULT_MAX_ATTEMPTS)) < 1:
             problems.append(f"step '{key}' has max_attempts below 1")
         compensates = step.get("compensates")
         if compensates is not None and compensates not in keys:
-            problems.append(
-                f"step '{key}' compensates '{compensates}', which does not precede it"
-            )
+            problems.append(f"step '{key}' compensates '{compensates}', which does not precede it")
     return problems
 
 
@@ -125,8 +123,14 @@ def register_workflow(
             RETURNING id, current_version
             """
         ),
-        {"t": ctx.tenant_id, "k": workflow_key, "n": name, "d": description, "o": owner_team,
-         "mc": max_concurrent_runs},
+        {
+            "t": ctx.tenant_id,
+            "k": workflow_key,
+            "n": name,
+            "d": description,
+            "o": owner_team,
+            "mc": max_concurrent_runs,
+        },
     ).one()
 
     session.execute(
@@ -175,13 +179,17 @@ def start(
     parent_workflow_run_id: str | None = None,
     deadline_seconds: int = 3600,
 ) -> str:
-    workflow = session.execute(
-        text(
-            "SELECT id, current_version, max_concurrent_runs, status FROM workflows "
-            "WHERE tenant_id = :t AND workflow_key = :k"
-        ),
-        {"t": ctx.tenant_id, "k": workflow_key},
-    ).mappings().first()
+    workflow = (
+        session.execute(
+            text(
+                "SELECT id, current_version, max_concurrent_runs, status FROM workflows "
+                "WHERE tenant_id = :t AND workflow_key = :k"
+            ),
+            {"t": ctx.tenant_id, "k": workflow_key},
+        )
+        .mappings()
+        .first()
+    )
     if workflow is None:
         raise NotFound(f"workflow '{workflow_key}' is not registered")
     if workflow["status"] != "ACTIVE":
@@ -260,9 +268,7 @@ def _load_definition(session: Session, tenant_id: str, run: dict) -> dict[str, A
     return row if isinstance(row, dict) else json.loads(row)
 
 
-def claim_due_runs(
-    session: Session, worker_id: str, *, tenant_id: str, limit: int = 10
-) -> list[str]:
+def claim_due_runs(session: Session, worker_id: str, *, tenant_id: str, limit: int = 10) -> list[str]:
     """Lease runs that are ready to advance, within one tenant.
 
     Deliberately tenant-scoped. Row level security has no bypass predicate, so
@@ -301,10 +307,14 @@ def advance(
     session: Session, ctx: ExecutionContext, workflow_run_id: str, *, worker_id: str = "inline"
 ) -> WorkflowRunState:
     """Advance one workflow run by one step."""
-    run = session.execute(
-        text("SELECT * FROM workflow_runs WHERE tenant_id = :t AND id = CAST(:i AS uuid)"),
-        {"t": ctx.tenant_id, "i": workflow_run_id},
-    ).mappings().first()
+    run = (
+        session.execute(
+            text("SELECT * FROM workflow_runs WHERE tenant_id = :t AND id = CAST(:i AS uuid)"),
+            {"t": ctx.tenant_id, "i": workflow_run_id},
+        )
+        .mappings()
+        .first()
+    )
     if run is None:
         raise NotFound(f"workflow run {workflow_run_id} not found")
 
@@ -316,9 +326,7 @@ def advance(
         return _finish(session, ctx, run, "CANCELLED", state, error_message="cancelled by operator")
 
     if run["deadline_at"] is not None and run["deadline_at"] <= utcnow():
-        return _compensate_and_fail(
-            session, ctx, run, state, "TIMEOUT", "workflow exceeded its deadline"
-        )
+        return _compensate_and_fail(session, ctx, run, state, "TIMEOUT", "workflow exceeded its deadline")
 
     definition = _load_definition(session, ctx.tenant_id, run)
     steps = definition["steps"]
@@ -337,13 +345,17 @@ def advance(
     )
 
     idempotency_key = f"{workflow_run_id}:{index}:{step['key']}"
-    existing = session.execute(
-        text(
-            "SELECT id, status, output, attempt FROM workflow_steps "
-            "WHERE workflow_run_id = CAST(:w AS uuid) AND step_index = :i"
-        ),
-        {"w": workflow_run_id, "i": index},
-    ).mappings().first()
+    existing = (
+        session.execute(
+            text(
+                "SELECT id, status, output, attempt FROM workflow_steps "
+                "WHERE workflow_run_id = CAST(:w AS uuid) AND step_index = :i"
+            ),
+            {"w": workflow_run_id, "i": index},
+        )
+        .mappings()
+        .first()
+    )
 
     if existing is not None and existing["status"] == "SUCCEEDED":
         # Already done — never re-execute a completed step.
@@ -364,7 +376,10 @@ def advance(
                 """
             ),
             {
-                "t": ctx.tenant_id, "w": workflow_run_id, "i": index, "k": step["key"],
+                "t": ctx.tenant_id,
+                "w": workflow_run_id,
+                "i": index,
+                "k": step["key"],
                 "type": step["type"],
                 "max_attempts": int(step.get("max_attempts", DEFAULT_MAX_ATTEMPTS)),
                 "backoff": int(step.get("backoff_seconds", 2)),
@@ -389,7 +404,11 @@ def advance(
     handler = _STEP_HANDLERS.get(step["type"])
     if handler is None:
         return _compensate_and_fail(
-            session, ctx, run, state, "CONFIGURATION",
+            session,
+            ctx,
+            run,
+            state,
+            "CONFIGURATION",
             f"no handler registered for step type '{step['type']}'",
         )
 
@@ -410,7 +429,15 @@ def advance(
         return WorkflowRunState(workflow_run_id, "AWAITING_APPROVAL", index, state)
     except AgenticError as exc:
         return _handle_step_failure(
-            session, ctx, run, state, step, step_id, attempt, exc.error_class.value, exc.message,
+            session,
+            ctx,
+            run,
+            state,
+            step,
+            step_id,
+            attempt,
+            exc.error_class.value,
+            exc.message,
             retryable=exc.retryable,
         )
     except Exception as exc:  # noqa: BLE001
@@ -456,14 +483,22 @@ def _next_step(
 
 
 def _handle_step_failure(
-    session: Session, ctx: ExecutionContext, run: dict, state: dict, step: dict,
-    step_id: str, attempt: int, error_class: str, message: str, *, retryable: bool,
+    session: Session,
+    ctx: ExecutionContext,
+    run: dict,
+    state: dict,
+    step: dict,
+    step_id: str,
+    attempt: int,
+    error_class: str,
+    message: str,
+    *,
+    retryable: bool,
 ) -> WorkflowRunState:
     max_attempts = int(step.get("max_attempts", DEFAULT_MAX_ATTEMPTS))
     session.execute(
         text(
-            "UPDATE workflow_steps SET status = 'FAILED', error_class = :c, error_message = :m "
-            "WHERE id = :i"
+            "UPDATE workflow_steps SET status = 'FAILED', error_class = :c, error_message = :m WHERE id = :i"
         ),
         {"c": error_class, "m": message[:2000], "i": step_id},
     )
@@ -477,9 +512,7 @@ def _handle_step_failure(
             ),
             {"b": backoff, "i": run["id"]},
         )
-        session.execute(
-            text("UPDATE workflow_steps SET status = 'PENDING' WHERE id = :i"), {"i": step_id}
-        )
+        session.execute(text("UPDATE workflow_steps SET status = 'PENDING' WHERE id = :i"), {"i": step_id})
         return WorkflowRunState(str(run["id"]), "RUNNING", int(run["current_step"]), state)
 
     session.execute(
@@ -491,30 +524,42 @@ def _handle_step_failure(
             """
         ),
         {
-            "t": ctx.tenant_id, "w": run["id"], "s": step_id,
+            "t": ctx.tenant_id,
+            "w": run["id"],
+            "s": step_id,
             "reason": f"step '{step['key']}' failed after {attempt} attempt(s)",
-            "ec": error_class, "p": json.dumps({"message": message}, default=str), "a": attempt,
+            "ec": error_class,
+            "p": json.dumps({"message": message}, default=str),
+            "a": attempt,
         },
     )
     return _compensate_and_fail(session, ctx, run, state, error_class, message)
 
 
 def _compensate_and_fail(
-    session: Session, ctx: ExecutionContext, run: dict, state: dict,
-    error_class: str, message: str,
+    session: Session,
+    ctx: ExecutionContext,
+    run: dict,
+    state: dict,
+    error_class: str,
+    message: str,
 ) -> WorkflowRunState:
     """Undo completed steps newest-first, then mark the run failed."""
     definition = _load_definition(session, ctx.tenant_id, run)
     compensated: list[str] = []
 
-    completed = session.execute(
-        text(
-            "SELECT id, step_index, step_key FROM workflow_steps "
-            "WHERE workflow_run_id = :w AND status = 'SUCCEEDED' AND compensated = false "
-            "ORDER BY step_index DESC"
-        ),
-        {"w": run["id"]},
-    ).mappings().all()
+    completed = (
+        session.execute(
+            text(
+                "SELECT id, step_index, step_key FROM workflow_steps "
+                "WHERE workflow_run_id = :w AND status = 'SUCCEEDED' AND compensated = false "
+                "ORDER BY step_index DESC"
+            ),
+            {"w": run["id"]},
+        )
+        .mappings()
+        .all()
+    )
 
     steps_by_key = {s["key"]: s for s in definition["steps"]}
     for row in completed:
@@ -541,7 +586,8 @@ def _compensate_and_fail(
                     """
                 ),
                 {
-                    "t": ctx.tenant_id, "w": run["id"],
+                    "t": ctx.tenant_id,
+                    "w": run["id"],
                     "r": f"compensation for '{row['step_key']}' failed",
                     "p": json.dumps({"error": str(exc)}, default=str),
                 },
@@ -549,14 +595,19 @@ def _compensate_and_fail(
 
     status = "COMPENSATED" if compensated else "FAILED"
     state["_compensated_steps"] = compensated
-    return _finish(
-        session, ctx, run, status, state, error_class=error_class, error_message=message
-    )
+    return _finish(session, ctx, run, status, state, error_class=error_class, error_message=message)
 
 
 def _finish(
-    session: Session, ctx: ExecutionContext, run: dict, status: str, state: dict,
-    *, output: dict | None = None, error_class: str = "", error_message: str = "",
+    session: Session,
+    ctx: ExecutionContext,
+    run: dict,
+    status: str,
+    state: dict,
+    *,
+    output: dict | None = None,
+    error_class: str = "",
+    error_message: str = "",
 ) -> WorkflowRunState:
     session.execute(
         text(
@@ -605,7 +656,12 @@ def run_to_completion(
     for _ in range(max_iterations):
         state = advance(session, ctx, workflow_run_id)
         if state.status in (
-            "SUCCEEDED", "FAILED", "CANCELLED", "COMPENSATED", "TIMED_OUT", "AWAITING_APPROVAL"
+            "SUCCEEDED",
+            "FAILED",
+            "CANCELLED",
+            "COMPENSATED",
+            "TIMED_OUT",
+            "AWAITING_APPROVAL",
         ):
             return state
     raise Conflict(

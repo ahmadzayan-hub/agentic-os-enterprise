@@ -71,7 +71,9 @@ class GraphEdge:
     source_ref: str = ""
 
 
-def upsert_node(session: Session, ctx: ExecutionContext, node: GraphNode, *, document_id: str | None = None) -> str:
+def upsert_node(
+    session: Session, ctx: ExecutionContext, node: GraphNode, *, document_id: str | None = None
+) -> str:
     row = session.execute(
         text(
             """
@@ -171,7 +173,7 @@ def extract_relations(content: str, known_keys: set[str]) -> list[GraphEdge]:
             if any(hint in lowered for hint in hints):
                 relation, confidence = candidate, 0.75
                 break
-        for (left_pos, left), (right_pos, right) in zip(found, found[1:], strict=False):
+        for (_left_pos, left), (_right_pos, right) in zip(found, found[1:], strict=False):
             if left == right:
                 continue
             edges.append(
@@ -252,9 +254,10 @@ def query(
     if node_key:
         return traverse(session, ctx, node_key=node_key, depth=depth, relation=relation, limit=limit)
 
-    rows = session.execute(
-        text(
-            """
+    rows = (
+        session.execute(
+            text(
+                """
             SELECT node_key, node_type, label, properties, classification, confidence, source_ref
             FROM knowledge_nodes
             WHERE tenant_id = :t
@@ -266,9 +269,12 @@ def query(
             ORDER BY label
             LIMIT :limit
             """
-        ),
-        {"t": ctx.tenant_id, "ntype": node_type, "rank": rank, "limit": limit},
-    ).mappings().all()
+            ),
+            {"t": ctx.tenant_id, "ntype": node_type, "rank": rank, "limit": limit},
+        )
+        .mappings()
+        .all()
+    )
     return {"nodes": [dict(r) for r in rows], "edges": [], "depth": 0}
 
 
@@ -284,9 +290,10 @@ def traverse(
 ) -> dict[str, Any]:
     """Breadth-first traversal from a node, bounded by depth and clearance."""
     rank = _clearance_rank(ctx)
-    root = session.execute(
-        text(
-            """
+    root = (
+        session.execute(
+            text(
+                """
             SELECT node_key, node_type, label, properties, classification
             FROM knowledge_nodes
             WHERE tenant_id = :t AND node_key = :k
@@ -294,9 +301,12 @@ def traverse(
                     WHEN 'PUBLIC' THEN 0 WHEN 'INTERNAL' THEN 1
                     WHEN 'CONFIDENTIAL' THEN 2 ELSE 3 END <= :rank
             """
-        ),
-        {"t": ctx.tenant_id, "k": node_key, "rank": rank},
-    ).mappings().first()
+            ),
+            {"t": ctx.tenant_id, "k": node_key, "rank": rank},
+        )
+        .mappings()
+        .first()
+    )
     if root is None:
         raise NotFound(f"graph node '{node_key}' not found or not accessible")
 
@@ -308,9 +318,10 @@ def traverse(
         current, level = frontier.popleft()
         if level >= depth:
             continue
-        rows = session.execute(
-            text(
-                """
+        rows = (
+            session.execute(
+                text(
+                    """
                 SELECT e.relation, e.confidence, e.properties,
                        fn.node_key AS from_key, tn.node_key AS to_key,
                        tn.node_type AS to_type, tn.label AS to_label,
@@ -334,9 +345,19 @@ def traverse(
                         WHEN 'CONFIDENTIAL' THEN 2 ELSE 3 END <= :rank
                 LIMIT :limit
                 """
-            ),
-            {"t": ctx.tenant_id, "k": current, "rel": relation, "dir": direction, "rank": rank, "limit": limit},
-        ).mappings().all()
+                ),
+                {
+                    "t": ctx.tenant_id,
+                    "k": current,
+                    "rel": relation,
+                    "dir": direction,
+                    "rank": rank,
+                    "limit": limit,
+                },
+            )
+            .mappings()
+            .all()
+        )
 
         for row in rows:
             edges.append(
@@ -373,13 +394,15 @@ def traverse(
 
 
 def impact_analysis(
-    session: Session, ctx: ExecutionContext, *, node_key: str, depth: int = 3,
+    session: Session,
+    ctx: ExecutionContext,
+    *,
+    node_key: str,
+    depth: int = 3,
     direction: str = "downstream",
 ) -> dict[str, Any]:
     """What a change to this node could affect, ranked by proximity."""
-    result = traverse(
-        session, ctx, node_key=node_key, depth=depth, direction=direction, relation=""
-    )
+    result = traverse(session, ctx, node_key=node_key, depth=depth, direction=direction, relation="")
 
     distance: dict[str, int] = {node_key: 0}
     adjacency: dict[str, list[str]] = {}

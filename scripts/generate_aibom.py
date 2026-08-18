@@ -26,8 +26,11 @@ from agentic_os.core.registry import PROMPTS_DIR, load_registries  # noqa: E402
 
 def _commit() -> str:
     try:
-        return subprocess.run(  # noqa: S603
-            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=10
+        return subprocess.run(  # noqa: S603, S607 - git resolved from PATH by design
+            ["git", "rev-parse", "HEAD"],  # noqa: S607 - resolved from PATH by design
+            capture_output=True,
+            text=True,
+            timeout=10,
         ).stdout.strip()
     except Exception:
         return "unknown"
@@ -160,8 +163,9 @@ def build() -> dict:
             "machine-learning-model",
             "embedding/" + settings.embedding_provider,
             "1.0.0",
-            content_hash({"provider": settings.embedding_provider,
-                          "dimensions": settings.embedding_dimensions}),
+            content_hash(
+                {"provider": settings.embedding_provider, "dimensions": settings.embedding_dimensions}
+            ),
             {
                 "dimensions": settings.embedding_dimensions,
                 "role": "retrieval",
@@ -197,10 +201,13 @@ def build() -> dict:
             },
             "properties": [
                 {"name": "commit", "value": _commit()},
-                {"name": "aibom.note", "value": (
-                    "Lists every artefact that determines system behaviour: models, prompts, "
-                    "agent contracts, skills, tools, policies, embeddings and guardrails."
-                )},
+                {
+                    "name": "aibom.note",
+                    "value": (
+                        "Lists every artefact that determines system behaviour: models, prompts, "
+                        "agent contracts, skills, tools, policies, embeddings and guardrails."
+                    ),
+                },
             ],
         },
         "components": components,

@@ -9,7 +9,6 @@ entry whose hash is unchanged produces no new version row.
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any
 
 from sqlalchemy import text
@@ -618,4 +617,3 @@ def seed_domain(tenant_id: str, organization_id: str) -> dict[str, int]:
 
     summary.update(seed_corpus(tenant_id, organization_id))
     return summary
-

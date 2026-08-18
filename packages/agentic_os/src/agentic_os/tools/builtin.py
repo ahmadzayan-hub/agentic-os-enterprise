@@ -14,8 +14,9 @@ import json
 import math
 import operator
 import statistics
+from collections.abc import Callable
 from datetime import timedelta
-from typing import Any, Callable
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -103,8 +104,12 @@ def _eval_node(node: ast.AST, variables: dict[str, Any]) -> Any:
         for op_node, comparator in zip(node.ops, node.comparators, strict=True):
             right = _eval_node(comparator, variables)
             comparison = {
-                ast.Eq: operator.eq, ast.NotEq: operator.ne, ast.Lt: operator.lt,
-                ast.LtE: operator.le, ast.Gt: operator.gt, ast.GtE: operator.ge,
+                ast.Eq: operator.eq,
+                ast.NotEq: operator.ne,
+                ast.Lt: operator.lt,
+                ast.LtE: operator.le,
+                ast.Gt: operator.gt,
+                ast.GtE: operator.ge,
             }.get(type(op_node))
             if comparison is None or not comparison(left, right):
                 return False
@@ -113,9 +118,7 @@ def _eval_node(node: ast.AST, variables: dict[str, Any]) -> Any:
     raise ValidationError(f"unsupported expression element: {type(node).__name__}")
 
 
-def calc_evaluate(
-    session: Session, ctx: ExecutionContext, params: dict[str, Any]
-) -> dict[str, Any]:
+def calc_evaluate(session: Session, ctx: ExecutionContext, params: dict[str, Any]) -> dict[str, Any]:
     """Evaluate an arithmetic expression with no access to Python internals."""
     expression = str(params["expression"])
     variables = dict(params.get("variables") or {})
@@ -160,9 +163,7 @@ def calc_evaluate(
 # ---------------------------------------------------------------------------
 # knowledge.*
 # ---------------------------------------------------------------------------
-def knowledge_search(
-    session: Session, ctx: ExecutionContext, params: dict[str, Any]
-) -> dict[str, Any]:
+def knowledge_search(session: Session, ctx: ExecutionContext, params: dict[str, Any]) -> dict[str, Any]:
     result = retrieval.search(
         session,
         ctx,
@@ -200,9 +201,7 @@ def graph_query(session: Session, ctx: ExecutionContext, params: dict[str, Any])
     )
 
 
-def graph_impact_analysis(
-    session: Session, ctx: ExecutionContext, params: dict[str, Any]
-) -> dict[str, Any]:
+def graph_impact_analysis(session: Session, ctx: ExecutionContext, params: dict[str, Any]) -> dict[str, Any]:
     return graph.impact_analysis(
         session,
         ctx,
@@ -235,35 +234,41 @@ def _num(value: Any) -> float:
 
 
 def _load_dataset(session: Session, ctx: ExecutionContext, dataset_key: str) -> dict[str, Any]:
-    row = session.execute(
-        text(
-            "SELECT id, dataset_key, name, schema_fields, row_count, quality_score, "
-            "quality_detail, classification, freshness_at, source_system "
-            "FROM datasets WHERE tenant_id = :t AND dataset_key = :k AND status = 'ACTIVE'"
-        ),
-        {"t": ctx.tenant_id, "k": dataset_key},
-    ).mappings().first()
+    row = (
+        session.execute(
+            text(
+                "SELECT id, dataset_key, name, schema_fields, row_count, quality_score, "
+                "quality_detail, classification, freshness_at, source_system "
+                "FROM datasets WHERE tenant_id = :t AND dataset_key = :k AND status = 'ACTIVE'"
+            ),
+            {"t": ctx.tenant_id, "k": dataset_key},
+        )
+        .mappings()
+        .first()
+    )
     if row is None:
         raise NotFound(f"dataset '{dataset_key}' not found")
     return dict(row)
 
 
-def dataset_query(
-    session: Session, ctx: ExecutionContext, params: dict[str, Any]
-) -> dict[str, Any]:
+def dataset_query(session: Session, ctx: ExecutionContext, params: dict[str, Any]) -> dict[str, Any]:
     """Deterministic filter/aggregate over a governed dataset, with lineage."""
     dataset = _load_dataset(session, ctx, str(params["dataset_key"]))
-    rows = session.execute(
-        text(
-            """
+    rows = (
+        session.execute(
+            text(
+                """
             SELECT r.data, r.row_key, r.quality_flags, b.source_file, b.ingested_at
             FROM dataset_rows r
             JOIN dataset_batches b ON b.id = r.batch_id
             WHERE r.tenant_id = :t AND r.dataset_id = :d
             """
-        ),
-        {"t": ctx.tenant_id, "d": dataset["id"]},
-    ).mappings().all()
+            ),
+            {"t": ctx.tenant_id, "d": dataset["id"]},
+        )
+        .mappings()
+        .all()
+    )
 
     records = [
         {
@@ -307,9 +312,7 @@ def dataset_query(
             groups: dict[Any, list[Any]] = {}
             for record in records:
                 key = record.get(group_by)
-                groups.setdefault(key, []).append(
-                    record.get(agg_field) if agg_field else 1
-                )
+                groups.setdefault(key, []).append(record.get(agg_field) if agg_field else 1)
             result = [
                 {group_by: key, aggregate: apply(values), "row_count": len(values)}
                 for key, values in groups.items()
@@ -329,9 +332,7 @@ def dataset_query(
                 "source_system": dataset["source_system"],
                 "dataset_row_count": dataset["row_count"],
                 "freshness_at": dataset["freshness_at"],
-                "quality_score": (
-                    float(dataset["quality_score"]) if dataset["quality_score"] else None
-                ),
+                "quality_score": (float(dataset["quality_score"]) if dataset["quality_score"] else None),
             },
             "deterministic": True,
         }
@@ -360,15 +361,17 @@ def dataset_query(
     }
 
 
-def dataset_profile(
-    session: Session, ctx: ExecutionContext, params: dict[str, Any]
-) -> dict[str, Any]:
+def dataset_profile(session: Session, ctx: ExecutionContext, params: dict[str, Any]) -> dict[str, Any]:
     """Score completeness, validity, uniqueness, consistency and freshness."""
     dataset = _load_dataset(session, ctx, str(params["dataset_key"]))
-    rows = session.execute(
-        text("SELECT data FROM dataset_rows WHERE tenant_id = :t AND dataset_id = :d"),
-        {"t": ctx.tenant_id, "d": dataset["id"]},
-    ).scalars().all()
+    rows = (
+        session.execute(
+            text("SELECT data FROM dataset_rows WHERE tenant_id = :t AND dataset_id = :d"),
+            {"t": ctx.tenant_id, "d": dataset["id"]},
+        )
+        .scalars()
+        .all()
+    )
     records = [r if isinstance(r, dict) else json.loads(r) for r in rows]
 
     if not records:
@@ -466,20 +469,30 @@ def analytics_query_metrics(
     metric = str(params["metric"])
     window_hours = int(params.get("window_hours", 24))
     aggregate = str(params.get("aggregate", "sum"))
-    function = {"sum": "sum", "avg": "avg", "min": "min", "max": "max", "count": "count"}[aggregate]
+    # Allow-list, not a lookup convenience: the chosen value is interpolated
+    # into the statement, so anything outside this map must be refused rather
+    # than reaching the database.
+    allowed = {"sum": "sum", "avg": "avg", "min": "min", "max": "max", "count": "count"}
+    if aggregate not in allowed:
+        raise ValidationError(f"aggregate must be one of {sorted(allowed)}, not '{aggregate}'")
+    function = allowed[aggregate]
 
-    row = session.execute(
-        text(
-            f"""
+    row = (
+        session.execute(
+            text(
+                f"""
             SELECT {function}(value) AS result, count(*) AS samples,
                    min(recorded_at) AS first_sample, max(recorded_at) AS last_sample
             FROM metric_samples
             WHERE tenant_id = :t AND metric = :m
               AND recorded_at >= now() - make_interval(hours => :hours)
             """
-        ),
-        {"t": ctx.tenant_id, "m": metric, "hours": window_hours},
-    ).mappings().one()
+            ),
+            {"t": ctx.tenant_id, "m": metric, "hours": window_hours},
+        )
+        .mappings()
+        .one()
+    )
 
     return {
         "metric": metric,
@@ -507,27 +520,31 @@ def tasks_create(session: Session, ctx: ExecutionContext, params: dict[str, Any]
             raise NotFound(f"no user with email '{email}' in this tenant")
         assignee_id = row.id
 
-    row = session.execute(
-        text(
-            """
+    row = (
+        session.execute(
+            text(
+                """
             INSERT INTO tasks (tenant_id, run_id, title, description, assignee_user_id,
                                assignee_agent_key, priority, due_at)
             VALUES (:t, :run, :title, :desc, :assignee, :agent, :priority,
                     CAST(NULLIF(:due, '') AS timestamptz))
             RETURNING id, title, status, priority, created_at
             """
-        ),
-        {
-            "t": ctx.tenant_id,
-            "run": ctx.run_id or None,
-            "title": str(params["title"]),
-            "desc": str(params.get("description", "")),
-            "assignee": assignee_id,
-            "agent": ctx.agent.agent_id if ctx.agent else "",
-            "priority": str(params.get("priority", "MEDIUM")),
-            "due": str(params.get("due_at", "")),
-        },
-    ).mappings().one()
+            ),
+            {
+                "t": ctx.tenant_id,
+                "run": ctx.run_id or None,
+                "title": str(params["title"]),
+                "desc": str(params.get("description", "")),
+                "assignee": assignee_id,
+                "agent": ctx.agent.agent_id if ctx.agent else "",
+                "priority": str(params.get("priority", "MEDIUM")),
+                "due": str(params.get("due_at", "")),
+            },
+        )
+        .mappings()
+        .one()
+    )
     return {"task_id": str(row["id"]), **{k: v for k, v in row.items() if k != "id"}}
 
 

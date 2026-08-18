@@ -129,9 +129,7 @@ def validate_registries() -> list[str]:
         if overlap:
             problems.append(f"agent {agent_id}: tool(s) both allowed and denied: {sorted(overlap)}")
         if "*" in denied_tools and allowed_tools:
-            problems.append(
-                f"agent {agent_id}: denies all tools but also allows {sorted(allowed_tools)}"
-            )
+            problems.append(f"agent {agent_id}: denies all tools but also allows {sorted(allowed_tools)}")
 
         for key in contract["skills"].get("allowed", []):
             if key not in registries.skills:
@@ -164,9 +162,7 @@ def validate_registries() -> list[str]:
 
     conductor = registries.agents.get("conductor")
     if conductor is not None and conductor["tools"].get("allowed"):
-        problems.append(
-            "Architecture Constitution rule 17: the Conductor must hold no tool grants"
-        )
+        problems.append("Architecture Constitution rule 17: the Conductor must hold no tool grants")
 
     for skill_key, skill in registries.skills.items():
         for tool_key in skill.get("required_tools", []):

@@ -108,8 +108,7 @@ def authorize(
     if request.resource.tenant_id and request.resource.tenant_id != ctx.tenant_id:
         return _deny(
             "TENANT",
-            f"resource belongs to tenant {request.resource.tenant_id}, "
-            f"caller is bound to {ctx.tenant_id}",
+            f"resource belongs to tenant {request.resource.tenant_id}, caller is bound to {ctx.tenant_id}",
         )
 
     # --- RBAC -------------------------------------------------------------
@@ -124,9 +123,7 @@ def authorize(
 
     # --- ABAC: data classification ---------------------------------------
     if ctx.human is not None:
-        if classification_rank(request.resource.classification) > classification_rank(
-            ctx.human.clearance
-        ):
+        if classification_rank(request.resource.classification) > classification_rank(ctx.human.clearance):
             return _deny(
                 "CLEARANCE",
                 f"resource classification {request.resource.classification} exceeds "
@@ -192,9 +189,7 @@ def _principal_keys(ctx: ExecutionContext) -> frozenset[str]:
     return frozenset(keys)
 
 
-def _autonomy_ceiling(
-    ctx: ExecutionContext, agent_profile: AgentAuthorizationProfile | None
-) -> str:
+def _autonomy_ceiling(ctx: ExecutionContext, agent_profile: AgentAuthorizationProfile | None) -> str:
     """Lowest of the agent contract ceiling and the runtime agent identity."""
     candidates = []
     if agent_profile is not None:
@@ -243,9 +238,7 @@ def _check_agent_contract(
                 f"agent '{profile.agent_key}' is not permitted data domain '{domain}'",
             )
 
-    if classification_rank(resource.classification) > classification_rank(
-        profile.max_classification
-    ):
+    if classification_rank(resource.classification) > classification_rank(profile.max_classification):
         return _deny(
             "AGENT_CONTRACT",
             f"agent '{profile.agent_key}' may not handle {resource.classification} data "

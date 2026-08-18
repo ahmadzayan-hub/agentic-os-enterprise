@@ -119,9 +119,7 @@ class HttpEmbedder:
                 headers=headers,
                 timeout=settings.model_request_timeout_seconds,
             ) as client:
-                response = client.post(
-                    "/embeddings", json={"model": self.model, "input": texts}
-                )
+                response = client.post("/embeddings", json={"model": self.model, "input": texts})
                 response.raise_for_status()
                 data = response.json()
         except Exception as exc:  # pragma: no cover - network path

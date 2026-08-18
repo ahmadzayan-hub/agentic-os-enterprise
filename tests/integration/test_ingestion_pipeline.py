@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import pytest
+from agentic_os.core.context import ExecutionContext, HumanIdentity
+from agentic_os.knowledge import ingestion, pii
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from agentic_os.core.context import ExecutionContext, HumanIdentity
-from agentic_os.knowledge import ingestion, pii
 from tests.conftest import requires_db
 
 pytestmark = [pytest.mark.integration, requires_db]
@@ -33,9 +33,7 @@ def ictx(db: Session, tenant_id: str, organization_id: str) -> ExecutionContext:
 
 
 def _ingest(db, ctx, body: bytes, name: str, mime: str = "text/markdown", **kwargs):
-    return ingestion.ingest(
-        db, ctx, data=body, filename=name, mime_type=mime, title=name, **kwargs
-    )
+    return ingestion.ingest(db, ctx, data=body, filename=name, mime_type=mime, title=name, **kwargs)
 
 
 # ------------------------------------------------------------------- happy path
@@ -54,8 +52,14 @@ def test_clean_document_is_published_with_chunks_and_embeddings(db: Session, ict
 
     stages = {s.stage for s in result.stages}
     for required in (
-        "quarantine", "malware_scan", "validation", "parse", "pii_dlp",
-        "acl_inheritance", "index", "quality_gate",
+        "quarantine",
+        "malware_scan",
+        "validation",
+        "parse",
+        "pii_dlp",
+        "acl_inheritance",
+        "index",
+        "quality_gate",
     ):
         assert required in stages, f"stage '{required}' did not run"
 
@@ -139,9 +143,7 @@ def test_pii_raises_document_classification(db: Session, ictx) -> None:
     assert "EMIRATES_ID" in result.pii_labels
 
     inventory = db.execute(
-        text(
-            "SELECT count(*) FROM pii_inventory WHERE tenant_id = :t AND resource_id = :r"
-        ),
+        text("SELECT count(*) FROM pii_inventory WHERE tenant_id = :t AND resource_id = :r"),
         {"t": ictx.tenant_id, "r": result.document_id},
     ).scalar_one()
     assert inventory >= 3, "each finding must be inventoried"
@@ -155,9 +157,7 @@ def test_redaction_leaves_no_residual_fragments() -> None:
         "Card 4111 1111 1111 1111. Key sk-abcdefghij0123456789. Host 10.0.4.22."
     )
     redacted = pii.redact(body)
-    for fragment in (
-        "person@example.test", "971 4 284", "784-1985", "4111", "sk-abcdefghij", "10.0.4.22"
-    ):
+    for fragment in ("person@example.test", "971 4 284", "784-1985", "4111", "sk-abcdefghij", "10.0.4.22"):
         assert fragment not in redacted, f"'{fragment}' survived redaction"
 
 
@@ -180,7 +180,8 @@ def test_pii_coverage_gaps_are_declared() -> None:
 # ------------------------------------------------------------------------ ACL
 def test_acl_is_inherited_by_every_chunk(db: Session, ictx) -> None:
     result = _ingest(
-        db, ictx,
+        db,
+        ictx,
         b"# ACL probe\n\nThis document is restricted to a single group for testing purposes. "
         b"It exists so that the access control inheritance path has a real document to "
         b"assert against, and carries enough text to clear the quality gate.",
@@ -188,10 +189,14 @@ def test_acl_is_inherited_by_every_chunk(db: Session, ictx) -> None:
         acl=[{"principal_type": "GROUP", "principal_id": "systems-section"}],
     )
     assert result.published
-    principals = db.execute(
-        text("SELECT DISTINCT acl_principals FROM chunks WHERE document_id = CAST(:d AS uuid)"),
-        {"d": result.document_id},
-    ).scalars().all()
+    principals = (
+        db.execute(
+            text("SELECT DISTINCT acl_principals FROM chunks WHERE document_id = CAST(:d AS uuid)"),
+            {"d": result.document_id},
+        )
+        .scalars()
+        .all()
+    )
     assert principals, "chunks must carry inherited ACL principals"
     for entry in principals:
         assert "GROUP:systems-section" in entry

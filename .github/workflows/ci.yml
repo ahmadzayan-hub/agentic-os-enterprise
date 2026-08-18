@@ -186,7 +186,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build API image
-        run: docker build -f infrastructure/docker/Dockerfile.api -t agentic-os-api:ci .
+        run: docker build -f infrastructure/docker/Dockerfile --target api -t agentic-os-api:ci .
       - name: Trivy image scan
         uses: aquasecurity/trivy-action@master
         with:
@@ -205,6 +205,30 @@ jobs:
         with:
           directory: infrastructure
           soft_fail: true
+
+  deployment-manifests:
+    name: Deployment manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # These are the checks the build environment could not run: it had no
+      # container registry access, no cluster and no Terraform binary.
+      - name: Compose file is valid
+        run: docker compose config -q
+      - name: Kustomize overlays render
+        run: |
+          for overlay in infrastructure/kubernetes/overlays/*; do
+            echo "== $overlay"
+            kubectl kustomize "$overlay" > /dev/null
+          done
+      - name: Terraform format and validate
+        run: |
+          terraform fmt -check -recursive infrastructure/terraform
+          for env in infrastructure/terraform/environments/*; do
+            echo "== $env"
+            terraform -chdir="$env" init -backend=false -input=false
+            terraform -chdir="$env" validate
+          done
 
   # ------------------------------------------------------------------ SBOM
   sbom-aibom:

@@ -113,9 +113,7 @@ def _ids(*prefixes: str) -> tuple[str, ...]:
 SENSITIVE_READS = frozenset({"audit:read", "privacy:read"})
 
 #: The baseline read grant shared by operational roles.
-READ_ONLY = tuple(
-    p.id for p in CATALOGUE if p.action == "read" and p.id not in SENSITIVE_READS
-)
+READ_ONLY = tuple(p.id for p in CATALOGUE if p.action == "read" and p.id not in SENSITIVE_READS)
 
 
 @dataclass(frozen=True, slots=True)

@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 import pytest
 import yaml
-
 from agentic_os.core.registry import REPO_ROOT
 
 pytestmark = pytest.mark.unit
@@ -46,7 +44,12 @@ def test_no_hardcoded_secrets_in_source() -> None:
     ]
     # Files that legitimately contain example or detector patterns.
     allowlist = {
-        "pii.py", "audit.py", "context_firewall.py", "crypto.py", "seed.py", "config.py",
+        "pii.py",
+        "audit.py",
+        "context_firewall.py",
+        "crypto.py",
+        "seed.py",
+        "config.py",
     }
     offenders: list[str] = []
     for path in SOURCE_ROOT.rglob("*.py"):
@@ -91,10 +94,12 @@ def test_control_weights_match_the_declared_domain_model() -> None:
         totals[control["domain"]] = totals.get(control["domain"], 0) + control["weight"]
     for domain, declared in catalogue["domains"].items():
         assert totals.get(domain, 0) == declared, (
-            f"domain '{domain}' declares weight {declared} but its controls total "
-            f"{totals.get(domain, 0)}"
+            f"domain '{domain}' declares weight {declared} but its controls total {totals.get(domain, 0)}"
         )
-    assert sum(catalogue["domains"].values()) == 100
+    # The total is declared, not fixed at 100. A catalogue that had to sum to
+    # 100 could only admit a new unmet control by shrinking an existing one,
+    # which would raise the score for doing nothing.
+    assert sum(catalogue["domains"].values()) == catalogue["total_weight"]
 
 
 def test_every_control_test_reference_points_at_a_real_file() -> None:

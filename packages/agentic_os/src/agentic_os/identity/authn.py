@@ -76,7 +76,9 @@ def _valid_ip(value: str | None) -> str | None:
         return None
 
 
-def load_grants(session: Session, tenant_id: str, user_id: str) -> tuple[frozenset[str], frozenset[str], frozenset[str]]:
+def load_grants(
+    session: Session, tenant_id: str, user_id: str
+) -> tuple[frozenset[str], frozenset[str], frozenset[str]]:
     """Return (roles, permissions, groups) for a user.
 
     Expired role grants are excluded, so a time-boxed elevation lapses without
@@ -130,16 +132,20 @@ def authenticate_password(
     if not email or not password:
         raise AuthenticationError("Email and password are required")
 
-    row = session.execute(
-        text(
-            """
+    row = (
+        session.execute(
+            text(
+                """
             SELECT id, tenant_id, organization_id, password_hash, status,
                    mfa_enrolled, clearance, locked_until, failed_login_count, display_name
             FROM auth_bootstrap_user(:email)
             """
-        ),
-        {"email": email},
-    ).mappings().first()
+            ),
+            {"email": email},
+        )
+        .mappings()
+        .first()
+    )
 
     # Constant-ish work on the unknown-user path so response time does not
     # disclose whether an account exists.
@@ -158,12 +164,8 @@ def authenticate_password(
 
     stored = row["password_hash"] or ""
     if not stored or not verify_password(stored, password):
-        session.execute(
-            text("SELECT auth_record_login_attempt(:uid, false)"), {"uid": row["id"]}
-        )
-        _audit_auth(
-            session, str(row["tenant_id"]), str(row["id"]), email, "login.password", "DENIED"
-        )
+        session.execute(text("SELECT auth_record_login_attempt(:uid, false)"), {"uid": row["id"]})
+        _audit_auth(session, str(row["tenant_id"]), str(row["id"]), email, "login.password", "DENIED")
         session.commit()
         raise AuthenticationError("Invalid credentials")
 
@@ -303,10 +305,7 @@ def revoke_session(session: Session, tenant_id: str, session_id: str) -> bool:
 
 def session_is_active(session: Session, session_id: str) -> bool:
     row = session.execute(
-        text(
-            "SELECT 1 FROM sessions "
-            "WHERE id = :sid AND revoked_at IS NULL AND expires_at > now()"
-        ),
+        text("SELECT 1 FROM sessions WHERE id = :sid AND revoked_at IS NULL AND expires_at > now()"),
         {"sid": session_id},
     ).first()
     return row is not None
@@ -315,9 +314,7 @@ def session_is_active(session: Session, session_id: str) -> bool:
 def set_user_password(session: Session, user_id: str, password: str) -> None:
     settings = get_settings()
     if len(password) < settings.password_min_length:
-        raise ValidationError(
-            f"Password must be at least {settings.password_min_length} characters"
-        )
+        raise ValidationError(f"Password must be at least {settings.password_min_length} characters")
     session.execute(
         text("UPDATE users SET password_hash = :h, updated_at = now() WHERE id = :uid"),
         {"h": hash_password(password), "uid": user_id},

@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-
 from agentic_os.core.context import AgentIdentity, ExecutionContext, HumanIdentity
 from agentic_os.core.errors import (
     ApprovalRequired,
@@ -17,6 +14,9 @@ from agentic_os.core.errors import (
 )
 from agentic_os.core.ids import prefixed_id
 from agentic_os.tools.gateway import ToolGateway
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
 from tests.conftest import requires_db
 
 pytestmark = [pytest.mark.integration, pytest.mark.security, requires_db]
@@ -48,9 +48,7 @@ def gateway(db: Session) -> ToolGateway:
 
 
 def _as_agent(ctx: ExecutionContext, agent_key: str, autonomy: str = "A3") -> ExecutionContext:
-    return ctx.with_agent(
-        AgentIdentity(agent_id=agent_key, agent_version="3.1.0", autonomy_level=autonomy)
-    )
+    return ctx.with_agent(AgentIdentity(agent_id=agent_key, agent_version="3.1.0", autonomy_level=autonomy))
 
 
 # ------------------------------------------------------------------ happy path
@@ -202,12 +200,16 @@ def test_tool_scoped_kill_switch_blocks_only_that_tool(gateway, operator_ctx, db
     try:
         with pytest.raises(KillSwitchEngaged):
             gateway.invoke(
-                _as_agent(operator_ctx, "operations"), "tasks.create",
-                {"title": "blocked"}, idempotency_key=prefixed_id("t"),
+                _as_agent(operator_ctx, "operations"),
+                "tasks.create",
+                {"title": "blocked"},
+                idempotency_key=prefixed_id("t"),
             )
         ok = gateway.invoke(
-            _as_agent(operator_ctx, "knowledge"), "knowledge.search",
-            {"query": "escalator"}, idempotency_key=prefixed_id("t"),
+            _as_agent(operator_ctx, "knowledge"),
+            "knowledge.search",
+            {"query": "escalator"},
+            idempotency_key=prefixed_id("t"),
         )
         assert ok.allowed
     finally:
@@ -218,20 +220,14 @@ def test_over_classified_call_is_denied(gateway, operator_ctx) -> None:
     """A call carrying data above the tool's ceiling is refused."""
     from dataclasses import replace
 
-    ctx = replace(
-        _as_agent(operator_ctx, "analytics"), attributes={"classification": "RESTRICTED"}
-    )
+    ctx = replace(_as_agent(operator_ctx, "analytics"), attributes={"classification": "RESTRICTED"})
     with pytest.raises(PolicyDenied) as excinfo:
-        gateway.invoke(
-            ctx, "analytics.query_metrics", {"metric": "x"}, idempotency_key=prefixed_id("t")
-        )
+        gateway.invoke(ctx, "analytics.query_metrics", {"metric": "x"}, idempotency_key=prefixed_id("t"))
     assert excinfo.value.details["stage"] == "AUTHORIZATION"
 
 
 # ---------------------------------------------------------------- idempotency
-def test_repeated_call_with_the_same_key_does_not_re_execute(
-    gateway, operator_ctx, db: Session
-) -> None:
+def test_repeated_call_with_the_same_key_does_not_re_execute(gateway, operator_ctx, db: Session) -> None:
     key = prefixed_id("idem")
     ctx = _as_agent(operator_ctx, "operations")
     first = gateway.invoke(ctx, "tasks.create", {"title": "Idempotent task"}, idempotency_key=key)
@@ -250,24 +246,28 @@ def test_repeated_call_with_the_same_key_does_not_re_execute(
 def test_every_call_is_recorded_and_audited(gateway, operator_ctx, db: Session) -> None:
     key = prefixed_id("t")
     gateway.invoke(
-        _as_agent(operator_ctx, "knowledge"), "knowledge.search",
-        {"query": "brake pad"}, idempotency_key=key,
+        _as_agent(operator_ctx, "knowledge"),
+        "knowledge.search",
+        {"query": "brake pad"},
+        idempotency_key=key,
     )
-    call = db.execute(
-        text(
-            "SELECT gateway_decision, parameters_hash, agent_key FROM tool_calls "
-            "WHERE tenant_id = :t AND idempotency_key = :k"
-        ),
-        {"t": operator_ctx.tenant_id, "k": key},
-    ).mappings().one()
+    call = (
+        db.execute(
+            text(
+                "SELECT gateway_decision, parameters_hash, agent_key FROM tool_calls "
+                "WHERE tenant_id = :t AND idempotency_key = :k"
+            ),
+            {"t": operator_ctx.tenant_id, "k": key},
+        )
+        .mappings()
+        .one()
+    )
     assert call["gateway_decision"] == "ALLOWED"
     assert call["parameters_hash"]
     assert call["agent_key"] == "knowledge"
 
     audited = db.execute(
-        text(
-            "SELECT count(*) FROM audit_events WHERE tenant_id = :t AND category = 'TOOL_CALL'"
-        ),
+        text("SELECT count(*) FROM audit_events WHERE tenant_id = :t AND category = 'TOOL_CALL'"),
         {"t": operator_ctx.tenant_id},
     ).scalar_one()
     assert audited >= 1
@@ -277,16 +277,22 @@ def test_denied_calls_are_recorded_with_their_stage(gateway, operator_ctx, db: S
     key = prefixed_id("t")
     with pytest.raises(NotImplementedCapability):
         gateway.invoke(
-            _as_agent(operator_ctx, "finance"), "finance.read_invoices",
-            {"limit": 5}, idempotency_key=key,
+            _as_agent(operator_ctx, "finance"),
+            "finance.read_invoices",
+            {"limit": 5},
+            idempotency_key=key,
         )
-    row = db.execute(
-        text(
-            "SELECT gateway_decision, denial_stage FROM tool_calls "
-            "WHERE tenant_id = :t AND idempotency_key = :k"
-        ),
-        {"t": operator_ctx.tenant_id, "k": key},
-    ).mappings().first()
+    row = (
+        db.execute(
+            text(
+                "SELECT gateway_decision, denial_stage FROM tool_calls "
+                "WHERE tenant_id = :t AND idempotency_key = :k"
+            ),
+            {"t": operator_ctx.tenant_id, "k": key},
+        )
+        .mappings()
+        .first()
+    )
     assert row is not None, "a denial must still be recorded"
     assert row["gateway_decision"] == "DENIED"
     assert row["denial_stage"] == "TOOL_RESOLUTION"
@@ -300,12 +306,16 @@ def test_secrets_in_parameters_are_never_persisted(gateway, operator_ctx, db: Se
         {"title": "Rotate credential", "description": "api_key: sk-abcdefghijklmnop0123456789"},
         idempotency_key=key,
     )
-    stored = db.execute(
-        text(
-            "SELECT parameters_redacted::text AS p, result_redacted::text AS r FROM tool_calls "
-            "WHERE tenant_id = :t AND idempotency_key = :k"
-        ),
-        {"t": operator_ctx.tenant_id, "k": key},
-    ).mappings().one()
+    stored = (
+        db.execute(
+            text(
+                "SELECT parameters_redacted::text AS p, result_redacted::text AS r FROM tool_calls "
+                "WHERE tenant_id = :t AND idempotency_key = :k"
+            ),
+            {"t": operator_ctx.tenant_id, "k": key},
+        )
+        .mappings()
+        .one()
+    )
     assert "sk-abcdefghijklmnop0123456789" not in stored["p"]
     assert "sk-abcdefghijklmnop0123456789" not in (stored["r"] or "")

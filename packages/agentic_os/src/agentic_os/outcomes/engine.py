@@ -94,13 +94,17 @@ def measure_run_automation(
     the run's actual duration and step count come from the platform's own
     records.
     """
-    run = session.execute(
-        text(
-            "SELECT id, status, duration_ms, cost_usd, objective FROM runs "
-            "WHERE tenant_id = :t AND id = CAST(:i AS uuid)"
-        ),
-        {"t": ctx.tenant_id, "i": run_id},
-    ).mappings().first()
+    run = (
+        session.execute(
+            text(
+                "SELECT id, status, duration_ms, cost_usd, objective FROM runs "
+                "WHERE tenant_id = :t AND id = CAST(:i AS uuid)"
+            ),
+            {"t": ctx.tenant_id, "i": run_id},
+        )
+        .mappings()
+        .first()
+    )
     if run is None or run["status"] != "SUCCEEDED":
         return None
     if baseline_minutes <= 0:
@@ -144,9 +148,10 @@ def measure_run_automation(
 
 def roi_summary(session: Session, tenant_id: str, *, window_days: int = 30) -> dict[str, Any]:
     """ROI from measured outcomes only, with estimates reported separately."""
-    rows = session.execute(
-        text(
-            """
+    rows = (
+        session.execute(
+            text(
+                """
             SELECT basis, outcome_type, sum(quantity) AS quantity,
                    sum(monetary_value_usd) AS value, count(*) AS records
             FROM business_outcomes
@@ -154,9 +159,12 @@ def roi_summary(session: Session, tenant_id: str, *, window_days: int = 30) -> d
             GROUP BY basis, outcome_type
             ORDER BY basis, outcome_type
             """
-        ),
-        {"t": tenant_id, "d": window_days},
-    ).mappings().all()
+            ),
+            {"t": tenant_id, "d": window_days},
+        )
+        .mappings()
+        .all()
+    )
 
     cost = float(
         session.execute(
@@ -194,9 +202,10 @@ def roi_summary(session: Session, tenant_id: str, *, window_days: int = 30) -> d
 
 def operational_summary(session: Session, tenant_id: str, *, window_days: int = 7) -> dict[str, Any]:
     """Operational counters derived from recorded platform activity."""
-    row = session.execute(
-        text(
-            """
+    row = (
+        session.execute(
+            text(
+                """
             SELECT
               count(*) FILTER (WHERE status = 'SUCCEEDED') AS succeeded,
               count(*) FILTER (WHERE status = 'FAILED') AS failed,
@@ -207,9 +216,12 @@ def operational_summary(session: Session, tenant_id: str, *, window_days: int = 
             FROM runs
             WHERE tenant_id = :t AND created_at >= now() - make_interval(days => :d)
             """
-        ),
-        {"t": tenant_id, "d": window_days},
-    ).mappings().one()
+            ),
+            {"t": tenant_id, "d": window_days},
+        )
+        .mappings()
+        .one()
+    )
 
     total = int(row["total"])
     return {

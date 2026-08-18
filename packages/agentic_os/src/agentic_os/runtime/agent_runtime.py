@@ -30,7 +30,7 @@ from agentic_os.core.errors import (
     NotFound,
     ValidationError,
 )
-from agentic_os.core.ids import prefixed_id, utcnow
+from agentic_os.core.ids import prefixed_id
 from agentic_os.core.registry import load_registries
 from agentic_os.runtime.skills import SkillExecutor, SkillResult
 from agentic_os.tools.gateway import ToolGateway
@@ -67,8 +67,10 @@ class AgentBudget:
         if self.elapsed_seconds >= self.max_runtime_seconds:
             raise BudgetExceeded(
                 "agent runtime limit reached",
-                details={"limit_seconds": self.max_runtime_seconds,
-                         "elapsed_seconds": round(self.elapsed_seconds, 2)},
+                details={
+                    "limit_seconds": self.max_runtime_seconds,
+                    "elapsed_seconds": round(self.elapsed_seconds, 2),
+                },
             )
         if self.tool_calls_used >= self.max_tool_calls and self.max_tool_calls >= 0:
             raise BudgetExceeded(
@@ -128,22 +130,24 @@ class AgentRuntime:
     # -- lifecycle ---------------------------------------------------------
     def open(self, ctx: ExecutionContext, agent_key: str) -> AgentSession:
         """Resolve and pin the agent's published contract version."""
-        row = self._session.execute(
-            text(
-                """
+        row = (
+            self._session.execute(
+                text(
+                    """
                 SELECT a.agent_key, av.version, av.contract, av.status
                 FROM agents a
                 JOIN agent_versions av ON av.agent_id = a.id AND av.tenant_id = a.tenant_id
                 WHERE a.tenant_id = :t AND a.agent_key = :k
                   AND av.version = a.current_version AND a.status = 'ACTIVE'
                 """
-            ),
-            {"t": ctx.tenant_id, "k": agent_key},
-        ).mappings().first()
-        if row is None:
-            raise NotFound(
-                f"agent '{agent_key}' has no active published contract in this tenant"
+                ),
+                {"t": ctx.tenant_id, "k": agent_key},
             )
+            .mappings()
+            .first()
+        )
+        if row is None:
+            raise NotFound(f"agent '{agent_key}' has no active published contract in this tenant")
         if row["status"] != "ACTIVE":
             raise ContractViolation(f"agent '{agent_key}' contract version is {row['status']}")
 
@@ -231,8 +235,7 @@ class AgentRuntime:
         if requirements.get("citations") and skill_key in ("summarise", "analyse"):
             if not result.citations and not result.output.get("citations"):
                 raise ContractViolation(
-                    f"agent '{agent.agent_key}' requires citations but skill '{skill_key}' "
-                    "produced none",
+                    f"agent '{agent.agent_key}' requires citations but skill '{skill_key}' produced none",
                     details={"skill": skill_key},
                 )
         for citation in result.citations:

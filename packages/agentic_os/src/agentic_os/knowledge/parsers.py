@@ -297,9 +297,7 @@ _DISPATCH = {
 def parse(data: bytes, mime_type: str) -> ParseResult:
     """Parse a document. Raises NotImplementedCapability for declared gaps."""
     if mime_type in DECLARED_UNSUPPORTED:
-        raise NotImplementedCapability(
-            DECLARED_UNSUPPORTED[mime_type], details={"mime_type": mime_type}
-        )
+        raise NotImplementedCapability(DECLARED_UNSUPPORTED[mime_type], details={"mime_type": mime_type})
     handler = _DISPATCH.get(mime_type)
     if handler is None:
         raise NotImplementedCapability(

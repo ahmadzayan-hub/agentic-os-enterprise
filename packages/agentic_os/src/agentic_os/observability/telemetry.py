@@ -126,9 +126,10 @@ def run_trace(session: Session, tenant_id: str, run_id: str) -> list[dict[str, A
 
 def platform_metrics(session: Session, tenant_id: str, *, window_hours: int = 24) -> dict[str, Any]:
     """Operational metrics computed from recorded activity."""
-    runs = session.execute(
-        text(
-            """
+    runs = (
+        session.execute(
+            text(
+                """
             SELECT count(*) AS total,
                    count(*) FILTER (WHERE status = 'SUCCEEDED') AS succeeded,
                    count(*) FILTER (WHERE status = 'FAILED') AS failed,
@@ -136,13 +137,17 @@ def platform_metrics(session: Session, tenant_id: str, *, window_hours: int = 24
             FROM runs
             WHERE tenant_id = :t AND created_at >= now() - make_interval(hours => :h)
             """
-        ),
-        {"t": tenant_id, "h": window_hours},
-    ).mappings().one()
+            ),
+            {"t": tenant_id, "h": window_hours},
+        )
+        .mappings()
+        .one()
+    )
 
-    tools = session.execute(
-        text(
-            """
+    tools = (
+        session.execute(
+            text(
+                """
             SELECT count(*) AS total,
                    count(*) FILTER (WHERE gateway_decision = 'DENIED') AS denied,
                    count(*) FILTER (WHERE verification_status = 'FAILED') AS verification_failed,
@@ -150,46 +155,61 @@ def platform_metrics(session: Session, tenant_id: str, *, window_hours: int = 24
             FROM tool_calls
             WHERE tenant_id = :t AND created_at >= now() - make_interval(hours => :h)
             """
-        ),
-        {"t": tenant_id, "h": window_hours},
-    ).mappings().one()
+            ),
+            {"t": tenant_id, "h": window_hours},
+        )
+        .mappings()
+        .one()
+    )
 
-    retrieval = session.execute(
-        text(
-            """
+    retrieval = (
+        session.execute(
+            text(
+                """
             SELECT count(*) AS queries, COALESCE(avg(latency_ms), 0) AS avg_latency_ms,
                    COALESCE(sum(candidates_before_acl - candidates_after_acl), 0) AS acl_filtered
             FROM retrieval_queries
             WHERE tenant_id = :t AND created_at >= now() - make_interval(hours => :h)
             """
-        ),
-        {"t": tenant_id, "h": window_hours},
-    ).mappings().one()
+            ),
+            {"t": tenant_id, "h": window_hours},
+        )
+        .mappings()
+        .one()
+    )
 
-    security = session.execute(
-        text(
-            """
+    security = (
+        session.execute(
+            text(
+                """
             SELECT count(*) AS findings,
                    count(*) FILTER (WHERE severity IN ('HIGH', 'CRITICAL')) AS severe
             FROM security_findings
             WHERE tenant_id = :t AND created_at >= now() - make_interval(hours => :h)
             """
-        ),
-        {"t": tenant_id, "h": window_hours},
-    ).mappings().one()
+            ),
+            {"t": tenant_id, "h": window_hours},
+        )
+        .mappings()
+        .one()
+    )
 
-    policy = session.execute(
-        text(
-            """
+    policy = (
+        session.execute(
+            text(
+                """
             SELECT count(*) AS decisions,
                    count(*) FILTER (WHERE effect = 'DENY') AS denied,
                    count(*) FILTER (WHERE effect = 'REQUIRE_APPROVAL') AS escalated
             FROM policy_decisions
             WHERE tenant_id = :t AND evaluated_at >= now() - make_interval(hours => :h)
             """
-        ),
-        {"t": tenant_id, "h": window_hours},
-    ).mappings().one()
+            ),
+            {"t": tenant_id, "h": window_hours},
+        )
+        .mappings()
+        .one()
+    )
 
     total_runs = int(runs["total"])
     total_tools = int(tools["total"])

@@ -59,9 +59,7 @@ def get_context(
     from agentic_os.core.ids import correlation_id as new_correlation_id
     from agentic_os.identity.authn import session_is_active
 
-    ctx = principal.to_context(
-        correlation_id=request.headers.get("x-correlation-id") or new_correlation_id()
-    )
+    ctx = principal.to_context(correlation_id=request.headers.get("x-correlation-id") or new_correlation_id())
     # Bind the tenant *before* touching any protected table: the sessions table
     # is RLS-scoped, so an unbound lookup would find nothing and every request
     # would look like a revoked session.

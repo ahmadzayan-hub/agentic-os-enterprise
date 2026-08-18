@@ -12,10 +12,8 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
 import pytest
-
 from agentic_os.core.registry import REPO_ROOT
 
 REPORT = REPO_ROOT / "artifacts" / "accessibility.json"

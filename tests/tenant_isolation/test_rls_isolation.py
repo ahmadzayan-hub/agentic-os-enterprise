@@ -45,10 +45,7 @@ def test_every_tenant_table_has_forced_rls(db: Session) -> None:
 def test_every_tenant_table_has_an_isolation_policy(db: Session) -> None:
     tables = [r[0] for r in db.execute(text(TENANT_TABLES_QUERY)).all()]
     policied = {
-        r[0]
-        for r in db.execute(
-            text("SELECT tablename FROM pg_policies WHERE schemaname = 'public'")
-        ).all()
+        r[0] for r in db.execute(text("SELECT tablename FROM pg_policies WHERE schemaname = 'public'")).all()
     }
     missing = sorted(set(tables) - policied)
     assert missing == [], f"tenant tables without an RLS policy: {missing}"
@@ -79,14 +76,10 @@ def test_unbound_session_sees_nothing(db_unbound: Session) -> None:
         assert count == 0, f"unbound session saw {count} rows in {table}"
 
 
-def test_cross_tenant_insert_is_rejected(
-    db: Session, other_tenant_id: str, organization_id: str
-) -> None:
+def test_cross_tenant_insert_is_rejected(db: Session, other_tenant_id: str, organization_id: str) -> None:
     with pytest.raises(ProgrammingError) as excinfo:
         db.execute(
-            text(
-                "INSERT INTO tasks (tenant_id, title) VALUES (CAST(:t AS uuid), :title)"
-            ),
+            text("INSERT INTO tasks (tenant_id, title) VALUES (CAST(:t AS uuid), :title)"),
             {"t": other_tenant_id, "title": "cross-tenant write attempt"},
         )
         db.flush()
@@ -97,20 +90,15 @@ def test_cross_tenant_update_affects_no_rows(db: Session, db_other: Session) -> 
     """A row created in tenant B is invisible and unmodifiable from tenant A."""
     other_task = db_other.execute(
         text(
-            "INSERT INTO tasks (tenant_id, title) "
-            "VALUES (app_current_tenant(), 'tenant-b task') RETURNING id"
+            "INSERT INTO tasks (tenant_id, title) VALUES (app_current_tenant(), 'tenant-b task') RETURNING id"
         )
     ).scalar_one()
     db_other.flush()
 
-    seen = db.execute(
-        text("SELECT count(*) FROM tasks WHERE id = :i"), {"i": other_task}
-    ).scalar_one()
+    seen = db.execute(text("SELECT count(*) FROM tasks WHERE id = :i"), {"i": other_task}).scalar_one()
     assert seen == 0
 
-    result = db.execute(
-        text("UPDATE tasks SET title = 'hijacked' WHERE id = :i"), {"i": other_task}
-    )
+    result = db.execute(text("UPDATE tasks SET title = 'hijacked' WHERE id = :i"), {"i": other_task})
     assert result.rowcount == 0
 
     result = db.execute(text("DELETE FROM tasks WHERE id = :i"), {"i": other_task})

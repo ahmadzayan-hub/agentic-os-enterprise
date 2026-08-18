@@ -9,7 +9,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from agentic_os.api.deps import CtxDep, DbDep, require_permission
-from agentic_os.api.serialization import jsonify, row as json_row, rows as json_rows
+from agentic_os.api.serialization import jsonify
+from agentic_os.api.serialization import row as json_row
+from agentic_os.api.serialization import rows as json_rows
 from agentic_os.core.errors import AgenticError
 from agentic_os.observability import telemetry
 from agentic_os.outcomes import engine as outcomes_engine
@@ -34,56 +36,62 @@ def command_center(ctx: CtxDep, db: DbDep) -> dict:
 
     attention = {
         "pending_approvals": approval_engine.pending_for_principal(db, ctx, limit=10),
-        "failed_runs": json_rows(db.execute(
+        "failed_runs": json_rows(
+            db.execute(
                 text(
                     "SELECT id, objective, error_class, error_message, completed_at FROM runs "
                     "WHERE tenant_id = :t AND status = 'FAILED' "
                     "ORDER BY completed_at DESC NULLS LAST LIMIT 5"
                 ),
                 {"t": ctx.tenant_id},
-            ).mappings()),
-        "security_findings": json_rows(db.execute(
+            ).mappings()
+        ),
+        "security_findings": json_rows(
+            db.execute(
                 text(
                     "SELECT finding_type, severity, source, created_at FROM security_findings "
                     "WHERE tenant_id = :t AND severity IN ('HIGH', 'CRITICAL') "
                     "ORDER BY created_at DESC LIMIT 5"
                 ),
                 {"t": ctx.tenant_id},
-            ).mappings()),
-        "open_incidents": json_rows(db.execute(
+            ).mappings()
+        ),
+        "open_incidents": json_rows(
+            db.execute(
                 text(
                     "SELECT incident_key, title, severity, status, detected_at FROM incidents "
                     "WHERE tenant_id = :t AND status NOT IN ('RESOLVED', 'CLOSED') "
                     "ORDER BY detected_at DESC LIMIT 5"
                 ),
                 {"t": ctx.tenant_id},
-            ).mappings()),
+            ).mappings()
+        ),
         "dead_letters": len(event_bus.dead_letters(db, ctx.tenant_id, limit=50)),
         "expired_evidence": int(
             db.execute(
-                text(
-                    "SELECT count(*) FROM evidence WHERE tenant_id = :t AND status = 'EXPIRED'"
-                ),
+                text("SELECT count(*) FROM evidence WHERE tenant_id = :t AND status = 'EXPIRED'"),
                 {"t": ctx.tenant_id},
             ).scalar_one()
         ),
     }
 
-    kill_switches = json_rows(db.execute(
+    kill_switches = json_rows(
+        db.execute(
             text(
                 "SELECT scope, target_key, engaged, reason FROM kill_switches "
                 "WHERE (tenant_id = :t OR tenant_id IS NULL) AND engaged ORDER BY scope"
             ),
             {"t": ctx.tenant_id},
-        ).mappings())
+        ).mappings()
+    )
 
     return jsonify(
         {
-        "requires_attention": attention,
-        "agent_operations": telemetry.platform_metrics(db, ctx.tenant_id, window_hours=24),
-        "business_pulse": outcomes_engine.operational_summary(db, ctx.tenant_id, window_days=7),
-        "engaged_kill_switches": kill_switches,
-        "read_only_mode": any(k["scope"] == "READ_ONLY" for k in kill_switches),
+            "requires_attention": attention,
+            "agent_operations": telemetry.platform_metrics(db, ctx.tenant_id, window_hours=24),
+            "business_pulse": outcomes_engine.operational_summary(db, ctx.tenant_id, window_days=7),
+            "engaged_kill_switches": kill_switches,
+            "read_only_mode": any(k["scope"] == "READ_ONLY" for k in kill_switches),
         }
     )
 
@@ -92,18 +100,12 @@ def command_center(ctx: CtxDep, db: DbDep) -> dict:
     "/analytics",
     dependencies=[Depends(require_permission("analytics:read", resource_type="dashboard"))],
 )
-def analytics(
-    ctx: CtxDep, db: DbDep, window_hours: Annotated[int, Query(ge=1, le=8760)] = 168
-) -> dict:
+def analytics(ctx: CtxDep, db: DbDep, window_hours: Annotated[int, Query(ge=1, le=8760)] = 168) -> dict:
     return jsonify(telemetry.platform_metrics(db, ctx.tenant_id, window_hours=window_hours))
 
 
-@router.get(
-    "/outcomes", dependencies=[Depends(require_permission("outcomes:read", resource_type="outcome"))]
-)
-def outcomes(
-    ctx: CtxDep, db: DbDep, window_days: Annotated[int, Query(ge=1, le=365)] = 30
-) -> dict:
+@router.get("/outcomes", dependencies=[Depends(require_permission("outcomes:read", resource_type="outcome"))])
+def outcomes(ctx: CtxDep, db: DbDep, window_days: Annotated[int, Query(ge=1, le=365)] = 30) -> dict:
     return jsonify(outcomes_engine.roi_summary(db, ctx.tenant_id, window_days=window_days))
 
 
@@ -170,9 +172,7 @@ def list_workflows(ctx: CtxDep, db: DbDep) -> dict:
         ),
         {"t": ctx.tenant_id},
     ).mappings()
-    return {"workflows": json_rows(rows), "step_types": sorted(
-        workflow_engine.registered_step_types()
-    )}
+    return {"workflows": json_rows(rows), "step_types": sorted(workflow_engine.registered_step_types())}
 
 
 @router.get(
@@ -207,7 +207,10 @@ def start_workflow(payload: StartWorkflowRequest, ctx: CtxDep, db: DbDep) -> dic
 
     try:
         run_id = workflow_engine.start(
-            db, ctx, payload.workflow_key, payload.input,
+            db,
+            ctx,
+            payload.workflow_key,
+            payload.input,
             idempotency_key=payload.idempotency_key,
         )
     except AgenticError as exc:
@@ -242,15 +245,19 @@ def list_incidents(ctx: CtxDep, db: DbDep) -> dict:
 # ------------------------------------------------------------------ organization
 @router.get("/organization", dependencies=[Depends(require_permission("org:read"))])
 def organization(ctx: CtxDep, db: DbDep) -> dict:
-    tenant = db.execute(
-        text(
-            "SELECT t.slug, t.name, t.region, t.data_residency, t.default_classification, "
-            "t.retention_days, t.daily_cost_cap_usd, t.status, o.slug AS org_slug, "
-            "o.name AS org_name FROM tenants t JOIN organizations o ON o.id = t.organization_id "
-            "WHERE t.id = :t"
-        ),
-        {"t": ctx.tenant_id},
-    ).mappings().first()
+    tenant = (
+        db.execute(
+            text(
+                "SELECT t.slug, t.name, t.region, t.data_residency, t.default_classification, "
+                "t.retention_days, t.daily_cost_cap_usd, t.status, o.slug AS org_slug, "
+                "o.name AS org_name FROM tenants t JOIN organizations o ON o.id = t.organization_id "
+                "WHERE t.id = :t"
+            ),
+            {"t": ctx.tenant_id},
+        )
+        .mappings()
+        .first()
+    )
     users = db.execute(
         text(
             "SELECT u.email, u.display_name, u.clearance, u.status, u.mfa_enrolled, "

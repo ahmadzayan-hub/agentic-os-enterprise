@@ -11,11 +11,10 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-
 from agentic_os.assurance.audit import AuditEntry, AuditLedger
 from agentic_os.privacy import dsar
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from tests.conftest import requires_db
 
@@ -97,9 +96,7 @@ def _clear_holds(db: Session, tenant_id: str) -> None:
 
 def test_access_request_collects_the_subjects_records(db, ctx, subject):
     _clear_holds(db, ctx.tenant_id)
-    request_id = dsar.raise_request(
-        db, ctx, request_type="ACCESS", subject_email=SUBJECT_EMAIL
-    )
+    request_id = dsar.raise_request(db, ctx, request_type="ACCESS", subject_email=SUBJECT_EMAIL)
     result = dsar.process(db, ctx, request_id)
 
     assert result.status == "COMPLETED"
@@ -119,9 +116,7 @@ def test_access_request_collects_the_subjects_records(db, ctx, subject):
 
 def test_export_never_discloses_credential_material(db, ctx, subject):
     _clear_holds(db, ctx.tenant_id)
-    request_id = dsar.raise_request(
-        db, ctx, request_type="EXPORT", subject_email=SUBJECT_EMAIL
-    )
+    request_id = dsar.raise_request(db, ctx, request_type="EXPORT", subject_email=SUBJECT_EMAIL)
     result = dsar.process(db, ctx, request_id)
 
     exported = result.export["records"]
@@ -134,9 +129,7 @@ def test_erasure_is_blocked_by_an_active_legal_hold(db, ctx, subject):
     _clear_holds(db, ctx.tenant_id)
     _hold(db, ctx.tenant_id, "hold-green-line-arbitration")
 
-    request_id = dsar.raise_request(
-        db, ctx, request_type="DELETE", subject_email=SUBJECT_EMAIL
-    )
+    request_id = dsar.raise_request(db, ctx, request_type="DELETE", subject_email=SUBJECT_EMAIL)
     result = dsar.process(db, ctx, request_id)
 
     assert result.status == "BLOCKED_BY_HOLD"
@@ -144,33 +137,39 @@ def test_erasure_is_blocked_by_an_active_legal_hold(db, ctx, subject):
     assert result.affected == {}
 
     # Nothing was partially executed.
-    still_there = db.execute(
-        text("SELECT email, status FROM users WHERE tenant_id = :t AND id = CAST(:u AS uuid)"),
-        {"t": ctx.tenant_id, "u": subject["user_id"]},
-    ).mappings().one()
+    still_there = (
+        db.execute(
+            text("SELECT email, status FROM users WHERE tenant_id = :t AND id = CAST(:u AS uuid)"),
+            {"t": ctx.tenant_id, "u": subject["user_id"]},
+        )
+        .mappings()
+        .one()
+    )
     assert still_there["email"] == SUBJECT_EMAIL
     assert still_there["status"] == "ACTIVE"
-    assert db.execute(
-        text("SELECT count(*) FROM sessions WHERE user_id = CAST(:u AS uuid)"),
-        {"u": subject["user_id"]},
-    ).scalar_one() == 1
+    assert (
+        db.execute(
+            text("SELECT count(*) FROM sessions WHERE user_id = CAST(:u AS uuid)"),
+            {"u": subject["user_id"]},
+        ).scalar_one()
+        == 1
+    )
 
-    stored = db.execute(
-        text(
-            "SELECT status, affected_records FROM data_subject_requests "
-            "WHERE id = CAST(:i AS uuid)"
-        ),
-        {"i": request_id},
-    ).mappings().one()
+    stored = (
+        db.execute(
+            text("SELECT status, affected_records FROM data_subject_requests WHERE id = CAST(:i AS uuid)"),
+            {"i": request_id},
+        )
+        .mappings()
+        .one()
+    )
     assert stored["status"] == "BLOCKED_BY_HOLD"
     assert stored["affected_records"]["blocked_by"] == ["hold-green-line-arbitration"]
 
 
 def test_erasure_detaches_records_and_pseudonymises_the_account(db, ctx, subject):
     _clear_holds(db, ctx.tenant_id)
-    request_id = dsar.raise_request(
-        db, ctx, request_type="DELETE", subject_email=SUBJECT_EMAIL
-    )
+    request_id = dsar.raise_request(db, ctx, request_type="DELETE", subject_email=SUBJECT_EMAIL)
     result = dsar.process(db, ctx, request_id)
 
     assert result.status == "COMPLETED"
@@ -178,13 +177,17 @@ def test_erasure_detaches_records_and_pseudonymises_the_account(db, ctx, subject
     assert result.affected["documents"] == 1
     assert result.affected["memory_records"] == 1
 
-    user = db.execute(
-        text(
-            "SELECT email, display_name, password_hash, status, deleted_at "
-            "FROM users WHERE tenant_id = :t AND id = CAST(:u AS uuid)"
-        ),
-        {"t": ctx.tenant_id, "u": subject["user_id"]},
-    ).mappings().one()
+    user = (
+        db.execute(
+            text(
+                "SELECT email, display_name, password_hash, status, deleted_at "
+                "FROM users WHERE tenant_id = :t AND id = CAST(:u AS uuid)"
+            ),
+            {"t": ctx.tenant_id, "u": subject["user_id"]},
+        )
+        .mappings()
+        .one()
+    )
     assert user["email"].startswith("erased+")
     assert user["email"].endswith("@invalid.local")
     assert user["password_hash"] is None
@@ -192,18 +195,25 @@ def test_erasure_detaches_records_and_pseudonymises_the_account(db, ctx, subject
     assert user["deleted_at"] is not None
 
     # The document survives, detached from the person.
-    document = db.execute(
-        text("SELECT title, owner_user_id FROM documents WHERE id = CAST(:d AS uuid)"),
-        {"d": subject["document_id"]},
-    ).mappings().one()
+    document = (
+        db.execute(
+            text("SELECT title, owner_user_id FROM documents WHERE id = CAST(:d AS uuid)"),
+            {"d": subject["document_id"]},
+        )
+        .mappings()
+        .one()
+    )
     assert document["title"] == "Subject owned note"
     assert document["owner_user_id"] is None
 
     # Credential material is gone outright.
-    assert db.execute(
-        text("SELECT count(*) FROM sessions WHERE user_id = CAST(:u AS uuid)"),
-        {"u": subject["user_id"]},
-    ).scalar_one() == 0
+    assert (
+        db.execute(
+            text("SELECT count(*) FROM sessions WHERE user_id = CAST(:u AS uuid)"),
+            {"u": subject["user_id"]},
+        ).scalar_one()
+        == 0
+    )
 
 
 def test_erasure_retains_the_append_only_audit_ledger(db, ctx, subject):
@@ -218,16 +228,16 @@ def test_erasure_retains_the_append_only_audit_ledger(db, ctx, subject):
             resource_id=subject["user_id"],
         ),
     )
-    before = db.execute(text("SELECT count(*) FROM audit_events WHERE tenant_id = :t"),
-                        {"t": ctx.tenant_id}).scalar_one()
+    before = db.execute(
+        text("SELECT count(*) FROM audit_events WHERE tenant_id = :t"), {"t": ctx.tenant_id}
+    ).scalar_one()
 
-    request_id = dsar.raise_request(
-        db, ctx, request_type="DELETE", subject_email=SUBJECT_EMAIL
-    )
+    request_id = dsar.raise_request(db, ctx, request_type="DELETE", subject_email=SUBJECT_EMAIL)
     result = dsar.process(db, ctx, request_id)
 
-    after = db.execute(text("SELECT count(*) FROM audit_events WHERE tenant_id = :t"),
-                       {"t": ctx.tenant_id}).scalar_one()
+    after = db.execute(
+        text("SELECT count(*) FROM audit_events WHERE tenant_id = :t"), {"t": ctx.tenant_id}
+    ).scalar_one()
     assert after > before, "erasure must only ever add to the ledger"
     assert "audit_events" in result.retained
     assert "audit_events" not in result.affected
@@ -237,17 +247,13 @@ def test_a_request_is_not_processed_twice(db, ctx, subject):
     from agentic_os.core.errors import Conflict
 
     _clear_holds(db, ctx.tenant_id)
-    request_id = dsar.raise_request(
-        db, ctx, request_type="ACCESS", subject_email=SUBJECT_EMAIL
-    )
+    request_id = dsar.raise_request(db, ctx, request_type="ACCESS", subject_email=SUBJECT_EMAIL)
     dsar.process(db, ctx, request_id)
     with pytest.raises(Conflict):
         dsar.process(db, ctx, request_id)
 
 
-def test_retention_expires_documents_but_stops_at_a_legal_hold(
-    db, ctx, tenant_id, organization_id
-):
+def test_retention_expires_documents_but_stops_at_a_legal_hold(db, ctx, tenant_id, organization_id):
     _clear_holds(db, ctx.tenant_id)
     db.execute(
         text(

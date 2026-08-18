@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agentic-config
+data:
+  AGENTIC_APP_ENV: production
+  AGENTIC_POLICY_MODE: enforce
+  AGENTIC_SECRET_BACKEND: vault
+  AGENTIC_KMS_BACKEND: aws-kms

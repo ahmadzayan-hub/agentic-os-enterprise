@@ -1,3 +1,3 @@
-fastapi==0.116.1
-uvicorn[standard]==0.35.0
-pydantic==2.11.7
+# The control plane is the agentic-os-enterprise package itself. Install the
+# repository root rather than pinning a second, divergent dependency set.
+-e ../..
