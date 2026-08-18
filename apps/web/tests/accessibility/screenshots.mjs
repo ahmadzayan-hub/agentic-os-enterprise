@@ -19,6 +19,21 @@ const SHOTS = [
   { path: "/governance/audit", name: "10-audit-ledger", scheme: "light" },
   { path: "/agents/tools", name: "11-tool-registry", scheme: "dark" },
   { path: "/operations/capabilities", name: "12-capabilities", scheme: "dark", full: true },
+  { path: "/knowledge", name: "13-knowledge-search", scheme: "light" },
+  // The privacy register needs privacy:read, which the operator role does not
+  // carry; captured as the governance officer instead of showing a denial.
+  {
+    path: "/governance/privacy",
+    name: "14-privacy-register",
+    scheme: "light",
+    full: true,
+    email: "governance@rta.example",
+    // Privileged roles must present a second factor. The code is minted by
+    // scripts/dev_totp.py and passed in; no secret is stored here.
+    totpEnv: "GOVERNANCE_TOTP",
+  },
+  { path: "/operations/resilience", name: "15-resilience", scheme: "light", full: true },
+  { path: "/operations/costs", name: "16-cost", scheme: "dark" },
 ];
 
 mkdirSync(OUT, { recursive: true });
@@ -35,8 +50,18 @@ for (const shot of SHOTS) {
 
   if (shot.auth !== false) {
     await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded" });
-    await page.fill("#email", process.env.EMAIL ?? "systems.lead@rta.example");
+    await page.fill("#email", shot.email ?? process.env.EMAIL ?? "systems.lead@rta.example");
     await page.fill("#password", process.env.PASSWORD ?? "AgenticOS-Demo-2026!");
+    if (shot.totpEnv) {
+      const code = process.env[shot.totpEnv];
+      if (!code) {
+        throw new Error(
+          `${shot.name} signs in as a privileged role and needs ${shot.totpEnv}; ` +
+            "mint one with: python scripts/dev_totp.py <email>",
+        );
+      }
+      await page.fill("#mfa_code", code);
+    }
     await page.click('button[type="submit"]');
     await page.waitForLoadState("networkidle");
 

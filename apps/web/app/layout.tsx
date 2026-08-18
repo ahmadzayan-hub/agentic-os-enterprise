@@ -51,7 +51,7 @@ export default async function RootLayout({
                 <span className="brand-sub">enterprise 3.1</span>
               </span>
             </Link>
-            <Nav />
+            <Nav permissions={me.permissions} />
           </aside>
 
           <div className="main">

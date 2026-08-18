@@ -53,11 +53,15 @@ const SURFACES = [
   { path: "/governance/evidence", label: "Evidence" },
   { path: "/governance/policies", label: "Policies" },
   { path: "/governance/audit", label: "Audit" },
+  { path: "/governance/privacy", label: "Privacy" },
   { path: "/security", label: "Security" },
   { path: "/operations/analytics", label: "Analytics" },
   { path: "/operations/costs", label: "Cost" },
   { path: "/operations/outcomes", label: "Outcomes" },
   { path: "/operations/capabilities", label: "Capabilities" },
+  { path: "/operations/resilience", label: "Resilience" },
+  { path: "/operations/workflows", label: "Workflows" },
+  { path: "/operations/incidents", label: "Incidents" },
 ];
 
 // WCAG 2.2 AA plus the best-practice rules that catch real navigation problems.

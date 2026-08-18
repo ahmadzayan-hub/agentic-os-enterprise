@@ -1,0 +1,390 @@
+{
+  "tool": "axe-core via playwright",
+  "tags": [
+    "wcag2a",
+    "wcag2aa",
+    "wcag21a",
+    "wcag21aa",
+    "wcag22aa",
+    "best-practice"
+  ],
+  "generated_at": "2026-08-18T09:29:53.692Z",
+  "surfaces_scanned": 23,
+  "color_schemes": [
+    "light",
+    "dark"
+  ],
+  "total_violations": 0,
+  "serious_or_critical": 0,
+  "passed": true,
+  "results": [
+    {
+      "surface": "Sign in",
+      "path": "/login",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 45,
+      "incomplete": 1
+    },
+    {
+      "surface": "Command Center",
+      "path": "/",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 45,
+      "incomplete": 1
+    },
+    {
+      "surface": "Runs",
+      "path": "/runs",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Approvals",
+      "path": "/approvals",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 35,
+      "incomplete": 1
+    },
+    {
+      "surface": "Agents",
+      "path": "/agents",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Skills",
+      "path": "/agents/skills",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Models",
+      "path": "/agents/models",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Tools",
+      "path": "/agents/tools",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Knowledge",
+      "path": "/knowledge",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 39,
+      "incomplete": 1
+    },
+    {
+      "surface": "Documents",
+      "path": "/knowledge/documents",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "G-Brain",
+      "path": "/knowledge/graph",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 46,
+      "incomplete": 1
+    },
+    {
+      "surface": "Evidence",
+      "path": "/governance/evidence",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 42,
+      "incomplete": 1
+    },
+    {
+      "surface": "Policies",
+      "path": "/governance/policies",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Audit",
+      "path": "/governance/audit",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 35,
+      "incomplete": 1
+    },
+    {
+      "surface": "Privacy",
+      "path": "/governance/privacy",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 35,
+      "incomplete": 1
+    },
+    {
+      "surface": "Security",
+      "path": "/security",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Analytics",
+      "path": "/operations/analytics",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Cost",
+      "path": "/operations/costs",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Outcomes",
+      "path": "/operations/outcomes",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 35,
+      "incomplete": 1
+    },
+    {
+      "surface": "Capabilities",
+      "path": "/operations/capabilities",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 43,
+      "incomplete": 1
+    },
+    {
+      "surface": "Resilience",
+      "path": "/operations/resilience",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Workflows",
+      "path": "/operations/workflows",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Incidents",
+      "path": "/operations/incidents",
+      "colorScheme": "light",
+      "violations": [],
+      "passes": 35,
+      "incomplete": 1
+    },
+    {
+      "surface": "Sign in",
+      "path": "/login",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 45,
+      "incomplete": 1
+    },
+    {
+      "surface": "Command Center",
+      "path": "/",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 45,
+      "incomplete": 1
+    },
+    {
+      "surface": "Runs",
+      "path": "/runs",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Approvals",
+      "path": "/approvals",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 35,
+      "incomplete": 1
+    },
+    {
+      "surface": "Agents",
+      "path": "/agents",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Skills",
+      "path": "/agents/skills",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Models",
+      "path": "/agents/models",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Tools",
+      "path": "/agents/tools",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Knowledge",
+      "path": "/knowledge",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 39,
+      "incomplete": 1
+    },
+    {
+      "surface": "Documents",
+      "path": "/knowledge/documents",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "G-Brain",
+      "path": "/knowledge/graph",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 46,
+      "incomplete": 1
+    },
+    {
+      "surface": "Evidence",
+      "path": "/governance/evidence",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 42,
+      "incomplete": 1
+    },
+    {
+      "surface": "Policies",
+      "path": "/governance/policies",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Audit",
+      "path": "/governance/audit",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 35,
+      "incomplete": 1
+    },
+    {
+      "surface": "Privacy",
+      "path": "/governance/privacy",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 35,
+      "incomplete": 1
+    },
+    {
+      "surface": "Security",
+      "path": "/security",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Analytics",
+      "path": "/operations/analytics",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Cost",
+      "path": "/operations/costs",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Outcomes",
+      "path": "/operations/outcomes",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 35,
+      "incomplete": 1
+    },
+    {
+      "surface": "Capabilities",
+      "path": "/operations/capabilities",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 43,
+      "incomplete": 1
+    },
+    {
+      "surface": "Resilience",
+      "path": "/operations/resilience",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Workflows",
+      "path": "/operations/workflows",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 41,
+      "incomplete": 1
+    },
+    {
+      "surface": "Incidents",
+      "path": "/operations/incidents",
+      "colorScheme": "dark",
+      "violations": [],
+      "passes": 35,
+      "incomplete": 1
+    }
+  ]
+}
