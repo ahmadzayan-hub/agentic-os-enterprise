@@ -68,6 +68,14 @@ jobs:
   tests:
     name: Unit, integration, database and tenant-isolation tests
     runs-on: ubuntu-latest
+    # This job provisions PostgreSQL and Redis, so their absence is a defect,
+    # not a developer's local circumstance. Without this, a service that died
+    # mid-job would skip every test that depends on it and the job would still
+    # report green — "0 failed" is all the exit code says. "dr" is deliberately
+    # absent: no maintenance identity exists here, so DRP-001 stays
+    # NOT_EVIDENCED rather than being forced to pass.
+    env:
+      AGENTIC_REQUIRE_SERVICES: db,redis
     services:
       postgres:
         image: pgvector/pgvector:pg16

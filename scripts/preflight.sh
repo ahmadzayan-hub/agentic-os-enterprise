@@ -69,9 +69,39 @@ fi
 step "tests"
 # Bare pytest, as CI runs it — `python -m pytest` adds the working directory
 # to sys.path and would hide an import error that CI will not.
+#
+# Services are required only when they are actually reachable. Demanding them
+# unconditionally would make this script unusable without a local Redis, and
+# reporting a skip as a pass is exactly what the gate exists to prevent — so
+# any service that is not required gets named below rather than passing
+# silently.
+require=""
+if "$PY" - <<'PROBE' 2>/dev/null; then require="db"; fi
+import sys
+sys.path.insert(0, ".")
+from tests.conftest import service_available
+sys.exit(0 if service_available("db") else 1)
+PROBE
+if "$PY" - <<'PROBE' 2>/dev/null; then require="${require:+$require,}redis"; fi
+import sys
+sys.path.insert(0, ".")
+from tests.conftest import service_available
+sys.exit(0 if service_available("redis") else 1)
+PROBE
+
 if command -v pytest >/dev/null 2>&1 || [ -x .venv/bin/pytest ]; then
   PYTEST=$([ -x .venv/bin/pytest ] && echo .venv/bin/pytest || echo pytest)
-  if "$PYTEST" tests -q; then pass "suite green"; else fail "pytest"; fi
+  if AGENTIC_REQUIRE_SERVICES="$require" "$PYTEST" tests -q; then
+    pass "suite green${require:+ (required: $require)}"
+  else
+    fail "pytest"
+  fi
+  for service in db redis; do
+    case ",$require," in
+      *",$service,"*) ;;
+      *) skipped+=("tests needing $service (service unreachable)") ;;
+    esac
+  done
 else
   skipped+=("pytest (not installed)")
 fi

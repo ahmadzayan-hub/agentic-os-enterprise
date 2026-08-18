@@ -74,6 +74,7 @@ markers = [
   "performance: drives a running API under concurrency",
   "accessibility: WCAG conformance evidenced from a browser audit",
   "slow: long-running tests",
+  "requires_service(name): gated on a real service; skipped when absent, failed when AGENTIC_REQUIRE_SERVICES names it",
 ]
 filterwarnings = ["ignore::DeprecationWarning"]
 

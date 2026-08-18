@@ -34,6 +34,28 @@ def test_ci_pipeline_covers_required_gates() -> None:
     assert missing == [], f"CI pipeline is missing gates: {missing}"
 
 
+def test_the_test_job_cannot_pass_by_skipping_its_services() -> None:
+    """Every service CI provisions must also be required.
+
+    Otherwise a service that dies mid-job skips every test depending on it and
+    the job still reports green, because a skip and a pass are indistinguishable
+    in an exit code.
+    """
+    workflow = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text())
+    job = workflow["jobs"]["tests"]
+    declared = job.get("env", {}).get("AGENTIC_REQUIRE_SERVICES", "")
+    required = {part.strip() for part in str(declared).split(",") if part.strip()}
+
+    # The service container name in CI, mapped to the gate name in conftest.
+    gate_for_service = {"postgres": "db", "redis": "redis"}
+    provisioned = {gate_for_service[name] for name in job.get("services", {}) if name in gate_for_service}
+
+    assert provisioned <= required, (
+        f"CI provisions {sorted(provisioned)} but only requires {sorted(required)}; "
+        f"tests needing {sorted(provisioned - required)} would skip silently"
+    )
+
+
 def test_no_hardcoded_secrets_in_source() -> None:
     """Source must never contain a credential-shaped literal."""
     patterns = [

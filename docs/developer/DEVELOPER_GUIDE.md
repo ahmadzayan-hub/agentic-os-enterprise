@@ -180,6 +180,28 @@ Integration tests run against a real PostgreSQL. There is no in-memory
 substitute, because row level security, the ledger triggers and the vector
 index are the things under test and a fake would not have them.
 
+### Skips, and when they are not allowed
+
+Tests that need a real service carry a gate: `requires_db`, `requires_redis`,
+`requires_dr_identity` in `tests/conftest.py`. By default an absent service
+skips those tests, so you can work without a local Redis.
+
+That default is wrong for CI, where every service is provisioned and its
+absence is a defect. A skip and a pass are the same exit code, so a database
+that died mid-job would skip every integration test and still report green.
+Set `AGENTIC_REQUIRE_SERVICES` to make absence fail instead:
+
+```bash
+AGENTIC_REQUIRE_SERVICES=db,redis pytest    # what CI runs
+AGENTIC_REQUIRE_SERVICES=all pytest         # including the DR identity
+```
+
+A name that is not a known service fails the run at start-up rather than being
+ignored — a typo in CI must not quietly mean "require nothing". CI sets the
+variable to exactly the services its test job provisions, and
+`tests/api/test_repository_hygiene.py::test_the_test_job_cannot_pass_by_skipping_its_services`
+fails if a service is ever added without being required.
+
 The accessibility suite consumes a report produced by a real browser:
 
 ```bash

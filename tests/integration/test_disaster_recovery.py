@@ -13,14 +13,9 @@ from agentic_os.core.config import get_settings
 from agentic_os.resilience import RestoreNotConfigured, backup
 from sqlalchemy import text
 
-from tests.conftest import requires_db
+from tests.conftest import requires_db, requires_dr_identity
 
 pytestmark = [pytest.mark.integration, requires_db]
-
-requires_dr_identity = pytest.mark.skipif(
-    not get_settings().dr_admin_url,
-    reason="AGENTIC_DR_ADMIN_URL is not set; a real restore cannot be performed",
-)
 
 
 def test_the_exercise_refuses_to_run_without_a_maintenance_identity(monkeypatch):

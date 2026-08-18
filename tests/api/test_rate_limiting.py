@@ -7,7 +7,6 @@ evaluates it atomically, and only Redis can demonstrate that.
 
 from __future__ import annotations
 
-import os
 import secrets
 
 import pytest
@@ -18,23 +17,18 @@ from agentic_os.api.ratelimit import (
     hash_key,
 )
 
-pytestmark = [pytest.mark.unit]
+from tests.conftest import REDIS_URL, requires_redis
 
-REDIS_URL = os.environ.get("AGENTIC_REDIS_URL", "redis://127.0.0.1:6379/15")
+pytestmark = [pytest.mark.unit]
 
 
 def _redis():
-    try:
-        import redis
+    """A client for the tests the gate has already admitted."""
+    import redis
 
-        client = redis.Redis.from_url(REDIS_URL)
-        client.ping()
-        return client
-    except Exception:
-        return None
-
-
-requires_redis = pytest.mark.skipif(_redis() is None, reason="no Redis at AGENTIC_REDIS_URL")
+    client = redis.Redis.from_url(REDIS_URL)
+    client.ping()
+    return client
 
 
 # ------------------------------------------------------------------ in-process

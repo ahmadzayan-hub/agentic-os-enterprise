@@ -1,6 +1,6 @@
 # Maturity Report — Agentic OS Enterprise v3.1
 
-**Score: 94.55 / 100. Not certified.**
+**Score: 94.59 / 100. Not certified.**
 
 This number was not chosen. It is what the evidence engine computed from a test
 run that actually executed, and it is reproducible:
@@ -15,8 +15,8 @@ status from whether its named test passed, and computes
 
 ```
 score = verified applicable weight / total applicable weight * 100
-      = 104 / 110 * 100
-      = 94.55
+      = 105 / 111 * 100
+      = 94.59
 ```
 
 No status can be entered by hand. A control with no `test:` reference is
@@ -24,12 +24,12 @@ reported NOT_EVIDENCED and contributes zero however well it is implemented.
 
 | | |
 |---|---|
-| Controls assessed | 58 |
-| Applicable weight | 110 |
-| Verified weight | 104 |
+| Controls assessed | 59 |
+| Applicable weight | 111 |
+| Verified weight | 105 |
 | Critical blockers | none |
 | Certified | **no** — certification requires 100 with no critical blocker |
-| Test run | 313 tests, 0 failures, 0 errors, 0 skipped |
+| Test run | 322 tests, 0 failures, 0 errors, 0 skipped |
 | Environment | development, against PostgreSQL 16 with pgvector |
 | Accessibility | 23 surfaces × 2 colour schemes, 0 violations, 0 serious or critical |
 
@@ -69,7 +69,7 @@ existing one, which raises the per-control score for doing nothing.
 | UX and accessibility | 100.00 | 7 | 3 | 0 | 0 |
 | Reliability | 100.00 | 6 | 3 | 0 | 0 |
 | Observability | 100.00 | 5 | 3 | 0 | 0 |
-| Evaluation and assurance | 100.00 | 5 | 3 | 0 | 0 |
+| Evaluation and assurance | 100.00 | 6 | 4 | 0 | 0 |
 | Privacy | 100.00 | 5 | 3 | 0 | 0 |
 | DevSecOps | 100.00 | 4 | 2 | 0 | 0 |
 | **Deployment** | **50.00** | 4 | 2 | 0 | 1 |
@@ -87,7 +87,7 @@ a hash-addressed `artifacts/evidence-bundle.json`.
 Using the vocabulary the build brief asks for — mapped / tested / verified /
 not verified:
 
-* **Verified (54 controls, 104 weight).** An automated test names the control,
+* **Verified (55 controls, 105 weight).** An automated test names the control,
   the test executed in this run, and it passed. The tests exercise a real
   PostgreSQL 16 instance with row level security enforced, a real HTTP surface,
   and a real browser for the accessibility pass. Nothing is mocked at the
@@ -103,7 +103,7 @@ not verified:
 
 The platform is now measured under concurrency rather than carrying a declared
 latency target. A sweep at concurrency 1, 8 and 32 against the running API,
-120 requests per scenario per level, 100{'h1': 5.15, 'h8': 26.27, 'h32': 132.96, 'r1': 12.31, 'r8': 82.04, 'r32': 355.08, 'k1': 13.56, 'k8': 85.18, 'k32': 367.79, 'c1': 17.32, 'c8': 128.4, 'c32': 495.93, 't1': 75.2, 't8': 91.7, 't32': 79.4}uccess at every level:
+120 requests per scenario per level, 100% success at every level:
 
 | Scenario | p50 @1 | p50 @8 | p50 @32 |
 |---|---:|---:|---:|
@@ -124,13 +124,34 @@ curve.
 This is a saturation characterisation on one shared host, not a capacity
 statement. PRF-003 stays NOT_EVIDENCED for exactly that reason.
 
+## The run itself is now gated
+
+A number derived from a test run inherits that run's honesty. The weakest link
+was the suite's own skip behaviour: `requires_db` and `requires_redis` turned an
+unreachable service into a skip, and a skipped test is indistinguishable from a
+passing one in an exit code. Had PostgreSQL died partway through a CI job, every
+integration test would have skipped, the job would have reported green, and the
+evidence engine would have derived control statuses from a run that proved
+nothing.
+
+`AGENTIC_REQUIRE_SERVICES` names the services whose absence must fail the run.
+The CI test job sets it to `db,redis` — the two it provisions — and a repository
+test holds that wiring in place, so adding a service container without requiring
+it fails. `dr` is deliberately excluded: no maintenance identity exists in CI, so
+DRP-001 stays NOT_EVIDENCED there rather than being forced to pass.
+
+This is EVL-004, and it is critical: if the gate is broken, every other control's
+evidence is suspect. It was verified in both directions before being claimed —
+with the service absent and required, the run fails; with it absent and not
+required, it skips politely.
+
 ## What this score does not tell you
 
 * **It is a development-environment result.** Correct behaviour under seeded
   data and a single-node database is not the same as correct behaviour under
   production load, adversarial users and real integrations. See
   `FINAL_GAP_AUDIT.md` for the full list.
-* **The catalogue is self-authored.** 55 controls chosen by the builder,
+* **The catalogue is self-authored.** 59 controls chosen by the builder,
   weighted by the builder. That is a reasonable engineering instrument and a
   weak assurance instrument. It is why IND-001 exists and why it is
   unevidenced.

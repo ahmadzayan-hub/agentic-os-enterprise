@@ -18,7 +18,7 @@
 # critical: true means a failure blocks certification regardless of the score.
 
 version: 1.1.0
-total_weight: 110
+total_weight: 111
 
 domains:
   business_architecture: 7
@@ -33,7 +33,7 @@ domains:
   privacy: 5
   reliability: 6
   observability: 5
-  evaluation_assurance: 5
+  evaluation_assurance: 6
   devsecops: 4
   dr_resilience: 2
   business_value: 2
@@ -473,7 +473,7 @@ controls:
     test: tests/api/test_api_surface.py::test_run_detail_exposes_governance_record
     expected: Run detail returns the complete execution record.
 
-  # -------------------------------------------------- evaluation assurance (5)
+  # -------------------------------------------------- evaluation assurance (6)
   - id: EVL-001
     domain: evaluation_assurance
     title: Maturity is computed from executable evidence
@@ -502,6 +502,23 @@ controls:
     weight: 1
     test: tests/integration/test_evidence_engine.py::test_expired_evidence_does_not_count
     expected: Evidence past its TTL is reported EXPIRED and contributes zero.
+
+  - id: EVL-004
+    domain: evaluation_assurance
+    title: A run that could not exercise its services fails rather than skips
+    requirement: >-
+      Evidence may not be produced by a run in which the tested service was
+      absent. A skipped test must never be counted as a passing one.
+    implementation: >-
+      The requires_service gate in tests/conftest.py. AGENTIC_REQUIRE_SERVICES
+      names the services whose absence is a failure; the CI test job sets it to
+      the services it provisions, and
+      tests/api/test_repository_hygiene.py::test_the_test_job_cannot_pass_by_skipping_its_services
+      holds that wiring in place.
+    weight: 1
+    critical: true
+    test: tests/test_service_gates.py::test_an_absent_service_fails_when_it_is_required
+    expected: A required-but-absent service fails the run instead of skipping it.
 
   # ------------------------------------------------------------- devsecops (4)
   - id: DEV-001

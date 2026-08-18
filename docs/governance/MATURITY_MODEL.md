@@ -32,14 +32,14 @@ A critical failed or expired control blocks production certification regardless 
 | Privacy | 5 |
 | Reliability | 6 |
 | Observability | 5 |
-| Evaluation and assurance | 5 |
+| Evaluation and assurance | 6 |
 | DevSecOps | 4 |
 | DR and resilience | 2 |
 | Business value | 2 |
 | Deployment | 4 |
 | Independent assurance | 3 |
 | Performance | 3 |
-| **Total** | **110** |
+| **Total** | **111** |
 
 The total is deliberately not normalised to 100. Because the score is verified
 weight over total applicable weight, a control the platform cannot yet satisfy
