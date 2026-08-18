@@ -8,6 +8,7 @@ from sqlalchemy import text
 
 from agentic_os.ai import prompt_registry
 from agentic_os.api.deps import CtxDep, DbDep, require_permission
+from agentic_os.api.serialization import jsonify, row as json_row, rows as json_rows
 from agentic_os.core.errors import AgenticError
 from agentic_os.tools import mcp
 
@@ -40,7 +41,7 @@ def list_agents(ctx: CtxDep, db: DbDep) -> dict:
         ),
         {"t": ctx.tenant_id},
     ).mappings()
-    return {"agents": [dict(r) for r in rows]}
+    return {"agents": json_rows(rows)}
 
 
 @router.get(
@@ -78,8 +79,8 @@ def agent_detail(agent_key: str, ctx: CtxDep, db: DbDep) -> dict:
     ).mappings()
     return {
         "agent": dict(row),
-        "recent_runs": [dict(r) for r in recent],
-        "evaluations": [dict(r) for r in evaluations],
+        "recent_runs": json_rows(recent),
+        "evaluations": json_rows(evaluations),
     }
 
 
@@ -97,7 +98,7 @@ def list_skills(ctx: CtxDep, db: DbDep) -> dict:
         ),
         {"t": ctx.tenant_id},
     ).mappings()
-    return {"skills": [dict(r) for r in rows]}
+    return {"skills": json_rows(rows)}
 
 
 @router.get(
@@ -122,14 +123,14 @@ def list_models(ctx: CtxDep, db: DbDep) -> dict:
         ),
         {"t": ctx.tenant_id},
     ).mappings()
-    return {"models": [dict(r) for r in rows], "usage": [dict(r) for r in usage]}
+    return {"models": json_rows(rows), "usage": json_rows(usage)}
 
 
 @router.get(
     "/prompts", dependencies=[Depends(require_permission("prompts:read", resource_type="prompt"))]
 )
 def list_prompts(ctx: CtxDep, db: DbDep) -> dict:
-    return {"prompts": prompt_registry.list_prompts(db, ctx.tenant_id)}
+    return jsonify({"prompts": prompt_registry.list_prompts(db, ctx.tenant_id)})
 
 
 @router.get(
@@ -159,7 +160,7 @@ def prompt_detail(prompt_key: str, ctx: CtxDep, db: DbDep) -> dict:
             "owning_agent": resolved.owning_agent,
             "deployment_status": resolved.deployment_status,
         },
-        "versions": [dict(r) for r in versions],
+        "versions": json_rows(versions),
     }
 
 
@@ -177,7 +178,7 @@ def list_tools(ctx: CtxDep, db: DbDep) -> dict:
         ),
         {"t": ctx.tenant_id},
     ).mappings()
-    return {"tools": [dict(r) for r in rows]}
+    return {"tools": json_rows(rows)}
 
 
 @router.get(
@@ -192,7 +193,7 @@ def tool_calls(ctx: CtxDep, db: DbDep, limit: int = 100) -> dict:
         ),
         {"t": ctx.tenant_id, "l": min(limit, 500)},
     ).mappings()
-    return {"tool_calls": [dict(r) for r in rows]}
+    return {"tool_calls": json_rows(rows)}
 
 
 @router.get(
@@ -211,12 +212,12 @@ def list_connectors(ctx: CtxDep, db: DbDep) -> dict:
         ),
         {"t": ctx.tenant_id},
     ).mappings()
-    return {"connectors": [dict(r) for r in rows]}
+    return {"connectors": json_rows(rows)}
 
 
 @router.get("/mcp", dependencies=[Depends(require_permission("mcp:read", resource_type="mcp"))])
 def list_mcp_servers(ctx: CtxDep, db: DbDep) -> dict:
-    return {"servers": mcp.list_servers(db, ctx)}
+    return jsonify({"servers": mcp.list_servers(db, ctx)})
 
 
 class McpClassifyRequest(BaseModel):

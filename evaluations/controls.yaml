@@ -83,10 +83,14 @@ controls:
     domain: ux_accessibility
     title: WCAG 2.2 AA conformance is verified
     requirement: The operator UI meets WCAG 2.2 AA.
-    implementation: Not yet implemented — no automated accessibility suite runs.
+    implementation: >
+      axe-core driven through Playwright against the running application, covering
+      WCAG 2.0/2.1/2.2 A and AA plus best-practice rules, in both colour schemes.
     weight: 2
-    # Deliberately unmapped: axe-core against a running browser is not wired.
-    expected: Automated and manual accessibility testing evidence.
+    test: tests/accessibility/test_wcag_conformance.py::test_no_serious_or_critical_accessibility_violations
+    expected: >
+      axe-core reports zero serious or critical violations across every primary
+      surface in both light and dark colour schemes.
 
   # ----------------------------------------------- enterprise architecture (8)
   - id: EA-001

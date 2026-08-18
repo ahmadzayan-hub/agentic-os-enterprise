@@ -66,6 +66,7 @@ markers = [
   "security: security control tests",
   "redteam: adversarial agentic red-team tests",
   "rag: retrieval quality and leakage tests",
+  "accessibility: WCAG conformance evidenced from a browser audit",
   "slow: long-running tests",
 ]
 filterwarnings = ["ignore::DeprecationWarning"]

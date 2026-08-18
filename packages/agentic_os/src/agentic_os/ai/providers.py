@@ -314,11 +314,25 @@ class DeterministicProvider:
             "confidence": summary["confidence"],
         }
 
+    #: Skills whose inputs a planner can derive from a prose objective plus the
+    #: output of earlier retrieval steps.
+    #:
+    #: Skills outside this set — calculate, compare, forecast, optimise,
+    #: reconcile, transform, draft — need structured inputs (an expression, a
+    #: weighted criteria set, a numeric series) that no amount of reading the
+    #: objective will produce. They remain fully available through workflows,
+    #: where the definition supplies their inputs explicitly. Proposing them
+    #: from free text would only produce a step that fails at validation.
+    PROSE_DERIVABLE_SKILLS = frozenset(
+        {"search", "retrieve", "summarise", "analyse", "classify", "extract", "verify"}
+    )
+
     def _plan(self, request: ModelRequest) -> dict[str, Any]:
         """Rule-based planning over the capabilities the caller actually holds.
 
         The plan is assembled by matching intent verbs in the objective to
-        available skills. It never names a capability that was not supplied.
+        available skills. It never names a capability that was not supplied,
+        and never proposes a step whose inputs cannot be built.
         """
         objective: str = request.payload.get("objective", request.user)
         capabilities: dict[str, Any] = request.payload.get("capabilities", {})
@@ -338,7 +352,10 @@ class DeterministicProvider:
             "search": ("search", "find", "look", "locate", "which", "what", "where", "list"),
             "retrieve": ("retrieve", "fetch", "open", "read", "get"),
             "analyse": ("analyse", "analyze", "assess", "evaluate", "review", "investigate", "why"),
-            "calculate": ("calculate", "compute", "total", "sum", "average", "percentage"),
+            "calculate": (
+                "calculate", "comput", "total", "average", "percentage", "how much",
+                "how many",
+            ),
             "compare": ("compare", "versus", "against", "rank", "prioritise", "prioritize"),
             "forecast": ("forecast", "project", "predict", "trend", "next"),
             "reconcile": ("reconcile", "match", "difference", "discrepanc"),
@@ -351,11 +368,26 @@ class DeterministicProvider:
             "verify": ("verify", "confirm", "substantiate"),
             "transform": ("transform", "convert", "map", "normalise", "normalize"),
         }
+        # Match on word prefixes, not raw substrings. A substring test makes
+        # "summarise" trigger the "sum" calculate verb, which then produces a
+        # step whose inputs cannot be supplied.
         lowered = objective.lower()
+        words = re.findall(r"[a-z]+", lowered)
+
+        def triggered(triggers: tuple[str, ...]) -> bool:
+            return any(
+                any(word.startswith(trigger) for word in words)
+                if " " not in trigger
+                else trigger in lowered
+                for trigger in triggers
+            )
+
         matched = [
             skill
             for skill, triggers in verbs.items()
-            if skill in available_skills and any(t in lowered for t in triggers)
+            if skill in available_skills
+            and skill in self.PROSE_DERIVABLE_SKILLS
+            and triggered(triggers)
         ]
 
         # Grounded work always starts by retrieving evidence.
@@ -365,7 +397,8 @@ class DeterministicProvider:
         if "summarise" in available_skills and "summarise" not in matched:
             matched.append("summarise")
         if not matched:
-            matched = available_skills[:1]
+            derivable = [s for s in available_skills if s in self.PROSE_DERIVABLE_SKILLS]
+            matched = derivable[:1] or available_skills[:1]
 
         steps = []
         for index, skill in enumerate(matched[:6]):

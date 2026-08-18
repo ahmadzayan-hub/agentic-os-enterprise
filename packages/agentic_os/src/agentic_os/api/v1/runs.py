@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from agentic_os.api.deps import CtxDep, DbDep, require_permission
+from agentic_os.api.serialization import jsonify, row as json_row, rows as json_rows
 from agentic_os.control.conductor import Conductor
 from agentic_os.core.errors import AgenticError, NotFound
 
@@ -34,7 +35,7 @@ def submit(payload: SubmitRequest, ctx: CtxDep, db: DbDep) -> dict:
         )
     except AgenticError as exc:
         raise HTTPException(status_code=exc.http_status, detail=exc.to_dict()) from exc
-    return outcome.to_dict()
+    return jsonify(outcome.to_dict())
 
 
 @router.get("", dependencies=[Depends(require_permission("runs:read", resource_type="run"))])
@@ -65,7 +66,7 @@ def list_runs(
         ),
         {"t": ctx.tenant_id, "status": status_filter, "limit": limit},
     ).mappings()
-    return {"runs": [dict(r) for r in rows]}
+    return {"runs": json_rows(rows)}
 
 
 @router.get(
@@ -87,13 +88,10 @@ def run_detail(run_id: str, ctx: CtxDep, db: DbDep) -> dict:
         raise HTTPException(status_code=404, detail=NotFound(f"run {run_id} not found").to_dict())
 
     def rows(sql: str) -> list[dict]:
-        return [
-            dict(r)
-            for r in db.execute(text(sql), {"t": ctx.tenant_id, "i": run_id}).mappings()
-        ]
+        return json_rows(db.execute(text(sql), {"t": ctx.tenant_id, "i": run_id}).mappings())
 
     return {
-        "run": dict(run),
+        "run": json_row(run),
         "plan": rows(
             "SELECT version, planner, steps, plan_hash, validated, validation_errors, "
             "rationale, estimated_cost_usd FROM plans "

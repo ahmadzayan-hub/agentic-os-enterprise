@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from agentic_os.api.deps import CtxDep, DbDep, require_permission
+from agentic_os.api.serialization import jsonify, row as json_row, rows as json_rows
 from agentic_os.assurance.audit import AuditLedger
 from agentic_os.assurance import evidence as evidence_engine
 from agentic_os.control import approval_engine
@@ -30,7 +31,7 @@ class DecisionRequest(BaseModel):
 def list_approvals(ctx: CtxDep, db: DbDep, mine: bool = True) -> dict:
     approval_engine.expire_due_approvals(db, ctx.tenant_id)
     if mine:
-        return {"approvals": approval_engine.pending_for_principal(db, ctx)}
+        return jsonify({"approvals": approval_engine.pending_for_principal(db, ctx)})
     rows = db.execute(
         text(
             "SELECT id, action, target, status, mode, required_approvals, risk_class, "
@@ -40,7 +41,7 @@ def list_approvals(ctx: CtxDep, db: DbDep, mine: bool = True) -> dict:
         ),
         {"t": ctx.tenant_id},
     ).mappings()
-    return {"approvals": [dict(r) for r in rows]}
+    return {"approvals": json_rows(rows)}
 
 
 @router.get(
@@ -49,7 +50,7 @@ def list_approvals(ctx: CtxDep, db: DbDep, mine: bool = True) -> dict:
 )
 def get_approval(approval_id: str, ctx: CtxDep, db: DbDep) -> dict:
     try:
-        return approval_engine.get_approval(db, ctx.tenant_id, approval_id)
+        return jsonify(approval_engine.get_approval(db, ctx.tenant_id, approval_id))
     except AgenticError as exc:
         raise HTTPException(status_code=exc.http_status, detail=exc.to_dict()) from exc
 
@@ -92,7 +93,7 @@ def list_policies(ctx: CtxDep, db: DbDep) -> dict:
         ),
         {"t": ctx.tenant_id},
     ).mappings()
-    return {"policies": [dict(r) for r in rows]}
+    return {"policies": json_rows(rows)}
 
 
 @router.get(
@@ -108,7 +109,7 @@ def policy_decisions(ctx: CtxDep, db: DbDep, limit: Annotated[int, Query(le=500)
         ),
         {"t": ctx.tenant_id, "l": limit},
     ).mappings()
-    return {"decisions": [dict(r) for r in rows]}
+    return {"decisions": json_rows(rows)}
 
 
 # ----------------------------------------------------------------------- risks
@@ -124,7 +125,7 @@ def list_risks(ctx: CtxDep, db: DbDep, limit: Annotated[int, Query(le=500)] = 10
         ),
         {"t": ctx.tenant_id, "l": limit},
     ).mappings()
-    return {"risk_assessments": [dict(r) for r in rows]}
+    return {"risk_assessments": json_rows(rows)}
 
 
 # -------------------------------------------------------------------- evidence
@@ -142,7 +143,7 @@ def maturity(ctx: CtxDep, db: DbDep) -> dict:
                 "'agentic-evidence collect' to derive maturity from the test suite"
             ),
         }
-    return {"available": True, **report}
+    return jsonify({"available": True, **report})
 
 
 @router.get(
@@ -166,7 +167,7 @@ def list_controls(ctx: CtxDep, db: DbDep) -> dict:
         ),
         {"t": ctx.tenant_id},
     ).mappings()
-    return {"controls": [dict(r) for r in rows]}
+    return {"controls": json_rows(rows)}
 
 
 @router.get(
@@ -182,7 +183,7 @@ def certifications(ctx: CtxDep, db: DbDep) -> dict:
         ),
         {"t": ctx.tenant_id},
     ).mappings()
-    return {"certifications": [dict(r) for r in rows]}
+    return {"certifications": json_rows(rows)}
 
 
 # ----------------------------------------------------------------------- audit
@@ -195,7 +196,9 @@ def audit_log(
     category: str | None = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> dict:
-    return {"events": AuditLedger(db).recent(ctx.tenant_id, limit=limit, category=category)}
+    return jsonify(
+        {"events": AuditLedger(db).recent(ctx.tenant_id, limit=limit, category=category)}
+    )
 
 
 @router.get(
@@ -234,9 +237,9 @@ def security_posture(ctx: CtxDep, db: DbDep) -> dict:
         {"t": ctx.tenant_id},
     ).mappings()
     return {
-        "findings": [dict(r) for r in findings],
-        "kill_switches": [dict(r) for r in switches],
-        "denials_by_stage": [dict(r) for r in denials],
+        "findings": json_rows(findings),
+        "kill_switches": json_rows(switches),
+        "denials_by_stage": json_rows(denials),
     }
 
 

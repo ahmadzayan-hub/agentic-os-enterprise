@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from agentic_os.api.deps import CtxDep, DbDep, require_permission
+from agentic_os.api.serialization import jsonify, row as json_row, rows as json_rows
 from agentic_os.core.errors import AgenticError
 from agentic_os.observability import telemetry
 from agentic_os.outcomes import engine as outcomes_engine
@@ -33,39 +34,30 @@ def command_center(ctx: CtxDep, db: DbDep) -> dict:
 
     attention = {
         "pending_approvals": approval_engine.pending_for_principal(db, ctx, limit=10),
-        "failed_runs": [
-            dict(r)
-            for r in db.execute(
+        "failed_runs": json_rows(db.execute(
                 text(
                     "SELECT id, objective, error_class, error_message, completed_at FROM runs "
                     "WHERE tenant_id = :t AND status = 'FAILED' "
                     "ORDER BY completed_at DESC NULLS LAST LIMIT 5"
                 ),
                 {"t": ctx.tenant_id},
-            ).mappings()
-        ],
-        "security_findings": [
-            dict(r)
-            for r in db.execute(
+            ).mappings()),
+        "security_findings": json_rows(db.execute(
                 text(
                     "SELECT finding_type, severity, source, created_at FROM security_findings "
                     "WHERE tenant_id = :t AND severity IN ('HIGH', 'CRITICAL') "
                     "ORDER BY created_at DESC LIMIT 5"
                 ),
                 {"t": ctx.tenant_id},
-            ).mappings()
-        ],
-        "open_incidents": [
-            dict(r)
-            for r in db.execute(
+            ).mappings()),
+        "open_incidents": json_rows(db.execute(
                 text(
                     "SELECT incident_key, title, severity, status, detected_at FROM incidents "
                     "WHERE tenant_id = :t AND status NOT IN ('RESOLVED', 'CLOSED') "
                     "ORDER BY detected_at DESC LIMIT 5"
                 ),
                 {"t": ctx.tenant_id},
-            ).mappings()
-        ],
+            ).mappings()),
         "dead_letters": len(event_bus.dead_letters(db, ctx.tenant_id, limit=50)),
         "expired_evidence": int(
             db.execute(
@@ -77,24 +69,23 @@ def command_center(ctx: CtxDep, db: DbDep) -> dict:
         ),
     }
 
-    kill_switches = [
-        dict(r)
-        for r in db.execute(
+    kill_switches = json_rows(db.execute(
             text(
                 "SELECT scope, target_key, engaged, reason FROM kill_switches "
                 "WHERE (tenant_id = :t OR tenant_id IS NULL) AND engaged ORDER BY scope"
             ),
             {"t": ctx.tenant_id},
-        ).mappings()
-    ]
+        ).mappings())
 
-    return {
+    return jsonify(
+        {
         "requires_attention": attention,
         "agent_operations": telemetry.platform_metrics(db, ctx.tenant_id, window_hours=24),
         "business_pulse": outcomes_engine.operational_summary(db, ctx.tenant_id, window_days=7),
         "engaged_kill_switches": kill_switches,
         "read_only_mode": any(k["scope"] == "READ_ONLY" for k in kill_switches),
-    }
+        }
+    )
 
 
 @router.get(
@@ -104,7 +95,7 @@ def command_center(ctx: CtxDep, db: DbDep) -> dict:
 def analytics(
     ctx: CtxDep, db: DbDep, window_hours: Annotated[int, Query(ge=1, le=8760)] = 168
 ) -> dict:
-    return telemetry.platform_metrics(db, ctx.tenant_id, window_hours=window_hours)
+    return jsonify(telemetry.platform_metrics(db, ctx.tenant_id, window_hours=window_hours))
 
 
 @router.get(
@@ -113,7 +104,7 @@ def analytics(
 def outcomes(
     ctx: CtxDep, db: DbDep, window_days: Annotated[int, Query(ge=1, le=365)] = 30
 ) -> dict:
-    return outcomes_engine.roi_summary(db, ctx.tenant_id, window_days=window_days)
+    return jsonify(outcomes_engine.roi_summary(db, ctx.tenant_id, window_days=window_days))
 
 
 @router.get("/costs", dependencies=[Depends(require_permission("costs:read", resource_type="cost"))])
@@ -156,9 +147,9 @@ def costs(ctx: CtxDep, db: DbDep, window_days: Annotated[int, Query(ge=1, le=365
     return {
         "window_days": window_days,
         "spend_today_usd": round(spend_today, 6),
-        "by_model": [dict(r) for r in by_model],
-        "by_agent": [dict(r) for r in by_agent],
-        "budgets": [dict(r) for r in budgets],
+        "by_model": json_rows(by_model),
+        "by_agent": json_rows(by_agent),
+        "budgets": json_rows(budgets),
     }
 
 
@@ -179,7 +170,7 @@ def list_workflows(ctx: CtxDep, db: DbDep) -> dict:
         ),
         {"t": ctx.tenant_id},
     ).mappings()
-    return {"workflows": [dict(r) for r in rows], "step_types": sorted(
+    return {"workflows": json_rows(rows), "step_types": sorted(
         workflow_engine.registered_step_types()
     )}
 
@@ -198,7 +189,7 @@ def list_workflow_runs(ctx: CtxDep, db: DbDep, limit: Annotated[int, Query(le=20
         ),
         {"t": ctx.tenant_id, "l": limit},
     ).mappings()
-    return {"workflow_runs": [dict(r) for r in rows]}
+    return {"workflow_runs": json_rows(rows)}
 
 
 class StartWorkflowRequest(BaseModel):
@@ -245,7 +236,7 @@ def list_incidents(ctx: CtxDep, db: DbDep) -> dict:
         ),
         {"t": ctx.tenant_id},
     ).mappings()
-    return {"incidents": [dict(r) for r in rows], "alerts": [dict(r) for r in alerts]}
+    return {"incidents": json_rows(rows), "alerts": json_rows(alerts)}
 
 
 # ------------------------------------------------------------------ organization
@@ -273,4 +264,4 @@ def organization(ctx: CtxDep, db: DbDep) -> dict:
         ),
         {"t": ctx.tenant_id},
     ).mappings()
-    return {"tenant": dict(tenant) if tenant else None, "users": [dict(r) for r in users]}
+    return {"tenant": json_row(tenant), "users": json_rows(users)}

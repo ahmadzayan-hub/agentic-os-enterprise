@@ -397,7 +397,17 @@ class Conductor:
                 "context": intent.objective,
                 "evidence": evidence or [{"id": "objective", "statement": intent.objective}],
             }
-        return {"text": intent.objective, "fields": list(intent.entities)}
+        if step.skill == "extract":
+            return {"text": intent.objective, "fields": list(intent.entities) or ["subject"]}
+
+        # A step whose inputs cannot be built from the objective and prior state
+        # must fail here, naming the skill, rather than reaching the skill and
+        # producing an opaque schema error.
+        raise ValidationError(
+            f"the plan proposes skill '{step.skill}' but the Conductor cannot build its "
+            f"inputs from this objective",
+            details={"skill": step.skill, "step": step.key},
+        )
 
     @staticmethod
     def _consolidate(state: dict[str, Any], plan: Plan) -> dict[str, Any]:

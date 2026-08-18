@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from agentic_os.api.deps import CtxDep, DbDep, require_permission
+from agentic_os.api.serialization import jsonify, row as json_row, rows as json_rows
 from agentic_os.core.errors import AgenticError
 from agentic_os.knowledge import graph, ingestion, retrieval
 
@@ -32,7 +33,7 @@ def search(payload: SearchRequest, ctx: CtxDep, db: DbDep) -> dict:
         )
     except AgenticError as exc:
         raise HTTPException(status_code=exc.http_status, detail=exc.to_dict()) from exc
-    return result.to_dict()
+    return jsonify(result.to_dict())
 
 
 @router.get(
@@ -69,7 +70,7 @@ def list_documents(ctx: CtxDep, db: DbDep, limit: Annotated[int, Query(le=200)] 
             "l": limit,
         },
     ).mappings()
-    return {"documents": [dict(r) for r in rows]}
+    return {"documents": json_rows(rows)}
 
 
 @router.get(
@@ -78,7 +79,7 @@ def list_documents(ctx: CtxDep, db: DbDep, limit: Annotated[int, Query(le=200)] 
 )
 def get_document(document_id: str, ctx: CtxDep, db: DbDep) -> dict:
     try:
-        return retrieval.fetch_document(db, ctx, document_id)
+        return jsonify(retrieval.fetch_document(db, ctx, document_id))
     except AgenticError as exc:
         raise HTTPException(status_code=exc.http_status, detail=exc.to_dict()) from exc
 
@@ -129,7 +130,7 @@ def list_datasets(ctx: CtxDep, db: DbDep) -> dict:
         ),
         {"t": ctx.tenant_id},
     ).mappings()
-    return {"datasets": [dict(r) for r in rows]}
+    return {"datasets": json_rows(rows)}
 
 
 @router.get("/graph", dependencies=[Depends(require_permission("graph:read", resource_type="graph"))])
@@ -142,8 +143,10 @@ def query_graph(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> dict:
     try:
-        return graph.query(
-            db, ctx, node_key=node_key, node_type=node_type, depth=depth, limit=limit
+        return jsonify(
+            graph.query(
+                db, ctx, node_key=node_key, node_type=node_type, depth=depth, limit=limit
+            )
         )
     except AgenticError as exc:
         raise HTTPException(status_code=exc.http_status, detail=exc.to_dict()) from exc
@@ -161,6 +164,8 @@ def impact(
     direction: str = "downstream",
 ) -> dict:
     try:
-        return graph.impact_analysis(db, ctx, node_key=node_key, depth=depth, direction=direction)
+        return jsonify(
+            graph.impact_analysis(db, ctx, node_key=node_key, depth=depth, direction=direction)
+        )
     except AgenticError as exc:
         raise HTTPException(status_code=exc.http_status, detail=exc.to_dict()) from exc

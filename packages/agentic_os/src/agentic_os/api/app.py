@@ -10,6 +10,8 @@ import time
 from collections import defaultdict, deque
 from typing import Any
 
+from decimal import Decimal
+
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -20,6 +22,29 @@ from agentic_os.core.errors import AgenticError
 from agentic_os.core.ids import correlation_id as new_correlation_id
 
 API_PREFIX = "/api/v1"
+
+
+class NumericJSONResponse(JSONResponse):
+    """Serialise PostgreSQL ``numeric`` as a JSON number, not a string.
+
+    FastAPI's default encoder renders ``Decimal`` as a string, which forces every
+    consumer to remember to coerce a cost or a score before doing arithmetic on
+    it — and produces a runtime error the first time someone forgets. Money and
+    scores are numbers in the API contract; the database remains the authority
+    for exact decimal arithmetic.
+    """
+
+    def render(self, content: Any) -> bytes:
+        import json
+
+        def default(value: Any) -> Any:
+            if isinstance(value, Decimal):
+                return float(value)
+            raise TypeError(f"object of type {type(value).__name__} is not JSON serialisable")
+
+        return json.dumps(
+            content, ensure_ascii=False, allow_nan=False, separators=(",", ":"), default=default
+        ).encode("utf-8")
 
 #: The API returns JSON only, so its policy is maximally restrictive. The web
 #: application ships its own policy suited to rendering.
@@ -73,6 +98,7 @@ def create_app(*, include_docs: bool = True) -> FastAPI:
         docs_url=f"{API_PREFIX}/docs" if include_docs else None,
         openapi_url=f"{API_PREFIX}/openapi.json" if include_docs else None,
         redoc_url=None,
+        default_response_class=NumericJSONResponse,
     )
 
     app.add_middleware(
@@ -134,7 +160,12 @@ def create_app(*, include_docs: bool = True) -> FastAPI:
         knowledge.router,
         operations.router,
     ):
-        app.include_router(router, prefix=API_PREFIX)
+        # The response class must be passed here as well as on the app: a router
+        # created with a bare APIRouter() carries its own JSONResponse default,
+        # which would otherwise win and re-introduce Decimal-as-string.
+        app.include_router(
+            router, prefix=API_PREFIX, default_response_class=NumericJSONResponse
+        )
 
     @app.get("/health", tags=["platform"])
     def health() -> dict[str, Any]:

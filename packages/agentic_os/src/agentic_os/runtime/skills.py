@@ -447,6 +447,20 @@ class SkillExecutor:
         payload = dict(params)
         if skill_key == "summarise":
             payload.setdefault("max_sentences", max(2, params.get("max_words", 200) // 40))
+        if skill_key == "analyse":
+            # The analyse skill takes `evidence`; the extractive engine reads
+            # `sources`. Without this the engine sees no sources and correctly
+            # reports that it cannot ground an answer — which then trips the
+            # agent's citation requirement.
+            payload.setdefault(
+                "sources",
+                [
+                    {"id": str(item.get("id", "")), "text": str(item.get("text", ""))}
+                    for item in params.get("evidence", [])
+                ],
+            )
+            payload.setdefault("focus", str(params.get("question", "")))
+            payload.setdefault("max_sentences", 4)
         if skill_key == "draft":
             payload.setdefault("evidence", params.get("evidence", []))
             payload.setdefault("document_type", params.get("document_type", "note"))
