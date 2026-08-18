@@ -247,9 +247,16 @@ Listed so the audit is balanced, and because each is reproducible.
 
 ## 6. Process note
 
-The build brief asked for the work to be done on a branch named
+The build brief asked for the work to be done on
 `build/agentic-os-enterprise-v3.1`. The execution harness for this session
-designates a different branch, `claude/agentic-os-enterprise-v3.1-ogi9cq`, and
-pushing to any other branch is not permitted here. All work is on the
-designated branch; `main` was not modified. If the original branch name is
-required, the branch can be renamed or re-pushed under it by a maintainer.
+designated `claude/agentic-os-enterprise-v3.1-ogi9cq` instead, so development
+happened there; with the maintainer's approval the identical commits are also
+published as `build/agentic-os-enterprise-v3.1`, and the pull request is opened
+from that branch. Both refs point at the same commit.
+
+`main` did not exist on the remote when this build finished — the repository
+held no branches at all, so there was no base for a pull request. With the
+maintainer's approval, `main` was created at the unmodified v3.0 scaffold
+commit (`294dfca`), which is already an ancestor of this branch. `main` was
+created, not modified: its content is exactly the baseline the v3.0 scaffold
+defined, and every v3.1 change is in the pull request rather than on `main`.
