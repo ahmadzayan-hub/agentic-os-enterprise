@@ -260,8 +260,16 @@ def _load_definition(session: Session, tenant_id: str, run: dict) -> dict[str, A
     return row if isinstance(row, dict) else json.loads(row)
 
 
-def claim_due_runs(session: Session, worker_id: str, *, limit: int = 10) -> list[str]:
-    """Lease runs that are ready to advance. Concurrency-safe."""
+def claim_due_runs(
+    session: Session, worker_id: str, *, tenant_id: str, limit: int = 10
+) -> list[str]:
+    """Lease runs that are ready to advance, within one tenant.
+
+    Deliberately tenant-scoped. Row level security has no bypass predicate, so
+    a worker cannot sweep every tenant in one query — it iterates tenants and
+    binds each, which is also what keeps one noisy tenant from starving the
+    others in a single scan.
+    """
     rows = session.execute(
         text(
             """
@@ -272,7 +280,8 @@ def claim_due_runs(session: Session, worker_id: str, *, limit: int = 10) -> list
                    updated_at = now()
              WHERE id IN (
                SELECT id FROM workflow_runs
-                WHERE status IN ('PENDING', 'RUNNING')
+                WHERE tenant_id = CAST(:tenant AS uuid)
+                  AND status IN ('PENDING', 'RUNNING')
                   AND paused = false
                   AND next_poll_at <= now()
                   AND (lease_expires_at IS NULL OR lease_expires_at < now())
@@ -283,7 +292,7 @@ def claim_due_runs(session: Session, worker_id: str, *, limit: int = 10) -> list
             RETURNING id
             """
         ),
-        {"worker": worker_id, "lease": LEASE_SECONDS, "limit": limit},
+        {"worker": worker_id, "lease": LEASE_SECONDS, "limit": limit, "tenant": tenant_id},
     ).all()
     return [str(r.id) for r in rows]
 

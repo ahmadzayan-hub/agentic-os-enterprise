@@ -121,24 +121,29 @@ def _matching_handlers(event_type: str) -> list[Callable[[Session, dict[str, Any
     return handlers
 
 
-def dispatch_pending(session: Session, *, batch_size: int = 50) -> dict[str, int]:
-    """Deliver a batch of due outbox entries. Safe to run concurrently.
+def dispatch_pending(
+    session: Session, *, tenant_id: str, batch_size: int = 50
+) -> dict[str, int]:
+    """Deliver a batch of due outbox entries for one tenant.
 
     ``FOR UPDATE SKIP LOCKED`` means two dispatchers never pick the same row,
-    so the worker scales horizontally without coordination.
+    so the worker scales horizontally without coordination. Tenant-scoped for
+    the same reason as the workflow claim: RLS has no bypass, and per-tenant
+    batches keep one busy tenant from starving the rest.
     """
     rows = session.execute(
         text(
             """
             SELECT id, tenant_id, event_type, payload, attempts, max_attempts
             FROM outbox_events
-            WHERE status IN ('PENDING', 'FAILED') AND next_attempt_at <= now()
+            WHERE tenant_id = CAST(:tenant AS uuid)
+              AND status IN ('PENDING', 'FAILED') AND next_attempt_at <= now()
             ORDER BY created_at
             LIMIT :limit
             FOR UPDATE SKIP LOCKED
             """
         ),
-        {"limit": batch_size},
+        {"limit": batch_size, "tenant": tenant_id},
     ).mappings().all()
 
     dispatched = failed = dead = 0

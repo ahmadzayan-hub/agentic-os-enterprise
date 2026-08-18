@@ -80,6 +80,7 @@ class RetrievalResult:
 
     @property
     def acl_filtered_count(self) -> int:
+        """Searchable chunks withheld from this caller by ACL and clearance."""
         return self.candidates_before_acl - self.candidates_after_acl
 
     def to_dict(self) -> dict[str, Any]:
@@ -218,30 +219,46 @@ def _extra_filters(filters: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     return " ".join(clauses), params
 
 
-def _count_all_candidates(
-    session: Session, tenant_id: str, query: str, filters: dict[str, Any]
-) -> int:
-    """Total published chunks matching the query *ignoring* ACL.
+def _corpus_visibility(
+    session: Session, tenant_id: str, acl_keys: list[str], clearance_rank: int,
+    filters: dict[str, Any],
+) -> tuple[int, int]:
+    """Return (searchable chunks in the tenant, chunks visible to this caller).
 
-    Used only to report how much the ACL filter removed. It counts, never
-    returns content, so it cannot itself leak anything.
+    Both figures are counts of the *searchable corpus*, not of the candidates a
+    particular query happened to match — semantic search scans the whole index,
+    so a query-scoped "before ACL" figure would compare a lexical subset against
+    a hybrid result and be meaningless.
+
+    Counting is safe: it never returns content, so the reported delta discloses
+    only how much the ACL removed, not what.
     """
     extra, params = _extra_filters(filters)
-    return int(
-        session.execute(
-            text(
-                f"""
-                SELECT count(*) FROM chunks c
-                JOIN documents d ON d.id = c.document_id AND d.tenant_id = c.tenant_id
-                WHERE c.tenant_id = :tenant AND d.ingest_status = 'PUBLISHED'
-                  AND d.deleted_at IS NULL {extra}
-                  AND to_tsvector('english', c.content)
-                      @@ websearch_to_tsquery('english', :query)
-                """
-            ),
-            {"tenant": tenant_id, "query": query, **params},
-        ).scalar_one()
-    )
+    row = session.execute(
+        text(
+            f"""
+            SELECT
+              count(*) AS total,
+              count(*) FILTER (
+                WHERE c.acl_principals && CAST(:acl_keys AS text[])
+                  AND CASE c.classification
+                        WHEN 'PUBLIC' THEN 0 WHEN 'INTERNAL' THEN 1
+                        WHEN 'CONFIDENTIAL' THEN 2 ELSE 3 END <= :clearance_rank
+              ) AS visible
+            FROM chunks c
+            JOIN documents d ON d.id = c.document_id AND d.tenant_id = c.tenant_id
+            WHERE c.tenant_id = :tenant AND d.ingest_status = 'PUBLISHED'
+              AND d.deleted_at IS NULL {extra}
+            """
+        ),
+        {
+            "tenant": tenant_id,
+            "acl_keys": acl_keys,
+            "clearance_rank": clearance_rank,
+            **params,
+        },
+    ).one()
+    return int(row.total), int(row.visible)
 
 
 def search(
@@ -310,8 +327,9 @@ def search(
         for row in fused[:top_k]
     ]
 
-    after_acl = len({str(r["chunk_id"]) for r in semantic} | {str(r["chunk_id"]) for r in lexical})
-    before_acl = _count_all_candidates(session, ctx.tenant_id, query, filters)
+    before_acl, after_acl = _corpus_visibility(
+        session, ctx.tenant_id, acl_keys, clearance_rank, filters
+    )
     latency_ms = int((time.perf_counter() - started) * 1000)
 
     if record_query:

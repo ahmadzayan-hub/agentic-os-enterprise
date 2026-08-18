@@ -32,6 +32,16 @@ policies:
           reversibility_in: [IRREVERSIBLE]
         effect: REQUIRE_APPROVAL
         reason: Irreversible actions require human authorisation.
+      - name: reversible-write-under-policy
+        when:
+          side_effect_in: [WRITE]
+          reversibility_in: [REVERSIBLE]
+        effect: ALLOW
+        obligations: [VERIFY_SIDE_EFFECT, RECORD_RISK_ASSESSMENT]
+        reason: >
+          Reversible internal writes are the A3 band: permitted under policy,
+          but only with side-effect verification so the platform can prove the
+          change actually happened.
       - name: allow-reversible-reads
         when:
           side_effect_in: [READ]
