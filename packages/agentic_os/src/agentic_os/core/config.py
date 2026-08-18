@@ -120,6 +120,12 @@ class Settings(BaseSettings):
                 problems.append("AGENTIC_POLICY_MODE must be 'enforce' in production")
             if self.kms_backend == "local":
                 problems.append("AGENTIC_KMS_BACKEND must not be 'local' in production")
+            if self.model_allow_external_providers and not (
+                self.anthropic_api_key or self.openai_api_key or self.local_model_base_url
+            ):
+                problems.append(
+                    "external model providers are enabled but no provider is configured"
+                )
             if self.secret_backend == "env":
                 problems.append("AGENTIC_SECRET_BACKEND must be 'file' or 'vault' in production")
             if "*" in self.cors_allowed_origins:
@@ -137,6 +143,24 @@ def get_settings() -> Settings:
         settings.jwt_secret = os.environ.setdefault(
             "AGENTIC_JWT_SECRET", "dev-only-insecure-signing-key-change-me-0001"
         )
+    if not settings.kms_local_key:
+        if settings.kms_backend == "local" and not settings.is_production:
+            # Development and CI need a *stable* data key: a per-process random
+            # key would make yesterday's ciphertext undecryptable today.
+            #
+            # It is deliberately NOT derived from the signing key. Coupling them
+            # would mean that rotating AGENTIC_JWT_SECRET silently destroyed
+            # every KMS-encrypted record — a data-loss trap. Encryption keys and
+            # signing keys have independent rotation lifecycles.
+            #
+            # Production rejects the local backend outright in
+            # validate_for_boot(), so this path never runs there.
+            import base64
+            import hashlib
+
+            derived = hashlib.sha256(b"agentic-os/local-kms/development-key/v1").digest()
+            settings.kms_local_key = base64.b64encode(derived).decode("ascii")
+
     problems = settings.validate_for_boot()
     if problems:
         raise RuntimeError("Invalid configuration: " + "; ".join(problems))

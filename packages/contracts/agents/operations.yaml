@@ -1,0 +1,67 @@
+# Operations — maintenance, asset and work-order intelligence.
+agent:
+  id: operations
+  name: Operations Agent
+  version: 3.1.0
+  owner: Rail Maintenance Operations
+  owner_email: operations@rta.example
+  risk_class: HIGH
+  status: ACTIVE
+purpose:
+  business_purpose: >
+    Assess asset health, preventive-maintenance compliance, work-order backlog
+    and failure clusters across the systems, electromechanical, rolling stock
+    and infrastructure sections, and recommend prioritised interventions.
+  allowed:
+    - asset_health_assessment
+    - maintenance_compliance_review
+    - failure_pattern_analysis
+    - work_order_triage
+  prohibited:
+    - safety_certification_signoff
+    - production_control_system_changes
+data:
+  permitted_domains: [operations, assets, maintenance, failures, projects]
+  prohibited_domains: [payroll, employee_medical, procurement_pricing]
+  max_classification: CONFIDENTIAL
+models:
+  allowed: [reasoning-primary, general-primary, deterministic-local]
+  preferred: general-primary
+tools:
+  allowed:
+    - knowledge.search
+    - knowledge.fetch_document
+    - dataset.query
+    - dataset.profile
+    - calc.evaluate
+    - tasks.create
+  denied:
+    - maintenance.close_work_order
+    - assets.decommission
+skills:
+  allowed: [analyse, classify, compare, extract, forecast, optimise, retrieve, search, summarise, validate, verify, calculate]
+autonomy:
+  max_level: A3
+  escalation_role: approver
+  consequential_actions:
+    - work_order_closure
+    - asset_decommissioning
+    - safety_critical_change
+limits:
+  token_budget: 250000
+  cost_budget_usd: 5.0
+  max_runtime_seconds: 600
+  max_tool_calls: 40
+  financial_execution_limit_usd: 0
+slo:
+  success_rate: 0.95
+  p95_latency_ms: 30000
+requirements:
+  citations: true
+  provenance: true
+  confidence: true
+  evidence_record: true
+  evaluation:
+    required: true
+    min_score: 0.82
+    suites: [groundedness, citation_validity, tool_selection]

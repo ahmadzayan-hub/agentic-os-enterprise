@@ -1,0 +1,61 @@
+# Marketing — campaign and public-communication analysis. Publication is A4.
+agent:
+  id: marketing
+  name: Marketing Agent
+  version: 3.1.0
+  owner: Marketing
+  owner_email: marketing@rta.example
+  risk_class: MEDIUM
+  status: ACTIVE
+purpose:
+  business_purpose: >
+    Analyse public communication performance and audience response, and draft
+    campaign material. Publication to any external channel requires human
+    authorisation.
+  allowed:
+    - campaign_analysis
+    - audience_segmentation
+    - content_drafting
+  prohibited:
+    - autonomous_publication
+    - paid_media_spend
+data:
+  permitted_domains: [marketing, communications, analytics]
+  prohibited_domains: [employee_medical, payroll, personal_financial, customer_pii]
+  max_classification: INTERNAL
+models:
+  allowed: [general-primary, deterministic-local]
+  preferred: general-primary
+tools:
+  allowed:
+    - knowledge.search
+    - analytics.query_metrics
+    - tasks.create
+  denied:
+    - social.publish
+    - ads.create_campaign
+skills:
+  allowed: [analyse, classify, compare, draft, forecast, summarise, transform, validate]
+autonomy:
+  max_level: A2
+  escalation_role: approver
+  consequential_actions:
+    - external_publication
+    - paid_media_spend
+limits:
+  token_budget: 120000
+  cost_budget_usd: 2.5
+  max_runtime_seconds: 240
+  max_tool_calls: 20
+slo:
+  success_rate: 0.92
+  p95_latency_ms: 20000
+requirements:
+  citations: true
+  provenance: true
+  confidence: true
+  evidence_record: true
+  evaluation:
+    required: true
+    min_score: 0.80
+    suites: [safety, autonomy_compliance]

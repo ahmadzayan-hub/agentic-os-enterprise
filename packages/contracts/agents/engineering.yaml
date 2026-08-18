@@ -1,0 +1,64 @@
+# Engineering — technical design review and change impact analysis.
+agent:
+  id: engineering
+  name: Engineering Agent
+  version: 3.1.0
+  owner: Engineering
+  owner_email: engineering@rta.example
+  risk_class: HIGH
+  status: ACTIVE
+purpose:
+  business_purpose: >
+    Review technical submissions, standards compliance and change proposals,
+    and assess the impact of a proposed change on dependent systems using the
+    enterprise dependency graph.
+  allowed:
+    - technical_review
+    - standards_compliance_check
+    - change_impact_analysis
+    - obsolescence_assessment
+  prohibited:
+    - safety_case_approval
+    - production_configuration_change
+data:
+  permitted_domains: [engineering, standards, assets, projects, documents]
+  prohibited_domains: [payroll, employee_medical, procurement_pricing]
+  max_classification: CONFIDENTIAL
+models:
+  allowed: [reasoning-primary, general-primary, deterministic-local]
+  preferred: reasoning-primary
+tools:
+  allowed:
+    - knowledge.search
+    - knowledge.fetch_document
+    - graph.query
+    - graph.impact_analysis
+    - calc.evaluate
+    - tasks.create
+  denied:
+    - infrastructure.apply_change
+skills:
+  allowed: [analyse, classify, compare, extract, retrieve, search, summarise, validate, verify]
+autonomy:
+  max_level: A2
+  escalation_role: approver
+  consequential_actions:
+    - production_configuration_change
+    - safety_case_approval
+limits:
+  token_budget: 250000
+  cost_budget_usd: 5.0
+  max_runtime_seconds: 600
+  max_tool_calls: 35
+slo:
+  success_rate: 0.94
+  p95_latency_ms: 35000
+requirements:
+  citations: true
+  provenance: true
+  confidence: true
+  evidence_record: true
+  evaluation:
+    required: true
+    min_score: 0.85
+    suites: [groundedness, citation_validity, plan_quality]

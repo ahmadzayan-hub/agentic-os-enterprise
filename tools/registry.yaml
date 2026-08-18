@@ -1,0 +1,399 @@
+# Tool registry.
+#
+# Every entry is a governed capability reachable only through the Tool Security
+# Gateway. `implementation_status` is load-bearing, not documentation: the
+# gateway refuses NOT_IMPLEMENTED tools with a 501 and the UI hides them from
+# operational navigation. Declaring a tool without building it is therefore
+# safe and honest — it can never silently return fabricated data.
+#
+# side_effect drives risk classification and the approval requirement:
+#   READ       no external change
+#   WRITE      reversible internal change
+#   DELETE     destructive
+#   EXTERNAL   leaves the organisation (email, publication, third-party API)
+#   FINANCIAL  moves money
+
+version: 1.0.0
+tools:
+  # ---------------------------------------------------------------- knowledge
+  - key: knowledge.search
+    name: Knowledge search
+    description: ACL-aware hybrid search over the governed knowledge corpus.
+    kind: BUILTIN
+    owner_team: Information Management
+    side_effect: READ
+    reversibility: REVERSIBLE
+    risk_class: LOW
+    min_autonomy: A1
+    max_classification: RESTRICTED
+    scopes: [knowledge.read]
+    requires_approval: false
+    verification_mode: NONE
+    implementation_status: IMPLEMENTED
+    timeout_seconds: 15
+    rate_limit_per_minute: 120
+    parameter_schema:
+      type: object
+      required: [query]
+      additionalProperties: false
+      properties:
+        query: {type: string, minLength: 2, maxLength: 1000}
+        top_k: {type: integer, minimum: 1, maximum: 50, default: 8}
+        strategy: {enum: [hybrid, semantic, lexical], default: hybrid}
+        classification_ceiling: {enum: [PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED]}
+
+  - key: knowledge.fetch_document
+    name: Fetch document
+    description: Retrieve one governed document the caller is authorised to read.
+    kind: BUILTIN
+    owner_team: Information Management
+    side_effect: READ
+    reversibility: REVERSIBLE
+    risk_class: LOW
+    min_autonomy: A1
+    max_classification: RESTRICTED
+    scopes: [knowledge.read]
+    implementation_status: IMPLEMENTED
+    parameter_schema:
+      type: object
+      required: [document_id]
+      additionalProperties: false
+      properties:
+        document_id: {type: string, minLength: 1}
+        max_chars: {type: integer, minimum: 100, maximum: 200000, default: 20000}
+
+  # -------------------------------------------------------------------- graph
+  - key: graph.query
+    name: Graph query
+    description: Query the enterprise intelligence graph by node type and relation.
+    kind: BUILTIN
+    owner_team: Information Management
+    side_effect: READ
+    reversibility: REVERSIBLE
+    risk_class: LOW
+    min_autonomy: A1
+    max_classification: CONFIDENTIAL
+    scopes: [graph.read]
+    implementation_status: IMPLEMENTED
+    parameter_schema:
+      type: object
+      additionalProperties: false
+      properties:
+        node_key: {type: string}
+        node_type: {type: string}
+        relation: {type: string}
+        depth: {type: integer, minimum: 1, maximum: 4, default: 1}
+        limit: {type: integer, minimum: 1, maximum: 200, default: 50}
+
+  - key: graph.impact_analysis
+    name: Impact analysis
+    description: Traverse dependency edges to find everything a change would affect.
+    kind: BUILTIN
+    owner_team: Engineering
+    side_effect: READ
+    reversibility: REVERSIBLE
+    risk_class: LOW
+    min_autonomy: A1
+    max_classification: CONFIDENTIAL
+    scopes: [graph.read]
+    implementation_status: IMPLEMENTED
+    parameter_schema:
+      type: object
+      required: [node_key]
+      additionalProperties: false
+      properties:
+        node_key: {type: string, minLength: 1}
+        depth: {type: integer, minimum: 1, maximum: 5, default: 3}
+        direction: {enum: [downstream, upstream, both], default: downstream}
+
+  # ----------------------------------------------------------------- datasets
+  - key: dataset.query
+    name: Dataset query
+    description: >
+      Deterministic filter/aggregate over a governed structured dataset.
+      Returns rows with lineage back to the source file and batch.
+    kind: BUILTIN
+    owner_team: Platform Engineering
+    side_effect: READ
+    reversibility: REVERSIBLE
+    risk_class: LOW
+    min_autonomy: A1
+    max_classification: RESTRICTED
+    scopes: [dataset.read]
+    implementation_status: IMPLEMENTED
+    parameter_schema:
+      type: object
+      required: [dataset_key]
+      additionalProperties: false
+      properties:
+        dataset_key: {type: string, minLength: 2}
+        filters:
+          type: array
+          items:
+            type: object
+            required: [field, op, value]
+            additionalProperties: false
+            properties:
+              field: {type: string}
+              op: {enum: [eq, ne, gt, gte, lt, lte, contains, in]}
+              value: {}
+        group_by: {type: string}
+        aggregate: {enum: [count, sum, avg, min, max]}
+        aggregate_field: {type: string}
+        order_by: {type: string}
+        descending: {type: boolean, default: false}
+        limit: {type: integer, minimum: 1, maximum: 500, default: 100}
+
+  - key: dataset.profile
+    name: Dataset quality profile
+    description: >
+      Score a dataset on completeness, validity, uniqueness, consistency and
+      freshness, at dataset and field level.
+    kind: BUILTIN
+    owner_team: Platform Engineering
+    side_effect: READ
+    reversibility: REVERSIBLE
+    risk_class: LOW
+    min_autonomy: A1
+    max_classification: RESTRICTED
+    scopes: [dataset.read]
+    implementation_status: IMPLEMENTED
+    parameter_schema:
+      type: object
+      required: [dataset_key]
+      additionalProperties: false
+      properties:
+        dataset_key: {type: string, minLength: 2}
+
+  # ---------------------------------------------------------------- compute
+  - key: calc.evaluate
+    name: Deterministic calculation
+    description: >
+      Evaluate an arithmetic expression over named variables in a sandboxed
+      evaluator. No model is involved, so the result is reproducible.
+    kind: BUILTIN
+    owner_team: Platform Engineering
+    side_effect: READ
+    reversibility: REVERSIBLE
+    risk_class: LOW
+    min_autonomy: A1
+    max_classification: RESTRICTED
+    scopes: [compute.evaluate]
+    implementation_status: IMPLEMENTED
+    parameter_schema:
+      type: object
+      required: [expression]
+      additionalProperties: false
+      properties:
+        expression: {type: string, minLength: 1, maxLength: 2000}
+        variables: {type: object}
+        precision: {type: integer, minimum: 0, maximum: 12, default: 6}
+
+  - key: analytics.query_metrics
+    name: Query platform metrics
+    description: Aggregate recorded platform metrics over a time window.
+    kind: BUILTIN
+    owner_team: Business Intelligence
+    side_effect: READ
+    reversibility: REVERSIBLE
+    risk_class: LOW
+    min_autonomy: A1
+    max_classification: INTERNAL
+    scopes: [analytics.read]
+    implementation_status: IMPLEMENTED
+    parameter_schema:
+      type: object
+      required: [metric]
+      additionalProperties: false
+      properties:
+        metric: {type: string, minLength: 2}
+        window_hours: {type: integer, minimum: 1, maximum: 8760, default: 24}
+        aggregate: {enum: [sum, avg, min, max, count], default: sum}
+
+  # -------------------------------------------------------------------- write
+  - key: tasks.create
+    name: Create task
+    description: Create an internal task assigned to a person or agent.
+    kind: BUILTIN
+    owner_team: Platform Engineering
+    side_effect: WRITE
+    reversibility: REVERSIBLE
+    risk_class: LOW
+    min_autonomy: A3
+    max_classification: CONFIDENTIAL
+    scopes: [tasks.write]
+    verification_mode: READ_BACK
+    implementation_status: IMPLEMENTED
+    parameter_schema:
+      type: object
+      required: [title]
+      additionalProperties: false
+      properties:
+        title: {type: string, minLength: 3, maxLength: 300}
+        description: {type: string, maxLength: 5000}
+        assignee_email: {type: string}
+        priority: {enum: [LOW, MEDIUM, HIGH, CRITICAL], default: MEDIUM}
+        due_at: {type: string}
+
+  # --------------------------------------------------- declared, not built
+  # These are registered so contracts, policies and approval flows can name
+  # them, and so the gateway can refuse them explicitly. They return
+  # NOT_IMPLEMENTED until a connector is configured and security-reviewed.
+  - key: finance.read_invoices
+    name: Read invoices (ERP)
+    description: Read invoice records from the finance system of record.
+    kind: HTTP
+    connector_key: erp
+    owner_team: Finance
+    side_effect: READ
+    reversibility: REVERSIBLE
+    risk_class: MEDIUM
+    min_autonomy: A1
+    max_classification: RESTRICTED
+    scopes: [erp.invoice.read]
+    implementation_status: NOT_IMPLEMENTED
+    parameter_schema:
+      type: object
+      additionalProperties: false
+      properties:
+        supplier: {type: string}
+        status: {type: string}
+        limit: {type: integer, minimum: 1, maximum: 500, default: 50}
+
+  - key: finance.execute_payment
+    name: Execute payment
+    description: Release a payment through the treasury system.
+    kind: HTTP
+    connector_key: treasury
+    owner_team: Finance
+    side_effect: FINANCIAL
+    reversibility: IRREVERSIBLE
+    risk_class: CRITICAL
+    min_autonomy: A4
+    max_classification: RESTRICTED
+    scopes: [treasury.payment.execute]
+    requires_approval: true
+    verification_mode: RECEIPT
+    implementation_status: NOT_IMPLEMENTED
+    parameter_schema:
+      type: object
+      required: [payee, amount_usd]
+      additionalProperties: false
+      properties:
+        payee: {type: string}
+        amount_usd: {type: number, minimum: 0}
+        reference: {type: string}
+
+  - key: finance.issue_refund
+    name: Issue refund
+    description: Issue a customer refund through the payment platform.
+    kind: HTTP
+    connector_key: payments
+    owner_team: Finance
+    side_effect: FINANCIAL
+    reversibility: PARTIAL
+    risk_class: CRITICAL
+    min_autonomy: A4
+    max_classification: RESTRICTED
+    scopes: [payments.refund.write]
+    requires_approval: true
+    verification_mode: RECEIPT
+    implementation_status: NOT_IMPLEMENTED
+    parameter_schema:
+      type: object
+      required: [transaction_id, amount_usd]
+      additionalProperties: false
+      properties:
+        transaction_id: {type: string}
+        amount_usd: {type: number, minimum: 0}
+        reason: {type: string}
+
+  - key: email.send
+    name: Send email
+    description: Send an outbound email.
+    kind: HTTP
+    connector_key: mail
+    owner_team: Corporate Communications
+    side_effect: EXTERNAL
+    reversibility: IRREVERSIBLE
+    risk_class: HIGH
+    min_autonomy: A4
+    max_classification: CONFIDENTIAL
+    scopes: [mail.send]
+    requires_approval: true
+    verification_mode: RECEIPT
+    implementation_status: NOT_IMPLEMENTED
+    parameter_schema:
+      type: object
+      required: [to, subject, body]
+      additionalProperties: false
+      properties:
+        to: {type: array, items: {type: string}, minItems: 1}
+        subject: {type: string, maxLength: 300}
+        body: {type: string, maxLength: 100000}
+
+  - key: crm.read_cases
+    name: Read CRM cases
+    description: Read customer case records from the CRM.
+    kind: HTTP
+    connector_key: crm
+    owner_team: Customer Experience
+    side_effect: READ
+    reversibility: REVERSIBLE
+    risk_class: MEDIUM
+    min_autonomy: A1
+    max_classification: CONFIDENTIAL
+    scopes: [crm.case.read]
+    implementation_status: NOT_IMPLEMENTED
+    parameter_schema:
+      type: object
+      additionalProperties: false
+      properties:
+        status: {type: string}
+        limit: {type: integer, minimum: 1, maximum: 500, default: 50}
+
+  - key: maintenance.close_work_order
+    name: Close work order
+    description: Close a work order in the maintenance system of record.
+    kind: HTTP
+    connector_key: maximo
+    owner_team: Rail Maintenance Operations
+    side_effect: WRITE
+    reversibility: PARTIAL
+    risk_class: HIGH
+    min_autonomy: A4
+    max_classification: CONFIDENTIAL
+    scopes: [maximo.workorder.write]
+    requires_approval: true
+    verification_mode: READ_BACK
+    implementation_status: NOT_IMPLEMENTED
+    parameter_schema:
+      type: object
+      required: [work_order_id]
+      additionalProperties: false
+      properties:
+        work_order_id: {type: string}
+        completion_notes: {type: string}
+
+  - key: assets.decommission
+    name: Decommission asset
+    description: Mark an asset as decommissioned in the asset register.
+    kind: HTTP
+    connector_key: maximo
+    owner_team: Rail Maintenance Operations
+    side_effect: DELETE
+    reversibility: IRREVERSIBLE
+    risk_class: CRITICAL
+    min_autonomy: A4
+    max_classification: CONFIDENTIAL
+    scopes: [maximo.asset.write]
+    requires_approval: true
+    verification_mode: READ_BACK
+    implementation_status: NOT_IMPLEMENTED
+    parameter_schema:
+      type: object
+      required: [asset_id, reason]
+      additionalProperties: false
+      properties:
+        asset_id: {type: string}
+        reason: {type: string, minLength: 10}

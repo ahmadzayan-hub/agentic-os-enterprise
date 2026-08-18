@@ -144,6 +144,30 @@ def owner_session_scope() -> Iterator[Session]:
         session.close()
 
 
+@contextlib.contextmanager
+def provisioning_session_scope() -> Iterator[Session]:
+    """Session that may write platform-scope rows and cross-tenant tenancy data.
+
+    ``SET ROLE agentic_provisioner`` is the *only* way to obtain RLS bypass in
+    this codebase. The role has NOLOGIN, so it is unreachable except by a
+    principal that is already a member (the migration owner). Use it for
+    catalogue synchronisation, tenant provisioning and platform seeding —
+    never for request handling.
+    """
+    factory = sessionmaker(bind=get_owner_engine(), expire_on_commit=False, future=True)
+    session = factory()
+    try:
+        session.execute(text("SET ROLE agentic_provisioner"))
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.execute(text("RESET ROLE"))
+        session.close()
+
+
 def healthcheck() -> dict[str, Any]:
     try:
         with get_engine().connect() as conn:
