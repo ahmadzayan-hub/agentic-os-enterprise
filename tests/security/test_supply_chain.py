@@ -90,3 +90,25 @@ def test_secret_scan_exceptions_only_ever_cover_test_fixtures() -> None:
         assert path.startswith("tests/"), (
             f"secret-scan exceptions are only permitted for test fixtures, not {path}"
         )
+
+
+def test_no_module_hardcodes_a_local_virtualenv_path() -> None:
+    """Tooling must run wherever it is installed, not only where it was written.
+
+    The evidence engine shelled out to a literal ``.venv/bin/python`` and so
+    produced evidence on exactly one machine and nowhere else — CI included.
+    A path like that in shipped code is always this bug.
+    """
+    offenders: list[str] = []
+    for path in _source_files():
+        if path.suffix != ".py" or path.is_relative_to(REPO_ROOT / "tests"):
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+            # A comment describing the anti-pattern is not the anti-pattern.
+            # Whole-line comments only, so a trailing "#" inside a string
+            # literal cannot be used to hide a real path from this check.
+            if line.lstrip().startswith("#"):
+                continue
+            if ".venv/" in line:
+                offenders.append(f"{path.relative_to(REPO_ROOT)}:{number}")
+    assert offenders == [], f"hardcoded virtualenv paths: {offenders}"

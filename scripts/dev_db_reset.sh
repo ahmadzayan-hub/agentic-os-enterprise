@@ -17,6 +17,12 @@ SQL
 su postgres -c "psql -d $DB -f $(cd "$(dirname "$0")/.." && pwd)/database/bootstrap/01_extensions.sql" >/dev/null
 
 echo "==> applying migrations"
-"$(dirname "$0")/../.venv/bin/agentic-migrate" up
+# Prefer whatever is on PATH; fall back to a local virtualenv if present. A
+# hardcoded .venv path only works on a machine laid out one particular way.
+if command -v agentic-migrate >/dev/null 2>&1; then
+  agentic-migrate up
+else
+  "$(dirname "$0")/../.venv/bin/agentic-migrate" up
+fi
 
 echo "==> done"

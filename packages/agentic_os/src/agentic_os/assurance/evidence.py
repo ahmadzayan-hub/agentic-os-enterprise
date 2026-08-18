@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -131,8 +132,14 @@ def run_test_suite(
 ) -> dict[str, int]:
     """Run pytest and write a JUnit report. Returns the run summary."""
     junit_path.parent.mkdir(parents=True, exist_ok=True)
+    # ``sys.executable`` is the interpreter already running this process, so the
+    # suite runs under the same environment that imported the platform — a
+    # developer's virtualenv, a CI runner's toolchain, or the container image
+    # alike. The previous default was a hardcoded ".venv/bin/python", which
+    # meant the evidence engine could only ever produce evidence on a machine
+    # laid out exactly like the author's.
     command = [
-        os.environ.get("AGENTIC_PYTEST", ".venv/bin/python"),
+        os.environ.get("AGENTIC_PYTEST", sys.executable),
         "-m",
         "pytest",
         *(paths or ["tests"]),
