@@ -192,9 +192,25 @@ pytest tests/accessibility
 ## Quality gates
 
 ```bash
-ruff check . && ruff format --check .
-mypy packages/agentic_os/src/agentic_os     # advisory; annotation debt remains
+scripts/preflight.sh --staged    # before committing
+scripts/preflight.sh             # before pushing
 ```
 
-Both run in CI. Keep them green — CI runs `ruff format --check .` across the
-whole repository, so an unformatted file fails the build.
+That runs what CI runs, in CI's order: ruff lint, ruff format, the secret scan,
+bandit, and the suite under a bare `pytest`. A tool you have not installed is
+reported as *skipped* rather than passing, because a skipped check that looks
+like a green one is how things reach CI broken.
+
+Two details in there are load-bearing, both learned the hard way:
+
+* **`gitleaks detect` scans committed history, not your working tree.** Running
+  it before you commit checks everything except the change you just made. The
+  script runs `gitleaks protect --staged` as well, which sees the diff you are
+  about to commit. A secret-shaped literal in a new test slipped past a local
+  scan twice before this existed.
+* **The suite runs under a bare `pytest`, not `python -m pytest`.** The latter
+  adds the working directory to `sys.path` and will hide an import error that
+  CI hits immediately.
+
+`mypy packages/agentic_os/src/agentic_os` is advisory and not in the script;
+annotation debt remains.
