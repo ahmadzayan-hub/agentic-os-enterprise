@@ -160,6 +160,59 @@ def validate_registries() -> list[str]:
                 f"is cleared above {max_class}"
             )
 
+    # Model registry invariants.
+    #
+    # The build brief is explicit: no production AI service may use RTA data
+    # for external model training unless explicitly approved. A registry entry
+    # is where that claim is recorded, so an entry cleared for anything above
+    # INTERNAL has to make it, and a RESTRICTED clearance additionally requires
+    # that inference stays inside infrastructure the authority operates.
+    for model_key, model in registries.models.items():
+        clearance = model.get("max_classification", "INTERNAL")
+        declared = model.get("allows_training_on_input")
+        if _rank(clearance) > _rank("INTERNAL"):
+            if declared is None:
+                problems.append(
+                    f"model {model_key}: cleared for {clearance} but does not declare "
+                    "allows_training_on_input"
+                )
+            elif declared:
+                problems.append(
+                    f"model {model_key}: cleared for {clearance} while permitting training "
+                    "on input; that combination needs explicit approval and its own entry"
+                )
+        if clearance == "RESTRICTED" and model.get("deployment") not in ("local", "private"):
+            problems.append(
+                f"model {model_key}: cleared for RESTRICTED but deployment is "
+                f"'{model.get('deployment')}'; RESTRICTED inference may not leave "
+                "operator-controlled infrastructure"
+            )
+        if model.get("endpoint") and model.get("provider") != "openai-compatible":
+            problems.append(
+                f"model {model_key}: names an endpoint but provider "
+                f"'{model.get('provider')}' does not take one"
+            )
+
+    # Routing rules. A rule whose condition uses an unsupported operator, or
+    # which prefers a model that does not exist, is silently dead: it never
+    # matches and routing quietly falls through to the next rule. Catching it
+    # here is the difference between a policy and a comment.
+    _ROUTING_SUFFIXES = ("_in", "_gte", "_lte", "_lt", "_eq")
+    for rule in registries.routing.get("rules", []):
+        rule_name = rule.get("name", "<unnamed>")
+        for condition in rule.get("when") or {}:
+            if not condition.endswith(_ROUTING_SUFFIXES):
+                problems.append(
+                    f"routing rule {rule_name}: condition '{condition}' uses no supported "
+                    f"operator suffix {list(_ROUTING_SUFFIXES)}; the rule would never match"
+                )
+        preferred = rule.get("prefer") or []
+        if not preferred:
+            problems.append(f"routing rule {rule_name}: prefers no model")
+        for key in preferred:
+            if key not in registries.models:
+                problems.append(f"routing rule {rule_name}: prefers unregistered model '{key}'")
+
     conductor = registries.agents.get("conductor")
     if conductor is not None and conductor["tools"].get("allowed"):
         problems.append("Architecture Constitution rule 17: the Conductor must hold no tool grants")

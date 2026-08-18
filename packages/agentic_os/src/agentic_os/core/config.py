@@ -7,9 +7,10 @@ rather than a silent fallback.
 
 from __future__ import annotations
 
+import json
 import os
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -79,8 +80,25 @@ class Settings(BaseSettings):
     anthropic_base_url: str = "https://api.anthropic.com"
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
-    local_model_base_url: str = "http://127.0.0.1:11434"
+    # Ollama, vLLM and llama.cpp all expose the OpenAI-compatible surface under
+    # /v1. Omitting it makes every /chat/completions call 404, which is how a
+    # self-hosted open-weights deployment silently fails to work at all.
+    local_model_base_url: str = "http://127.0.0.1:11434/v1"
     model_request_timeout_seconds: float = 60.0
+
+    #: Named model endpoints, as JSON, so several OpenAI-compatible backends can
+    #: be registered at once — a self-hosted vLLM for RESTRICTED work and a
+    #: cloud open-weights host for the rest, say. A registry entry selects one
+    #: by name with its `endpoint:` field. Example:
+    #:
+    #:   {"onprem-vllm": {"base_url": "http://vllm.internal/v1",
+    #:                    "api_key_ref": "secret://model/onprem-vllm",
+    #:                    "external": false}}
+    #:
+    #: Keys are references resolved through the secret broker at call time.
+    #: A literal key here would put a credential in configuration, which the
+    #: broker exists to prevent.
+    model_endpoints: str = ""
     embedding_provider: str = "deterministic-hash"
     embedding_dimensions: int = 384
 
@@ -111,6 +129,22 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return value.strip().lower()
         return value
+
+    def endpoints(self) -> dict[str, dict[str, Any]]:
+        """Parsed model endpoint map. Invalid JSON is a configuration error.
+
+        Raising rather than returning {} matters: a typo here would otherwise
+        silently strip every endpoint and route real traffic to the fallback.
+        """
+        if not self.model_endpoints.strip():
+            return {}
+        try:
+            parsed = json.loads(self.model_endpoints)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"AGENTIC_MODEL_ENDPOINTS is not valid JSON: {exc}") from exc
+        if not isinstance(parsed, dict):
+            raise ValueError("AGENTIC_MODEL_ENDPOINTS must be a JSON object")
+        return parsed
 
     @property
     def is_production(self) -> bool:

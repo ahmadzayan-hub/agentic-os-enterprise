@@ -23,7 +23,11 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from agentic_os.ai.providers import ModelRequest, ModelResponse, get_provider
+from agentic_os.ai.providers import (
+    ModelRequest,
+    ModelResponse,
+    provider_for_model,
+)
 from agentic_os.assurance.audit import AuditEntry, AuditLedger
 from agentic_os.core.context import ExecutionContext, classification_rank
 from agentic_os.core.errors import (
@@ -168,6 +172,9 @@ def _rule_matches(rule: dict[str, Any], signals: dict[str, Any]) -> bool:
         elif key.endswith("_gte"):
             if float(signals.get(key[:-4], 0)) < float(expected):
                 return False
+        elif key.endswith("_lte"):
+            if float(signals.get(key[:-4], 10**9)) > float(expected):
+                return False
         elif key.endswith("_lt"):
             if float(signals.get(key[:-3], 10**9)) >= float(expected):
                 return False
@@ -238,7 +245,7 @@ def route(
         if _BREAKER.is_open(key):
             rejected[key] = "circuit breaker is open"
             continue
-        provider = get_provider(model["provider"])
+        provider = provider_for_model(model)
         if not provider.available():
             rejected[key] = "provider is not configured or not permitted"
             continue
@@ -386,7 +393,9 @@ class ModelGateway:
                 tenant_id=ctx.tenant_id,
             )
             model = registries.model(decision.model_key)
-            provider = get_provider(decision.provider)
+            # Resolved from the entry, not the provider name, so a model bound
+            # to a named endpoint reaches that endpoint and no other.
+            provider = provider_for_model(model)
             started = time.perf_counter()
             try:
                 response = provider.complete(request, decision.provider_model_id)

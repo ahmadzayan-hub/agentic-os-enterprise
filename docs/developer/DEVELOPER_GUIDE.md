@@ -92,6 +92,55 @@ tool, policy or prompt means editing YAML under the corresponding directory and
 running `agentic-seed`. `validate_registries()` runs in CI and fails on an
 inconsistent catalogue.
 
+## Running a real model
+
+The platform answers without any model provider: routing falls back to the
+deterministic executor and records the substitution on the run. Nothing is
+faked — a deterministic answer is labelled as one.
+
+To run an actual open-weights model locally, no API key and no third party:
+
+```bash
+ollama pull qwen2.5:7b-instruct
+export AGENTIC_MODEL_ENDPOINTS='{"onprem-ollama":{"base_url":"http://127.0.0.1:11434/v1","external":false}}'
+```
+
+`private-fast` is now routable. `AGENTIC_MODEL_ALLOW_EXTERNAL_PROVIDERS` is not
+needed, because a privately operated endpoint is not an external provider.
+
+### Endpoints
+
+`AGENTIC_MODEL_ENDPOINTS` is a JSON map of named endpoints, and each entry in
+`models/registry.yaml` selects one with its `endpoint:` field. That indirection
+is why a self-hosted deployment and a third-party host can be registered at the
+same time; with a single base URL in settings, the second model registered
+would silently talk to the first one's server.
+
+| Field | Meaning |
+|---|---|
+| `base_url` | OpenAI-compatible root. Ollama, vLLM, TGI and llama.cpp all serve it under `/v1` — omitting the suffix 404s every call. |
+| `api_key_ref` | A *reference* the secret broker resolves at call time. Never a key. Omit it for a private endpoint that needs none. |
+| `external` | `false` marks the endpoint operator-controlled: reachable without the external-provider switch, and eligible for RESTRICTED work. |
+
+An endpoint a model names but which is not configured makes that model
+*unavailable*, so the gateway routes on. It never falls through to a different
+endpoint — that would send data to a server the registry entry never named.
+
+### What may see what
+
+The registry validator enforces two rules that are easy to violate by accident:
+
+* A model cleared above `INTERNAL` must declare `allows_training_on_input:
+  false`. The build brief forbids RTA data reaching external training without
+  explicit approval, and the registry entry is where that claim lives.
+* A model cleared for `RESTRICTED` must be `local` or `private`. Open weights
+  are not the point — *where the inference runs* is. `oss-cloud-fast` runs the
+  same Llama 3.3 weights as `private-general` and is capped at `CONFIDENTIAL`,
+  because the prompt leaves the residency boundary.
+
+Both are declarations, not enforcement at the provider. They make the claim
+reviewable and refuse the contradictory combinations.
+
 ## Adding things
 
 **A skill.** Implement it in `runtime/skills.py`, register it in

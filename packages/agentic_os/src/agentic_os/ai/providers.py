@@ -19,6 +19,7 @@ Three adapters ship:
 from __future__ import annotations
 
 import json
+import logging
 import math
 import re
 from collections import Counter
@@ -33,6 +34,8 @@ from agentic_os.core.errors import (
     UpstreamUnavailable,
     ValidationError,
 )
+
+log = logging.getLogger("agentic_os.ai.providers")
 
 
 @dataclass(slots=True)
@@ -526,14 +529,32 @@ class OpenAICompatibleProvider(_HttpProviderBase):
 
     name = "openai-compatible"
 
-    def __init__(self, base_url: str | None = None, api_key: str | None = None) -> None:
+    def __init__(
+        self,
+        base_url: str | None = None,
+        api_key: str | None = None,
+        *,
+        endpoint: dict[str, Any] | None = None,
+        endpoint_name: str = "",
+        external: bool | None = None,
+    ) -> None:
         self._base_url = base_url
         self._api_key = api_key
+        self._endpoint = endpoint
+        self._endpoint_name = endpoint_name
+        self._external = external
+        if endpoint_name:
+            self.name = f"openai-compatible[{endpoint_name}]"
 
     def _resolve(self) -> tuple[str, str]:
         settings = get_settings()
         base = self._base_url or settings.openai_base_url or settings.local_model_base_url
-        key = self._api_key if self._api_key is not None else settings.openai_api_key
+        if self._api_key is not None:
+            key = self._api_key
+        elif self._endpoint is not None:
+            key = _endpoint_api_key(self._endpoint, self._endpoint_name)
+        else:
+            key = settings.openai_api_key
         return base, key
 
     def available(self) -> bool:
@@ -541,10 +562,15 @@ class OpenAICompatibleProvider(_HttpProviderBase):
         base, key = self._resolve()
         if not base:
             return False
-        is_local = base.startswith(("http://127.0.0.1", "http://localhost", "http://host.docker"))
-        if is_local:
-            # A privately operated endpoint is not an external provider.
+        if self._external is False:
+            # An operator has declared this endpoint privately operated. It is
+            # reachable without the external-provider switch, and needs no key.
             return True
+        if self._external is None:
+            is_local = base.startswith(("http://127.0.0.1", "http://localhost", "http://host.docker"))
+            if is_local:
+                # A privately operated endpoint is not an external provider.
+                return True
         return bool(settings.model_allow_external_providers and key)
 
     def complete(self, request: ModelRequest, model_id: str) -> ModelResponse:
@@ -598,3 +624,86 @@ def get_provider(name: str) -> ModelProvider:
     if name not in PROVIDERS:
         raise ValidationError(f"unknown model provider '{name}'")
     return PROVIDERS[name]
+
+
+def _endpoint_api_key(endpoint: dict[str, Any], name: str) -> str:
+    """Resolve an endpoint's credential through the secret broker.
+
+    The endpoint map holds a *reference*, never a key. An endpoint that needs
+    no credential — a self-hosted vLLM on a private network, typically — omits
+    it and gets an empty string.
+
+    Resolution is lazy and non-fatal: a reference that will not resolve makes
+    the endpoint unavailable so the gateway routes on, rather than raising out
+    of a routing decision that was only asking whether the model could be used.
+    """
+    reference = str(endpoint.get("api_key_ref", "")).strip()
+    if not reference:
+        return ""
+    from agentic_os.tools.secrets import SecretBroker
+
+    try:
+        value, _handle = SecretBroker().resolve(reference)
+        return value
+    except Exception:  # noqa: BLE001 - unresolvable means unavailable, not broken
+        log.warning("model endpoint %r declares %s, which did not resolve", name, reference)
+        return ""
+
+
+def provider_for_model(model: dict[str, Any]) -> ModelProvider:
+    """The provider instance a specific registry entry should use.
+
+    Several OpenAI-compatible backends can be registered at once — a
+    self-hosted open-weights deployment for RESTRICTED work and a cloud
+    open-weights host for everything else — because each registry entry names
+    its own ``endpoint``. Without this every such model would share one base
+    URL from settings and the second one registered would silently talk to the
+    first one's server.
+    """
+    provider_name = model.get("provider", "")
+    endpoint_name = str(model.get("endpoint", "") or "").strip()
+    if not endpoint_name:
+        return get_provider(provider_name)
+
+    if provider_name != "openai-compatible":
+        raise ValidationError(
+            f"model '{model.get('key')}' names an endpoint but provider '{provider_name}' does not take one"
+        )
+
+    endpoints = get_settings().endpoints()
+    if endpoint_name not in endpoints:
+        # Not configured is not the same as broken: the gateway treats the
+        # model as unavailable and routes on, rather than failing the run.
+        return _UnconfiguredEndpoint(endpoint_name)
+
+    endpoint = endpoints[endpoint_name]
+    base_url = str(endpoint.get("base_url", "")).strip()
+    if not base_url:
+        return _UnconfiguredEndpoint(endpoint_name)
+    return OpenAICompatibleProvider(
+        base_url=base_url,
+        endpoint=endpoint,
+        endpoint_name=endpoint_name,
+        external=bool(endpoint.get("external", True)),
+    )
+
+
+class _UnconfiguredEndpoint:
+    """Stands in for a registered model whose endpoint is not configured.
+
+    It reports itself unavailable and refuses to complete. The alternative —
+    falling through to some other endpoint — would send data to a server the
+    registry entry never named.
+    """
+
+    def __init__(self, endpoint_name: str) -> None:
+        self.name = f"openai-compatible[{endpoint_name}]"
+        self._endpoint_name = endpoint_name
+
+    def available(self) -> bool:
+        return False
+
+    def complete(self, request: ModelRequest, model_id: str) -> ModelResponse:
+        raise UpstreamUnavailable(
+            f"model endpoint '{self._endpoint_name}' is not configured; add it to AGENTIC_MODEL_ENDPOINTS"
+        )

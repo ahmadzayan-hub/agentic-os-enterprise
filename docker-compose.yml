@@ -59,6 +59,17 @@ services:
       AGENTIC_JWT_SECRET: development-only-signing-key-change-me-0001
       AGENTIC_KMS_LOCAL_KEY: ""
       AGENTIC_POLICY_MODE: enforce
+      # The platform answers without any model provider: routing falls back to
+      # the deterministic executor and records the substitution. To run a real
+      # open-weights model locally, start Ollama on the host and uncomment:
+      #
+      #   AGENTIC_MODEL_ENDPOINTS: >-
+      #     {"onprem-ollama": {"base_url": "http://host.docker.internal:11434/v1",
+      #                        "external": false}}
+      #
+      # then `ollama pull qwen2.5:7b-instruct`. No API key, nothing leaves the
+      # machine, and private-fast becomes routable for RESTRICTED work.
+      AGENTIC_MODEL_ENDPOINTS: ""
     depends_on:
       postgres:
         condition: service_healthy
