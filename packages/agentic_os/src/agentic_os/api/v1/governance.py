@@ -299,3 +299,97 @@ def set_kill_switch(payload: KillSwitchRequest, ctx: CtxDep, db: DbDep) -> dict:
         ),
     )
     return {"scope": payload.scope, "target_key": payload.target_key, "engaged": payload.engaged}
+
+
+# -------------------------------------------------------------------- privacy
+class DsarRequest(BaseModel):
+    request_type: str = Field(pattern="^(ACCESS|EXPORT|DELETE|RECTIFY)$")
+    subject_email: str = Field(min_length=3, max_length=320)
+
+
+@router.get(
+    "/privacy",
+    dependencies=[Depends(require_permission("privacy:read", resource_type="privacy"))],
+)
+def privacy_register(ctx: CtxDep, db: DbDep) -> dict:
+    """The privacy register: requests, holds, processing activities, PII found."""
+    requests = db.execute(
+        text(
+            "SELECT id, request_type, subject_email, status, due_at, completed_at, "
+            "affected_records, created_at FROM data_subject_requests "
+            "WHERE tenant_id = :t ORDER BY created_at DESC LIMIT 100"
+        ),
+        {"t": ctx.tenant_id},
+    ).mappings()
+    holds = db.execute(
+        text(
+            "SELECT hold_key, reason, resource_type, active, created_at, released_at "
+            "FROM legal_holds WHERE tenant_id = :t ORDER BY created_at DESC LIMIT 100"
+        ),
+        {"t": ctx.tenant_id},
+    ).mappings()
+    activities = db.execute(
+        text(
+            "SELECT activity, purpose, legal_basis, data_categories, subject_categories, "
+            "recipients, cross_border, retention, controller FROM processing_records "
+            "WHERE tenant_id = :t ORDER BY activity"
+        ),
+        {"t": ctx.tenant_id},
+    ).mappings()
+    pii = db.execute(
+        text(
+            "SELECT pii_type, count(*) AS occurrences, "
+            "count(*) FILTER (WHERE redacted) AS redacted "
+            "FROM pii_inventory WHERE tenant_id = :t GROUP BY pii_type ORDER BY pii_type"
+        ),
+        {"t": ctx.tenant_id},
+    ).mappings()
+    return {
+        "requests": json_rows(requests),
+        "legal_holds": json_rows(holds),
+        "processing_activities": json_rows(activities),
+        "pii_summary": json_rows(pii),
+    }
+
+
+@router.post(
+    "/privacy/requests",
+    dependencies=[Depends(require_permission("privacy:write", resource_type="privacy"))],
+)
+def raise_dsar(payload: DsarRequest, ctx: CtxDep, db: DbDep) -> dict:
+    from agentic_os.privacy import dsar
+
+    try:
+        request_id = dsar.raise_request(
+            db,
+            ctx,
+            request_type=payload.request_type,  # type: ignore[arg-type]
+            subject_email=payload.subject_email,
+        )
+    except AgenticError as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.to_dict()) from exc
+    db.commit()
+    return {"request_id": request_id, "status": "RECEIVED"}
+
+
+@router.post(
+    "/privacy/requests/{request_id}/process",
+    dependencies=[Depends(require_permission("privacy:write", resource_type="privacy"))],
+)
+def process_dsar(request_id: str, ctx: CtxDep, db: DbDep) -> dict:
+    """Execute a recorded request.
+
+    The export body is deliberately not returned over this endpoint: it is a
+    complete dossier on a person and belongs in a delivery channel with its own
+    identity verification. The response reports what was collected or changed.
+    """
+    from agentic_os.privacy import dsar
+
+    try:
+        result = dsar.process(db, ctx, request_id)
+    except AgenticError as exc:
+        raise HTTPException(status_code=exc.http_status, detail=exc.to_dict()) from exc
+    db.commit()
+    body = result.to_dict()
+    body.pop("export", None)
+    return jsonify(body)

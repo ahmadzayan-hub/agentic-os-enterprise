@@ -49,6 +49,7 @@ parsers = [
 agentic-migrate = "agentic_os.core.migrate:main"
 agentic-seed = "agentic_os.core.seed:main"
 agentic-evidence = "agentic_os.assurance.cli:main"
+agentic-dr = "agentic_os.resilience.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["packages/agentic_os/src"]

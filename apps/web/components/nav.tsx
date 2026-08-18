@@ -20,6 +20,7 @@ const GROUPS: { label: string; items: { href: string; label: string }[] }[] = [
       { href: "/approvals", label: "Approvals" },
       { href: "/operations/incidents", label: "Incidents" },
       { href: "/operations/workflows", label: "Workflows" },
+      { href: "/operations/resilience", label: "Resilience" },
     ],
   },
   {
@@ -49,6 +50,7 @@ const GROUPS: { label: string; items: { href: string; label: string }[] }[] = [
       { href: "/governance/policies", label: "Policies" },
       { href: "/governance/risks", label: "Risks" },
       { href: "/governance/audit", label: "Audit" },
+      { href: "/governance/privacy", label: "Privacy" },
       { href: "/security", label: "Security" },
     ],
   },

@@ -31,6 +31,26 @@ def _clean_subscriptions():
     events.clear_subscriptions()
 
 
+@pytest.fixture(autouse=True)
+def _drain_backlog(db: Session, tenant_id: str):
+    """Clear the pending outbox before each test.
+
+    Dispatch takes the oldest batch first, so a backlog accumulated by earlier
+    tests would push this test's own event out of the batch and make the
+    assertion depend on execution order.
+    """
+    db.execute(
+        text(
+            "UPDATE outbox_events SET status = 'DISPATCHED', dispatched_at = now() "
+            "WHERE tenant_id = :t AND status IN ('PENDING', 'FAILED')"
+        ),
+        {"t": tenant_id},
+    )
+    db.commit()
+    bind_tenant(db, tenant_id)
+    yield
+
+
 def test_outbox_commits_with_the_state_change(db: Session, ectx) -> None:
     """A rolled-back state change must leave no queued event behind."""
     marker = prefixed_id("task")

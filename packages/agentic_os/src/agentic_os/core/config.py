@@ -38,6 +38,14 @@ class Settings(BaseSettings):
     db_max_overflow: int = 20
     db_echo: bool = False
 
+    #: Maintenance DSN used *only* by the disaster recovery exercise, which has
+    #: to create and drop a scratch database and restore extensions. Neither
+    #: the application nor the migration role may do that. Left empty by
+    #: default so the exercise reports NOT_RUN rather than inventing evidence.
+    dr_admin_url: str = ""
+    #: Where restore exercises write their dump artefacts.
+    dr_artifact_path: str = "./.data/backups"
+
     redis_url: str = "redis://127.0.0.1:6379/0"
     object_store_path: str = "./.data/objects"
 

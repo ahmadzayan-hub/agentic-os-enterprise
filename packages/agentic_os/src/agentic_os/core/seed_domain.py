@@ -521,6 +521,84 @@ def seed_budgets_and_switches(session: Session, tenant_id: str) -> int:
     return 2
 
 
+#: Record of processing activities. These describe what this platform actually
+#: does with personal data — they are not sample rows. Each one is traceable to
+#: a table and a code path in this repository.
+PROCESSING_ACTIVITIES: tuple[dict[str, Any], ...] = (
+    {
+        "activity": "workforce-identity",
+        "purpose": "Authenticate staff and authorise their access to the platform",
+        "legal_basis": "Contract (employment) and legitimate interest in securing systems",
+        "data_categories": ["name", "work email", "authentication factors", "IP address"],
+        "subject_categories": ["employees", "contractors"],
+        "recipients": ["internal platform operations"],
+        "cross_border": False,
+        "retention": "Duration of engagement plus 12 months; sessions purged 30 days after expiry",
+        "controller": "RTA",
+    },
+    {
+        "activity": "agent-run-audit",
+        "purpose": "Record who requested each agent run and what it did, for accountability",
+        "legal_basis": "Legal obligation and legitimate interest in auditability",
+        "data_categories": ["user identifier", "request text", "decisions taken"],
+        "subject_categories": ["employees"],
+        "recipients": ["internal audit", "regulators on lawful request"],
+        "cross_border": False,
+        "retention": "Append-only ledger retained for the statutory audit period",
+        "controller": "RTA",
+    },
+    {
+        "activity": "knowledge-ingestion",
+        "purpose": "Index operational documents so agents can answer from cited sources",
+        "legal_basis": "Legitimate interest in operational efficiency",
+        "data_categories": ["personal data incidentally present in ingested documents"],
+        "subject_categories": ["employees", "contractors", "members of the public"],
+        "recipients": ["internal users cleared for the document classification"],
+        "cross_border": False,
+        "retention": "Per document retention_until; detected identifiers redacted at ingestion",
+        "controller": "RTA",
+    },
+    {
+        "activity": "model-invocation",
+        "purpose": "Generate and analyse text in support of a requested task",
+        "legal_basis": "Legitimate interest in operational efficiency",
+        "data_categories": ["prompt content", "retrieved excerpts"],
+        "subject_categories": ["employees"],
+        "recipients": ["configured model providers subject to the model registry"],
+        "cross_border": False,
+        "retention": "Prompts and completions are not retained beyond the run record",
+        "controller": "RTA",
+    },
+)
+
+
+def seed_processing_records(session: Session, tenant_id: str) -> int:
+    """Register the record of processing activities."""
+    for activity in PROCESSING_ACTIVITIES:
+        session.execute(
+            text(
+                """
+                INSERT INTO processing_records (tenant_id, activity, purpose, legal_basis,
+                                                data_categories, subject_categories, recipients,
+                                                cross_border, retention, controller)
+                VALUES (:t, :activity, :purpose, :legal_basis, :data_categories,
+                        :subject_categories, :recipients, :cross_border, :retention, :controller)
+                ON CONFLICT (tenant_id, activity) DO UPDATE SET
+                    purpose = EXCLUDED.purpose,
+                    legal_basis = EXCLUDED.legal_basis,
+                    data_categories = EXCLUDED.data_categories,
+                    subject_categories = EXCLUDED.subject_categories,
+                    recipients = EXCLUDED.recipients,
+                    cross_border = EXCLUDED.cross_border,
+                    retention = EXCLUDED.retention,
+                    controller = EXCLUDED.controller
+                """
+            ),
+            {"t": tenant_id, **activity},
+        )
+    return len(PROCESSING_ACTIVITIES)
+
+
 def seed_domain(tenant_id: str, organization_id: str) -> dict[str, int]:
     """Synchronise registries and seed the demo corpus for one tenant."""
     summary: dict[str, int] = {}
@@ -534,6 +612,7 @@ def seed_domain(tenant_id: str, organization_id: str) -> dict[str, int]:
         summary["prompts"] = sync_prompts(session, tenant_id)
         summary["controls"] = sync_controls(session, tenant_id)
         summary["budgets"] = seed_budgets_and_switches(session, tenant_id)
+        summary["processing_records"] = seed_processing_records(session, tenant_id)
 
     from agentic_os.core.seed_corpus import seed_corpus
 

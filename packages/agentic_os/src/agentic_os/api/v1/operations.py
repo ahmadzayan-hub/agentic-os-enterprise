@@ -265,3 +265,34 @@ def organization(ctx: CtxDep, db: DbDep) -> dict:
         {"t": ctx.tenant_id},
     ).mappings()
     return {"tenant": json_row(tenant), "users": json_rows(users)}
+
+
+# ------------------------------------------------------------------ resilience
+@router.get(
+    "/resilience",
+    dependencies=[Depends(require_permission("incidents:read", resource_type="incident"))],
+)
+def resilience(ctx: CtxDep, db: DbDep) -> dict:
+    """Backup and restore evidence.
+
+    Disaster recovery is a platform-scope activity, so these rows carry no
+    tenant id; the RLS policy on both tables admits platform rows to every
+    tenant's read path while still refusing cross-tenant rows.
+    """
+    backups = db.execute(
+        text(
+            "SELECT backup_type, scope, artifact_hash, size_bytes, status, started_at, "
+            "completed_at FROM backup_records WHERE tenant_id IS NULL OR tenant_id = :t "
+            "ORDER BY started_at DESC LIMIT 20"
+        ),
+        {"t": ctx.tenant_id},
+    ).mappings()
+    restores = db.execute(
+        text(
+            "SELECT environment, outcome, rpo_achieved_seconds, rto_achieved_seconds, "
+            "verified_rows, notes, executed_by, executed_at FROM restore_tests "
+            "WHERE tenant_id IS NULL OR tenant_id = :t ORDER BY executed_at DESC LIMIT 20"
+        ),
+        {"t": ctx.tenant_id},
+    ).mappings()
+    return {"backups": json_rows(backups), "restore_tests": json_rows(restores)}

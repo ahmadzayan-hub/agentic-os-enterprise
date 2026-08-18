@@ -393,9 +393,15 @@ controls:
     domain: privacy
     title: Data subject request handling
     requirement: Access, export, deletion and rectification requests are processed.
-    implementation: Not yet implemented — schema exists, no processing pipeline.
+    implementation: >-
+      agentic_os.privacy.dsar processes ACCESS, EXPORT, DELETE and RECTIFY
+      requests. Erasure detaches the subject from operational records,
+      pseudonymises the account and deletes credential material; an active
+      legal hold parks the request as BLOCKED_BY_HOLD instead of partially
+      executing it, and the append-only audit ledger is never removed.
     weight: 1
-    expected: A DSAR is processed end to end with evidence.
+    test: tests/integration/test_privacy_dsar.py::test_erasure_is_blocked_by_an_active_legal_hold
+    expected: An erasure request under an active legal hold is blocked with the hold named, and no subject record is altered.
 
   # ------------------------------------------------------------ reliability (6)
   - id: REL-001
@@ -510,9 +516,16 @@ controls:
     domain: dr_resilience
     title: Backup and restore are verified by exercise
     requirement: A restore has been performed and verified.
-    implementation: Not yet implemented — schema exists, no exercise has run.
+    implementation: >-
+      agentic_os.resilience.backup takes a real pg_dump, restores it into a
+      scratch database, compares every table's row count against the source and
+      recomputes each tenant's audit hash chain inside the restored copy before
+      recording a restore_tests row with measured RPO and RTO. The scratch
+      database is dropped afterwards. Without a maintenance identity the
+      exercise refuses to run, leaving this control NOT_EVIDENCED.
     weight: 2
-    expected: A restore_tests row with outcome SUCCESS and a measured RPO and RTO.
+    test: tests/integration/test_disaster_recovery.py::test_a_restore_is_performed_and_verified_end_to_end
+    expected: A restore_tests row with outcome SUCCESS, a measured RPO and RTO, matching row counts and an intact audit chain in the restored copy.
 
   # ------------------------------------------------------- business value (2)
   - id: BVL-001
