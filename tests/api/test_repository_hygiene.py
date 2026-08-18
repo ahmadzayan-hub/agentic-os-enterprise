@@ -56,6 +56,31 @@ def test_the_test_job_cannot_pass_by_skipping_its_services() -> None:
     )
 
 
+def test_a_piped_ci_step_cannot_swallow_its_own_failure() -> None:
+    """`cmd | tee` under `bash -e` exits with tee's status, which is always 0.
+
+    A gate written that way can never fail the job. Any step that pipes must
+    set pipefail in the same block.
+    """
+    workflow = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text())
+    offenders = []
+    for job_name, job in workflow["jobs"].items():
+        for step in job.get("steps", []):
+            script = step.get("run", "")
+            if "|" not in script or "pipefail" in script:
+                continue
+            for line in script.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("#") or "|" not in stripped:
+                    continue
+                # `||`, `|>` and YAML block markers are not pipelines.
+                if "||" in stripped or stripped.endswith("|"):
+                    continue
+                offenders.append(f"{job_name}: {step.get('name', stripped)}")
+                break
+    assert offenders == [], f"CI steps pipe without pipefail, so a failure would report success: {offenders}"
+
+
 def test_no_hardcoded_secrets_in_source() -> None:
     """Source must never contain a credential-shaped literal."""
     patterns = [

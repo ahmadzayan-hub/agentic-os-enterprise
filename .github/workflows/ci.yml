@@ -399,15 +399,35 @@ jobs:
       # Both reports now exist, and AGENTIC_REQUIRE_*_REPORT above turns a
       # silently missing one into a failure rather than a skip that would
       # quietly cost those controls their evidence.
+      # The score goes to the run summary, not only to stdout. The evidence
+      # bundle is an artifact, and artifact upload can fail — a full storage
+      # quota does it — so a number that exists only inside a log or an
+      # un-uploaded file is a number nobody can check.
       - name: Collect evidence and compute maturity
-        run: agentic-evidence collect --environment ci --output artifacts
+        run: |
+          # Without pipefail the pipeline's status is tee's, and a failed
+          # collection would report success.
+          set -o pipefail
+          agentic-evidence collect --environment ci --output artifacts | tee /tmp/score.txt
+          {
+            echo "## Evidence-derived maturity"
+            echo
+            echo '```'
+            cat /tmp/score.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # The floor sits just under the current score, not at an arbitrary 70. A
       # gate with 20 points of slack cannot notice evidence quietly going
       # missing — which is exactly what it failed to notice when this job ran
       # without the reports it needed. Raise the floor when the score rises.
       - name: Release gate
-        run: agentic-evidence gate --min-score 90 --require-no-critical-blockers
+        run: |
+          # pipefail is load-bearing here: without it this gate could never
+          # fail the job, because tee always succeeds.
+          set -o pipefail
+          agentic-evidence gate --min-score 90 --require-no-critical-blockers \
+            | tee -a "$GITHUB_STEP_SUMMARY"
 
       # Best-effort: the gate above is what decides this job.
       - uses: actions/upload-artifact@v4
