@@ -10,7 +10,7 @@ a real database with row level security, a governed execution path, a durable
 workflow engine, permission-aware retrieval, a hash-chained audit ledger and an
 operator console rendering live data. Nothing in the console is a mockup.
 
-**Current evidence-derived maturity: 95.33 / 100. Not certified.** See
+**Current evidence-derived maturity: 94.55 / 100. Not certified.** See
 [`docs/assurance/MATURITY_REPORT.md`](docs/assurance/MATURITY_REPORT.md) for
 what the missing five points are and
 [`docs/assurance/FINAL_GAP_AUDIT.md`](docs/assurance/FINAL_GAP_AUDIT.md) for
@@ -67,8 +67,8 @@ database/                 cluster bootstrap and 12 forward-only migrations
 packages/contracts/       10 agent contracts, schema-validated
 skills/ models/ tools/    declarative registries — the configuration surface
 policies/ prompts/
-evaluations/              the assurance control catalogue (55 controls)
-tests/                    308 tests across 12 suites
+evaluations/              the assurance control catalogue (58 controls)
+tests/                    313 tests across 13 suites
 infrastructure/           docker, kubernetes, terraform
 services/                 thin deployables over the platform package
 docs/                     architecture, governance, security, operations,
@@ -79,8 +79,8 @@ docs/                     architecture, governance, security, operations,
 |---|---|
 | API endpoints | 54 |
 | Console surfaces | 30 |
-| Tests | 308, all passing |
-| Controls | 55, of which 52 verified |
+| Tests | 313, all passing |
+| Controls | 58, of which 54 verified |
 | Accessibility | 23 surfaces × 2 colour schemes, 0 axe violations |
 | Tools | 16 declared, 9 implemented, 7 marked NOT_IMPLEMENTED and refused |
 
@@ -106,7 +106,7 @@ The same applies to assurance. This platform has **never been deployed to a
 cluster, never been independently assessed and never been run in production**.
 No claim of conformance with ISO 27001, SOC 2, NIST AI RMF, the EU AI Act or
 any other scheme is made anywhere in this repository, because none has been
-assessed. The maturity score measures 55 self-authored controls executed in a
+assessed. The maturity score measures 58 self-authored controls executed in a
 development environment — a reasonable engineering instrument and a weak
 assurance instrument, which is precisely why the catalogue now contains
 controls the platform cannot yet satisfy.

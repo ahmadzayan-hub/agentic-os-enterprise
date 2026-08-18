@@ -18,7 +18,7 @@
 # critical: true means a failure blocks certification regardless of the score.
 
 version: 1.1.0
-total_weight: 107
+total_weight: 110
 
 domains:
   business_architecture: 7
@@ -39,6 +39,7 @@ domains:
   business_value: 2
   deployment: 4
   independent_assurance: 3
+  performance: 3
 
 controls:
   # ------------------------------------------------ business architecture (7)
@@ -536,6 +537,49 @@ controls:
     weight: 2
     test: tests/integration/test_disaster_recovery.py::test_a_restore_is_performed_and_verified_end_to_end
     expected: A restore_tests row with outcome SUCCESS, a measured RPO and RTO, matching row counts and an intact audit chain in the restored copy.
+
+  # --------------------------------------------------------- performance (3)
+  - id: PRF-001
+    domain: performance
+    title: The platform is measured under concurrency, not only under one request
+    requirement: >-
+      Latency and success rate are measured with requests overlapping, across
+      more than one concurrency level, and the measurement records the
+      conditions it was taken under.
+    implementation: >-
+      scripts/loadtest.py drives the running API across a concurrency sweep and
+      writes artifacts/performance.json; tests/performance asserts the result.
+      CI runs both, and a missing report fails rather than skips.
+    weight: 1
+    test: tests/performance/test_slo_conformance.py::test_every_request_succeeded_at_every_concurrency
+    expected: Every request succeeds at every concurrency level — no pool exhaustion, no lost tenant binding, no lease race.
+
+  - id: PRF-002
+    domain: performance
+    title: Uncontended latency is gated against regression
+    requirement: A per-request cost regression fails the build.
+    implementation: >-
+      The concurrency-1 pass measures cost with no queueing; the suite fails if
+      p95 exceeds the budget, which catches an unindexed query or an N+1
+      without tripping on ordinary CI variance.
+    weight: 1
+    test: tests/performance/test_slo_conformance.py::test_uncontended_latency_has_not_regressed
+    expected: p95 at concurrency 1 stays within the documented budget for every scenario.
+
+  - id: PRF-003
+    domain: performance
+    title: Capacity is established on representative hardware
+    requirement: >-
+      Throughput and latency are measured on hardware and data volumes
+      representative of production, with a stated headroom margin.
+    implementation: >-
+      NOT_IMPLEMENTED as evidence. The measurement that exists runs one API
+      process against one database on a shared development host with a seeded
+      corpus. It characterises the platform's saturation behaviour — throughput
+      peaks near concurrency 8 and degrades beyond it — but it is not a capacity
+      statement, and no production-representative run has been performed.
+    weight: 1
+    expected: A load test on production-representative hardware and data volume, with a stated headroom margin.
 
   # ---------------------------------------------------------- deployment (4)
   - id: DEP-001

@@ -38,7 +38,8 @@ A critical failed or expired control blocks production certification regardless 
 | Business value | 2 |
 | Deployment | 4 |
 | Independent assurance | 3 |
-| **Total** | **107** |
+| Performance | 3 |
+| **Total** | **110** |
 
 The total is deliberately not normalised to 100. Because the score is verified
 weight over total applicable weight, a control the platform cannot yet satisfy

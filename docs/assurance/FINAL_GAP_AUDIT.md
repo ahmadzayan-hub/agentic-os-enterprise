@@ -66,12 +66,26 @@ Every passing control is VERIFIED in a development environment. Not one is
 PRODUCTION_PROVEN. Nothing here has met real users, real load, real data
 volumes or a real incident.
 
-### 1.4 No load or performance evidence
-SLO targets are declared in agent contracts (`slo_p95_latency_ms`,
-`slo_success_rate`) and are enforced as *contract* values, but no load test
-exists. Throughput, p95 latency under concurrency, connection-pool behaviour,
-pgvector index performance beyond a seeded corpus and worker throughput at
-scale are all **unmeasured**. Any capacity statement would be invention.
+### 1.4 Load behaviour measured; capacity still not established (PRF-003, weight 1, NOT_EVIDENCED)
+Was: no load test at all, so any capacity statement would have been invention.
+There is now a concurrency sweep (`scripts/loadtest.py`) run by CI, held to
+account by `tests/performance`, with a missing report failing rather than
+skipping.
+
+What it found is worth more than the numbers: **throughput peaks near
+concurrency 8 and falls at 32, while latency roughly quadruples.** Past that
+point the platform queues rather than doing more work. Every request succeeded
+at every level — no connection-pool exhaustion, no tenant binding lost under
+load — but a deployment sized from the uncontended numbers would be sizing from
+the wrong end of the curve. The manifests' two replicas and the pool settings
+(10 + 20 overflow) should be revisited against this shape before any capacity
+commitment.
+
+Still unmeasured, and why the control stays NOT_EVIDENCED: one API process, one
+database, one shared development host, a seeded corpus. No production-scale
+data volume, no representative hardware, no headroom margin, no sustained soak,
+and **no measurement of the worker or of end-to-end governed runs** — the sweep
+covers read paths and the API surface, not a full agent execution under load.
 
 ---
 
@@ -261,8 +275,8 @@ Listed so the audit is balanced, and because each is reproducible.
 3. Add OIDC federation — with the shared rate limiter now in place, this is
    the remaining gap that blocks a real enterprise pilot regardless of anything
    else.
-4. Run a load test against a staging deployment and replace the declared SLOs
-   with measured ones.
+4. Re-run the load test on production-representative hardware, extend it to
+   the worker and to end-to-end governed runs, and close PRF-003.
 5. Exercise DR at production scale with WAL archiving and point-in-time
    recovery, and encrypt the dump artefact.
 6. Manual accessibility and screen-reader audit; add Arabic and RTL.

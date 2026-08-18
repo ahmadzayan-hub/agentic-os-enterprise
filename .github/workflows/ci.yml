@@ -136,7 +136,23 @@ jobs:
       - name: Agentic red-team tests
         run: pytest tests/redteam -q
 
+      # Measure the governed path under concurrency, then hold the measurement
+      # to account. A load test that never runs would leave the SLO declared
+      # rather than measured, which is the state this replaced.
+      - name: Load test
+        run: |
+          AGENTIC_RATE_LIMIT_PER_MINUTE=100000 \
+            uvicorn agentic_os.api.app:app --host 127.0.0.1 --port 8000 --log-level warning &
+          for _ in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8000/health >/dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8000/health >/dev/null
+          python scripts/loadtest.py --requests 120 --concurrency 1,8,32
+
       - name: Full suite with JUnit report
+        env:
+          AGENTIC_REQUIRE_PERF_REPORT: "1"
         run: pytest tests -q --junitxml=artifacts/junit.xml
 
       # Best-effort: a full artifact store must not turn a green test run red.
