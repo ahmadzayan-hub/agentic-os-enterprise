@@ -176,7 +176,7 @@ _RULES: tuple[tuple[str, str, str, str], ...] = (
         "invisible_characters",
         "OBFUSCATION",
         "HIGH",
-        r"[​-‏‪-‮⁠-⁯﻿]",
+        r"[\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]",
     ),
 )
 
@@ -186,7 +186,7 @@ _COMPILED = tuple(
 )
 
 #: Characters stripped outright — they exist only to hide text from a reviewer.
-_INVISIBLE = re.compile(r"[​-‏‪-‮⁠-⁯﻿]")
+_INVISIBLE = re.compile(r"[\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]")
 
 
 def detect(text: str) -> list[Detection]:

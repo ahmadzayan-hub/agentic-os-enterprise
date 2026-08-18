@@ -62,6 +62,9 @@ where = ["packages/agentic_os/src"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-q --strict-markers"
+# The repository root must be importable so `from tests.conftest import ...`
+# resolves under a bare `pytest`, not only under `python -m pytest`.
+pythonpath = ["."]
 markers = [
   "unit: pure unit tests, no external dependencies",
   "integration: requires database",
@@ -94,6 +97,26 @@ ignore = ["S101", "B008", "E501"]
 "packages/agentic_os/src/agentic_os/knowledge/retrieval.py" = ["S608"]
 "packages/agentic_os/src/agentic_os/privacy/dsar.py" = ["S608"]
 "packages/agentic_os/src/agentic_os/tools/builtin.py" = ["S608"]
+
+[tool.bandit]
+# Bandit and ruff overlap on these two checks, and ruff enforces them with
+# file-level precision that bandit's global config cannot express:
+#
+#   B608 / S608 (SQL built with an f-string) — ruff enforces this everywhere
+#   except three files listed in per-file-ignores, where the only interpolated
+#   fragments are module-level constants (the ACL predicate, the table/column
+#   pairs in SUBJECT_TABLES, an allow-listed aggregate) and every caller value
+#   is a bound parameter. Bandit reports the diagnostic on the opening quote of
+#   a multi-line string, where an inline `# nosec` would land inside the SQL.
+#
+#   B314 / S314 (ElementTree) — ruff enforces this too; the two justified uses
+#   carry a targeted `# noqa: S314` explaining that the JUnit report is written
+#   by the test run this process just started, not accepted from a caller.
+#
+# Skipping them here removes the duplicate report, not the control. Anything
+# bandit finds that ruff does not — B613 trojansource, for one — still fails
+# the build.
+skips = ["B608", "B314"]
 
 [tool.mypy]
 python_version = "3.11"

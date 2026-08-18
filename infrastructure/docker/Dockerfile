@@ -41,7 +41,6 @@ COPY models ./models
 COPY tools ./tools
 COPY policies ./policies
 COPY prompts ./prompts
-COPY workflows ./workflows
 COPY scripts ./scripts
 RUN pip install --no-cache-dir --no-deps -e .
 

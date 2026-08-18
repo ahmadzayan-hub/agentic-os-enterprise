@@ -66,9 +66,9 @@ apps/web/                 Next.js 15 operator console — 30 surfaces
 database/                 cluster bootstrap and 12 forward-only migrations
 packages/contracts/       10 agent contracts, schema-validated
 skills/ models/ tools/    declarative registries — the configuration surface
-policies/ prompts/ workflows/
+policies/ prompts/
 evaluations/              the assurance control catalogue (55 controls)
-tests/                    283 tests across 12 suites
+tests/                    285 tests across 12 suites
 infrastructure/           docker, kubernetes, terraform
 services/                 thin deployables over the platform package
 docs/                     architecture, governance, security, operations,
@@ -79,7 +79,7 @@ docs/                     architecture, governance, security, operations,
 |---|---|
 | API endpoints | 54 |
 | Console surfaces | 30 |
-| Tests | 283, all passing |
+| Tests | 285, all passing |
 | Controls | 55, of which 52 verified |
 | Accessibility | 23 surfaces × 2 colour schemes, 0 axe violations |
 | Tools | 16 declared, 9 implemented, 7 marked NOT_IMPLEMENTED and refused |

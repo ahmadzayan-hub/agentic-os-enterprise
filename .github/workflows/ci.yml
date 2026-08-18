@@ -135,11 +135,17 @@ jobs:
         with:
           name: junit-report
           path: artifacts/junit.xml
+          retention-days: 14
 
   # --------------------------------------------------------------- security
   secret-scan:
     name: Secret scan
     runs-on: ubuntu-latest
+    # gitleaks-action lists the pull request's commits to scope the scan; the
+    # workflow-level `contents: read` alone makes that call 403.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -160,7 +166,7 @@ jobs:
           cache: pip
       - run: pip install bandit[toml] semgrep
       - name: bandit
-        run: bandit -r packages/agentic_os/src/agentic_os -ll -f txt
+        run: bandit -c pyproject.toml -r packages/agentic_os/src/agentic_os -ll -f txt
       - name: semgrep
         run: semgrep --config auto --error --severity ERROR .
         continue-on-error: true
@@ -221,6 +227,10 @@ jobs:
             echo "== $overlay"
             kubectl kustomize "$overlay" > /dev/null
           done
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
       - name: Terraform format and validate
         run: |
           terraform fmt -check -recursive infrastructure/terraform
@@ -251,6 +261,7 @@ jobs:
         with:
           name: bill-of-materials
           path: artifacts/
+          retention-days: 14
 
   # -------------------------------------------------------------- evidence
   evidence:

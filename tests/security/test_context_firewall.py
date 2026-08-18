@@ -79,11 +79,14 @@ def test_high_confidence_injection_is_blocked_not_rendered() -> None:
 
 
 def test_invisible_characters_are_stripped() -> None:
-    hidden = "Normal text​with‮hidden﻿characters"
+    # Written as escapes rather than literal characters: source carrying
+    # bidirectional controls can render differently from how it executes,
+    # which is the very thing this test is about.
+    hidden = "Normal text\u200bwith\u202ehidden\ufeffcharacters"
     screened = screen(hidden, TrustTier.EXTERNAL)
-    assert "​" not in screened.text
-    assert "‮" not in screened.text
-    assert "﻿" not in screened.text
+    assert "\u200b" not in screened.text
+    assert "\u202e" not in screened.text
+    assert "\ufeff" not in screened.text
     assert any(d.category == "OBFUSCATION" for d in screened.detections)
 
 
