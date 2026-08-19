@@ -1,0 +1,35 @@
+# Prompt registry.
+#
+# Prompts are controlled production assets: versioned, hashed, approved and
+# regression-tested. A prompt body change produces a new version; deploying it
+# requires the prompt regression suite to pass (see .github/workflows/ci.yml).
+version: 1.0.0
+prompts:
+  - key: conductor.plan
+    purpose: Turn a user objective into a validated, governed step plan.
+    owning_agent: conductor
+    version: 1.0.0
+    body_file: conductor.plan.md
+    deployment_status: DEPLOYED
+    evaluation_suites: [plan_quality, tool_selection, autonomy_compliance]
+  - key: knowledge.answer
+    purpose: Answer strictly from retrieved, authorised evidence with citations.
+    owning_agent: knowledge
+    version: 1.0.0
+    body_file: knowledge.answer.md
+    deployment_status: DEPLOYED
+    evaluation_suites: [groundedness, citation_validity]
+  - key: analysis.narrative
+    purpose: Narrate deterministic analysis results without inventing numbers.
+    owning_agent: analytics
+    version: 1.0.0
+    body_file: analysis.narrative.md
+    deployment_status: DEPLOYED
+    evaluation_suites: [numeric_accuracy, groundedness]
+  - key: communications.draft
+    purpose: Draft a message for human review and human sending.
+    owning_agent: communications
+    version: 1.0.0
+    body_file: communications.draft.md
+    deployment_status: DEPLOYED
+    evaluation_suites: [safety, autonomy_compliance]

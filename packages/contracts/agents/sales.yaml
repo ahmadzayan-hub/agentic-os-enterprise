@@ -1,0 +1,65 @@
+# Sales — commercial pipeline analysis. Included as a first-class platform
+# domain agent; in the rail-maintenance demo tenant it covers contract and
+# framework-agreement pipeline rather than product sales.
+agent:
+  id: sales
+  name: Sales Agent
+  version: 3.1.0
+  owner: Commercial
+  owner_email: commercial@rta.example
+  risk_class: HIGH
+  status: ACTIVE
+purpose:
+  business_purpose: >
+    Analyse the commercial pipeline, contract renewals and framework agreement
+    utilisation, and prepare briefing material for commercial decisions.
+  allowed:
+    - pipeline_analysis
+    - renewal_risk_assessment
+    - proposal_drafting
+  prohibited:
+    - contract_signature
+    - pricing_commitment
+    - discount_authorisation
+data:
+  permitted_domains: [sales, contracts, customer, finance_summary]
+  prohibited_domains: [employee_medical, payroll, personal_financial]
+  max_classification: CONFIDENTIAL
+models:
+  allowed: [general-primary, reasoning-primary, deterministic-local]
+  preferred: general-primary
+tools:
+  allowed:
+    - knowledge.search
+    - crm.read_cases
+    - calc.evaluate
+    - tasks.create
+  denied:
+    - crm.update_opportunity
+    - contracts.sign
+skills:
+  allowed: [analyse, classify, compare, draft, extract, forecast, retrieve, search, summarise, validate]
+autonomy:
+  max_level: A2
+  escalation_role: approver
+  consequential_actions:
+    - contractual_commitment
+    - pricing_commitment
+    - discount_authorisation
+limits:
+  token_budget: 150000
+  cost_budget_usd: 3.0
+  max_runtime_seconds: 300
+  max_tool_calls: 25
+slo:
+  success_rate: 0.93
+  p95_latency_ms: 25000
+requirements:
+  citations: true
+  provenance: true
+  confidence: true
+  evidence_record: true
+  evaluation:
+    required: true
+    min_score: 0.82
+    suites: [groundedness, autonomy_compliance]

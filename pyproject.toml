@@ -1,0 +1,126 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentic-os-enterprise"
+version = "3.1.0"
+description = "Agentic OS Enterprise — governed enterprise agentic operating system"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "pydantic>=2.7",
+  "pydantic-settings>=2.3",
+  "sqlalchemy>=2.0.30",
+  "psycopg[binary]>=3.1",
+  "pgvector>=0.2.5",
+  "alembic>=1.13",
+  "redis>=5.0",
+  "pyjwt>=2.8",
+  "argon2-cffi>=23.1",
+  "python-multipart>=0.0.9",
+  "httpx>=0.27",
+  "pyyaml>=6.0",
+  "jsonschema>=4.22",
+  "opentelemetry-api>=1.25",
+  "opentelemetry-sdk>=1.25",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2",
+  "pytest-asyncio>=0.23",
+  "pytest-cov>=5.0",
+  "ruff>=0.5",
+  "mypy>=1.10",
+  "types-PyYAML",
+]
+parsers = [
+  "pypdf>=4.2",
+  "python-docx>=1.1",
+  "openpyxl>=3.1",
+  "python-pptx>=0.6",
+  "beautifulsoup4>=4.12",
+]
+
+[project.scripts]
+agentic-migrate = "agentic_os.core.migrate:main"
+agentic-seed = "agentic_os.core.seed:main"
+agentic-evidence = "agentic_os.assurance.cli:main"
+agentic-dr = "agentic_os.resilience.cli:main"
+agentic-worker = "agentic_os.worker.loop:main"
+
+[tool.setuptools.packages.find]
+where = ["packages/agentic_os/src"]
+
+[tool.setuptools.package-data]
+"agentic_os" = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q --strict-markers"
+# The repository root must be importable so `from tests.conftest import ...`
+# resolves under a bare `pytest`, not only under `python -m pytest`.
+pythonpath = ["."]
+markers = [
+  "unit: pure unit tests, no external dependencies",
+  "integration: requires database",
+  "security: security control tests",
+  "redteam: adversarial agentic red-team tests",
+  "rag: retrieval quality and leakage tests",
+  "performance: drives a running API under concurrency",
+  "accessibility: WCAG conformance evidenced from a browser audit",
+  "slow: long-running tests",
+  "requires_service(name): gated on a real service; skipped when absent, failed when AGENTIC_REQUIRE_SERVICES names it",
+]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+extend-exclude = ["apps/web", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "C4"]
+ignore = ["S101", "B008", "E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "B"]
+# S608 flags SQL assembled with an f-string. In these three modules the only
+# interpolated fragments are module-level constants — the ACL predicate, the
+# table/column pairs in SUBJECT_TABLES, an allow-listed aggregate function —
+# and every caller-supplied value is a bound parameter. The rule cannot see
+# that distinction and the diagnostic lands on the opening quote of a
+# multi-line string, where a noqa comment cannot go without ending up inside
+# the SQL itself.
+"packages/agentic_os/src/agentic_os/knowledge/retrieval.py" = ["S608"]
+"packages/agentic_os/src/agentic_os/privacy/dsar.py" = ["S608"]
+"packages/agentic_os/src/agentic_os/tools/builtin.py" = ["S608"]
+
+[tool.bandit]
+# Bandit and ruff overlap on these two checks, and ruff enforces them with
+# file-level precision that bandit's global config cannot express:
+#
+#   B608 / S608 (SQL built with an f-string) — ruff enforces this everywhere
+#   except three files listed in per-file-ignores, where the only interpolated
+#   fragments are module-level constants (the ACL predicate, the table/column
+#   pairs in SUBJECT_TABLES, an allow-listed aggregate) and every caller value
+#   is a bound parameter. Bandit reports the diagnostic on the opening quote of
+#   a multi-line string, where an inline `# nosec` would land inside the SQL.
+#
+#   B314 / S314 (ElementTree) — ruff enforces this too; the two justified uses
+#   carry a targeted `# noqa: S314` explaining that the JUnit report is written
+#   by the test run this process just started, not accepted from a caller.
+#
+# Skipping them here removes the duplicate report, not the control. Anything
+# bandit finds that ruff does not — B613 trojansource, for one — still fails
+# the build.
+skips = ["B608", "B314"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+plugins = []

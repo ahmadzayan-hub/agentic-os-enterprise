@@ -1,0 +1,24 @@
+# Non-secret configuration only. Connection strings, signing keys and KMS keys
+# arrive from the secret store as a Secret named agentic-secrets, which
+# Terraform wires to the environment's secret manager. Nothing secret is
+# committed to this repository.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agentic-config
+  namespace: agentic-os
+data:
+  AGENTIC_APP_ENV: production
+  AGENTIC_POLICY_MODE: enforce
+  AGENTIC_SECRET_BACKEND: vault
+  AGENTIC_KMS_BACKEND: local
+  AGENTIC_DB_POOL_SIZE: "10"
+  AGENTIC_DB_MAX_OVERFLOW: "20"
+  # Model endpoints are topology, not credentials: base URLs belong in config
+  # so they are reviewable in a diff. Each entry's api_key_ref is a reference
+  # the secret broker resolves at call time, so no key appears here.
+  # RESTRICTED-capable models must point at operator-controlled infrastructure;
+  # the registry validator refuses any other combination.
+  AGENTIC_MODEL_ENDPOINTS: |-
+    {"onprem-vllm": {"base_url": "http://vllm.ai.svc.cluster.local/v1", "external": false},
+     "onprem-ollama": {"base_url": "http://ollama.ai.svc.cluster.local/v1", "external": false}}

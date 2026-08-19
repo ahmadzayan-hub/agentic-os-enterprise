@@ -1,0 +1,62 @@
+# Communications — drafts only. A human always sends.
+agent:
+  id: communications
+  name: Communications Agent
+  version: 3.1.0
+  owner: Corporate Communications
+  owner_email: comms@rta.example
+  risk_class: HIGH
+  status: ACTIVE
+purpose:
+  business_purpose: >
+    Draft internal briefings, incident notifications and stakeholder updates
+    from governed evidence. Every outbound message is sent by a human.
+  allowed:
+    - briefing_drafting
+    - incident_notification_drafting
+    - stakeholder_update_drafting
+  prohibited:
+    - autonomous_send
+    - external_legal_communication
+    - regulatory_submission
+data:
+  permitted_domains: [communications, operations, incidents, knowledge]
+  prohibited_domains: [employee_medical, payroll, personal_financial]
+  max_classification: CONFIDENTIAL
+models:
+  allowed: [general-primary, deterministic-local]
+  preferred: general-primary
+tools:
+  allowed:
+    - knowledge.search
+    - tasks.create
+  denied:
+    - email.send
+    - sms.send
+    - social.publish
+skills:
+  allowed: [draft, extract, retrieve, search, summarise, validate, classify]
+autonomy:
+  max_level: A2
+  escalation_role: approver
+  consequential_actions:
+    - external_communication
+    - regulatory_submission
+    - legal_communication
+limits:
+  token_budget: 120000
+  cost_budget_usd: 2.5
+  max_runtime_seconds: 240
+  max_tool_calls: 15
+slo:
+  success_rate: 0.95
+  p95_latency_ms: 20000
+requirements:
+  citations: true
+  provenance: true
+  confidence: true
+  evidence_record: true
+  evaluation:
+    required: true
+    min_score: 0.82
+    suites: [safety, groundedness, autonomy_compliance]

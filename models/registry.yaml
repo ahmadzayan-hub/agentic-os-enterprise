@@ -1,0 +1,204 @@
+# Model registry.
+#
+# No agent calls a provider directly; every inference goes through the Model
+# Gateway, which resolves a logical model key to an approved deployment.
+#
+# `deterministic-local` is NOT a language model. It is a rule-based executor
+# used for deterministic skills, offline development and CI. It is registered
+# here so that routing, budgets, allowlists and audit treat it identically to a
+# probabilistic model — and so that its outputs are never mistaken for one.
+#
+# Cloud entries are inert until credentials are configured AND
+# AGENTIC_MODEL_ALLOW_EXTERNAL_PROVIDERS=true. Until then the gateway routes to
+# the local deployment and records the substitution on the run.
+
+version: 1.0.0
+models:
+  - key: deterministic-local
+    provider: deterministic
+    provider_model_id: rules-v1
+    deployment: local
+    allows_training_on_input: false
+    owner_team: Platform Engineering
+    capabilities: [structured_output, extraction, classification, arithmetic]
+    max_classification: RESTRICTED
+    context_window: 32768
+    input_cost_per_1k: 0.0
+    output_cost_per_1k: 0.0
+    p95_latency_ms: 25
+    residency: on-premise
+    approval_state: APPROVED
+    known_limitations: >
+      Rule-based, not generative. Produces grounded extractive output only and
+      returns an explicit low-confidence result when no rule matches. Cannot
+      perform open-ended reasoning.
+    evaluation_score: 1.0
+
+  - key: general-primary
+    provider: anthropic
+    provider_model_id: claude-sonnet-4-5
+    deployment: cloud
+    allows_training_on_input: false
+    owner_team: Platform Engineering
+    capabilities: [chat, reasoning, structured_output, long_context, tool_use]
+    max_classification: CONFIDENTIAL
+    context_window: 200000
+    input_cost_per_1k: 0.003
+    output_cost_per_1k: 0.015
+    p95_latency_ms: 4000
+    residency: global
+    approval_state: PENDING
+    known_limitations: >
+      External provider. Not approved for RESTRICTED data. Requires a signed
+      data-processing agreement and no-training assurance before approval.
+    evaluation_score: null
+
+  - key: reasoning-primary
+    provider: anthropic
+    provider_model_id: claude-opus-4-5
+    deployment: cloud
+    allows_training_on_input: false
+    owner_team: Platform Engineering
+    capabilities: [chat, deep_reasoning, planning, structured_output, tool_use]
+    max_classification: CONFIDENTIAL
+    context_window: 200000
+    input_cost_per_1k: 0.015
+    output_cost_per_1k: 0.075
+    p95_latency_ms: 9000
+    residency: global
+    approval_state: PENDING
+    known_limitations: >
+      External provider, highest cost tier. Reserved for planning and
+      high-complexity analysis; the router downgrades low-complexity work.
+    evaluation_score: null
+
+  # --- open-weights, self-hosted -------------------------------------------
+  # Open-source models run on infrastructure the authority operates. This is
+  # the only deployment class that may see RESTRICTED data, because the weights
+  # and the inference both stay inside the residency boundary and no third
+  # party sees the prompt.
+  - key: private-general
+    provider: openai-compatible
+    endpoint: onprem-vllm
+    provider_model_id: meta-llama/Llama-3.3-70B-Instruct
+    deployment: private
+    open_weights: true
+    allows_training_on_input: false
+    owner_team: Platform Engineering
+    capabilities: [chat, reasoning, structured_output, tool_use]
+    max_classification: RESTRICTED
+    context_window: 131072
+    input_cost_per_1k: 0.0005
+    output_cost_per_1k: 0.0015
+    p95_latency_ms: 2500
+    residency: ae-dxb
+    approval_state: PENDING
+    known_limitations: >
+      Open-weights model served from a customer-operated OpenAI-compatible
+      endpoint (vLLM, Ollama, TGI or equivalent). Inert until the `onprem-vllm`
+      entry exists in AGENTIC_MODEL_ENDPOINTS; the gateway reports it
+      unavailable and routes on rather than substituting another endpoint.
+      Costs are the authority's own compute, not a vendor tariff.
+    evaluation_score: null
+
+  - key: private-fast
+    provider: openai-compatible
+    endpoint: onprem-ollama
+    provider_model_id: qwen2.5:7b-instruct
+    deployment: private
+    open_weights: true
+    allows_training_on_input: false
+    owner_team: Platform Engineering
+    capabilities: [chat, classification, extraction, structured_output]
+    max_classification: RESTRICTED
+    context_window: 32768
+    input_cost_per_1k: 0.0001
+    output_cost_per_1k: 0.0002
+    p95_latency_ms: 900
+    residency: ae-dxb
+    approval_state: PENDING
+    known_limitations: >
+      Small open-weights model for high-volume classification and extraction
+      where a 70B is wasteful. Weaker at multi-step reasoning; the router sends
+      only low-complexity work here.
+    evaluation_score: null
+
+  # --- open-weights, cloud-hosted ------------------------------------------
+  # The same open-source weights served by a third party. Cheap and fast, but
+  # the prompt leaves the residency boundary, so the ceiling is CONFIDENTIAL
+  # and approval requires a no-training assurance in writing.
+  - key: oss-cloud-fast
+    provider: openai-compatible
+    endpoint: oss-cloud
+    provider_model_id: llama-3.3-70b-versatile
+    deployment: cloud
+    open_weights: true
+    allows_training_on_input: false
+    owner_team: Platform Engineering
+    capabilities: [chat, reasoning, structured_output, tool_use]
+    max_classification: CONFIDENTIAL
+    context_window: 131072
+    input_cost_per_1k: 0.00059
+    output_cost_per_1k: 0.00079
+    p95_latency_ms: 800
+    residency: global
+    approval_state: PENDING
+    known_limitations: >
+      Open weights, third-party inference. Not approved for RESTRICTED data.
+      Approval requires a signed data-processing agreement and a written
+      no-training assurance; `allows_training_on_input: false` records the
+      contractual claim, it does not enforce it at the provider.
+    evaluation_score: null
+
+routing:
+  # Ordered rules; the first match wins. Every rule is evaluated against the
+  # request's classification, complexity, residency and budget state.
+  rules:
+    - name: restricted-data-stays-on-premise
+      when:
+        classification_in: [RESTRICTED]
+      prefer: [private-general, private-fast, deterministic-local]
+      reason: >
+        RESTRICTED data may not leave approved residency, so only self-hosted
+        open-weights models and the deterministic executor are eligible.
+
+    - name: deterministic-skills-need-no-model
+      when:
+        task_kind_in: [deterministic_skill]
+      prefer: [deterministic-local]
+      reason: A computable answer is computed, never generated.
+
+    - name: planning-needs-reasoning
+      when:
+        task_kind_in: [planning, plan_validation]
+        complexity_gte: 0.6
+      prefer: [reasoning-primary, general-primary, deterministic-local]
+      reason: Plan quality dominates cost for planning steps.
+
+    - name: high-volume-classification-uses-the-small-model
+      when:
+        task_kind_in: [classification, extraction]
+        complexity_lte: 0.4
+      prefer: [private-fast, oss-cloud-fast, deterministic-local]
+      reason: >
+        A 70B is wasteful for label-and-extract work. The small self-hosted
+        open-weights model handles it at a fraction of the cost and latency.
+
+    - name: budget-pressure-downgrades
+      when:
+        budget_remaining_pct_lt: 20
+      prefer: [private-fast, oss-cloud-fast, private-general, deterministic-local]
+      reason: >
+        Route to the cheapest capable deployment under budget pressure —
+        open-weights first, whether self-hosted or third-party.
+
+    - name: default
+      when: {}
+      prefer: [general-primary, private-general, deterministic-local]
+      reason: Default general-purpose routing with local fallback.
+
+  fallback_chain_max_length: 3
+  circuit_breaker:
+    failure_threshold: 5
+    window_seconds: 60
+    open_seconds: 30

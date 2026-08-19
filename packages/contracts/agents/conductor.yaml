@@ -1,0 +1,57 @@
+# Conductor — plans and dispatches. It may reason about work but may never
+# execute a privileged tool itself (Architecture Constitution rule 17).
+agent:
+  id: conductor
+  name: Conductor
+  version: 3.1.0
+  owner: Platform Engineering
+  owner_email: platform@rta.example
+  risk_class: HIGH
+  status: ACTIVE
+purpose:
+  business_purpose: >
+    Interpret a user objective, produce a validated execution plan, and dispatch
+    each step to the agent authorised for that domain. The Conductor owns
+    sequencing and consolidation, not execution.
+  allowed:
+    - goal_interpretation
+    - plan_generation
+    - agent_dispatch
+    - result_consolidation
+  prohibited:
+    - direct_tool_execution
+    - direct_external_communication
+    - credential_handling
+data:
+  permitted_domains: [platform, operations, knowledge]
+  prohibited_domains: [payroll, employee_medical, personal_financial]
+  max_classification: CONFIDENTIAL
+models:
+  allowed: [reasoning-primary, general-primary, deterministic-local]
+  preferred: reasoning-primary
+tools:
+  allowed: []            # deliberately empty: the Conductor dispatches, never executes
+  denied: ["*"]
+skills:
+  allowed: [analyse, classify, compare, summarise, validate]
+autonomy:
+  max_level: A2
+  escalation_role: approver
+  consequential_actions: []
+limits:
+  token_budget: 200000
+  cost_budget_usd: 4.0
+  max_runtime_seconds: 300
+  max_tool_calls: 0
+slo:
+  success_rate: 0.97
+  p95_latency_ms: 20000
+requirements:
+  citations: true
+  provenance: true
+  confidence: true
+  evidence_record: true
+  evaluation:
+    required: true
+    min_score: 0.85
+    suites: [plan_quality, tool_selection, autonomy_compliance]

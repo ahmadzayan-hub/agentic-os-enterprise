@@ -1,18 +1,60 @@
+# Analytics — deterministic-first. Numeric work runs in code, not in a model.
 agent:
-  id: analytics.primary
-  version: 3.0.0
-  owner: Analytics
-  criticality: MEDIUM
+  id: analytics
+  name: Analytics Agent
+  version: 3.1.0
+  owner: Business Intelligence
+  owner_email: analytics@rta.example
+  risk_class: MEDIUM
+  status: ACTIVE
 purpose:
-  allowed: [descriptive_analysis, diagnostic_analysis, predictive_analysis, prescriptive_recommendation]
+  business_purpose: >
+    Produce KPI analysis, trend detection and forecasts from governed datasets,
+    using deterministic computation for every numeric result and reserving the
+    model for interpretation and narrative.
+  allowed:
+    - kpi_analysis
+    - trend_detection
+    - forecasting
+    - data_quality_scoring
+  prohibited:
+    - model_generated_numeric_results
+    - unlabelled_estimates
+data:
+  permitted_domains: [analytics, operations, assets, maintenance, finance_summary]
+  prohibited_domains: [employee_medical, payroll, personal_financial]
+  max_classification: CONFIDENTIAL
+models:
+  allowed: [general-primary, deterministic-local]
+  preferred: deterministic-local
 tools:
-  allow: [warehouse.read, python.sandbox, knowledge.search]
-  deny: [production.write, payment.execute]
+  allowed:
+    - knowledge.search
+    - calc.evaluate
+    - analytics.query_metrics
+    - dataset.query
+    - dataset.profile
+  denied: []
+skills:
+  allowed: [analyse, calculate, classify, compare, forecast, optimise, summarise, transform, validate]
 autonomy:
-  analysis: A1
-  draft: A2
+  max_level: A1
+  escalation_role: approver
+  consequential_actions: []
+limits:
+  token_budget: 150000
+  cost_budget_usd: 3.0
+  max_runtime_seconds: 300
+  max_tool_calls: 25
+slo:
+  success_rate: 0.96
+  p95_latency_ms: 20000
 requirements:
+  citations: true
   provenance: true
   confidence: true
-  uncertainty: true
   evidence_record: true
+  evaluation:
+    required: true
+    min_score: 0.85
+    suites: [numeric_accuracy, groundedness]

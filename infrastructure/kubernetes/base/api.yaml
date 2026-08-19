@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agentic-api
+  namespace: agentic-os
+  labels: { app.kubernetes.io/name: agentic-api }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app.kubernetes.io/name: agentic-api }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: agentic-api }
+    spec:
+      serviceAccountName: agentic-api
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: api
+          image: ghcr.io/rta/agentic-os-api:3.1.0
+          imagePullPolicy: IfNotPresent
+          args: ["uvicorn", "agentic_os.api.app:app", "--host", "0.0.0.0", "--port", "8000",
+                 "--proxy-headers", "--forwarded-allow-ips", "*"]
+          ports: [{ containerPort: 8000, name: http }]
+          envFrom:
+            - configMapRef: { name: agentic-config }
+            - secretRef: { name: agentic-secrets }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { cpu: "2", memory: 1Gi }
+          # /health reports database reachability; /ready additionally requires
+          # pgvector, because retrieval is not servable without it.
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet: { path: /ready, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            - { name: data, mountPath: /app/.data }
+      volumes:
+        - { name: tmp, emptyDir: {} }
+        - { name: data, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agentic-api
+  namespace: agentic-os
+spec:
+  selector: { app.kubernetes.io/name: agentic-api }
+  ports: [{ name: http, port: 8000, targetPort: http }]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: agentic-api
+  namespace: agentic-os
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: agentic-api }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: agentic-api
+  namespace: agentic-os
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: agentic-api }
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }

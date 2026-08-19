@@ -1,45 +1,70 @@
+# Finance — preserved from the v3.0 contract set and extended to the v3.1
+# contract schema. Financial execution remains hard-limited to zero.
 agent:
-  id: finance.primary
-  version: 3.0.0
+  id: finance
+  name: Finance Agent
+  version: 3.1.0
   owner: Finance
-  criticality: HIGH
+  owner_email: finance@rta.example
+  risk_class: CRITICAL
+  status: ACTIVE
 purpose:
+  business_purpose: >
+    Perform financial analysis, budget variance review, invoice and payment
+    reconciliation and financial reporting over approved finance data sources.
   allowed:
     - financial_analysis
     - payment_reconciliation
     - financial_reporting
-models:
-  approved:
-    - private-general
-    - private-reasoning
-data:
-  read:
-    - invoices
-    - payment_transactions
-  write:
-    - financial_analysis
-    - reconciliation_records
+    - budget_variance_analysis
   prohibited:
-    - employee_medical_data
+    - payment_execution
+    - bank_transfer
+    - contract_commitment
+data:
+  permitted_domains: [finance, invoices, payments, budgets]
+  prohibited_domains: [employee_medical, payroll, personal_financial]
+  max_classification: RESTRICTED
+models:
+  allowed: [reasoning-primary, deterministic-local]
+  preferred: reasoning-primary
 tools:
-  allow:
-    - stripe.read
-    - erp.invoice.read
-  conditional:
-    - crm.update
-  deny:
+  allowed:
+    - knowledge.search
+    - knowledge.fetch_document
+    - finance.read_invoices
+    - dataset.query
+    - calc.evaluate
+    - tasks.create
+  denied:
+    - finance.execute_payment
+    - finance.issue_refund
     - bank.transfer
+skills:
+  allowed: [analyse, calculate, compare, extract, forecast, reconcile, retrieve, summarise, validate, verify]
 autonomy:
-  analysis: A1
-  draft: A2
-  reversible_action: A3
-  financial_action: A4
+  max_level: A2
+  escalation_role: approver
+  consequential_actions:
+    - payment
+    - refund
+    - procurement_approval
+    - contractual_commitment
 limits:
-  financial_execution: 0
-  max_tool_calls: 30
+  token_budget: 200000
+  cost_budget_usd: 4.0
   max_runtime_seconds: 300
+  max_tool_calls: 30
+  financial_execution_limit_usd: 0
+slo:
+  success_rate: 0.97
+  p95_latency_ms: 25000
 requirements:
   citations: true
   provenance: true
   confidence: true
   evidence_record: true
+  evaluation:
+    required: true
+    min_score: 0.90
+    suites: [numeric_accuracy, groundedness, autonomy_compliance]

@@ -1,0 +1,128 @@
+# One command brings the whole platform up:
+#
+#     docker compose up --build
+#
+# Then sign in at http://localhost:3000 with the demo credentials the migrate
+# service prints. The API is on http://localhost:8000, its OpenAPI document on
+# http://localhost:8000/api/v1/docs.
+#
+# The credentials here are development placeholders and are deliberately
+# obvious. Nothing in this file belongs in a deployed environment: staging and
+# production draw every secret from the secret manager through Terraform. See
+# infrastructure/terraform.
+
+name: agentic-os
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: agentic
+    # The bootstrap scripts create the three database roles and install the
+    # extensions. They run as superuser on first start only, which is exactly
+    # the privilege boundary the migrations rely on: agentic_owner can never
+    # create a role or install an extension itself.
+    volumes:
+      - ./database/bootstrap:/docker-entrypoint-initdb.d:ro
+      - postgres-data:/var/lib/postgresql/data
+    # Not published. The database is reachable on the compose network only; to
+    # attach psql from the host, add a compose override with a port mapping
+    # rather than exposing it by default.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d agentic"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile
+      target: base
+    command: ["sh", "-c", "agentic-migrate && agentic-seed"]
+    environment: &app-env
+      AGENTIC_APP_ENV: development
+      AGENTIC_DATABASE_URL: postgresql+psycopg://agentic_app:agentic_app@postgres:5432/agentic
+      AGENTIC_DATABASE_OWNER_URL: postgresql+psycopg://agentic_owner:agentic_owner@postgres:5432/agentic
+      AGENTIC_REDIS_URL: redis://redis:6379/0
+      AGENTIC_JWT_SECRET: development-only-signing-key-change-me-0001
+      AGENTIC_KMS_LOCAL_KEY: ""
+      AGENTIC_POLICY_MODE: enforce
+      # The platform answers without any model provider: routing falls back to
+      # the deterministic executor and records the substitution. To run a real
+      # open-weights model locally, start Ollama on the host and uncomment:
+      #
+      #   AGENTIC_MODEL_ENDPOINTS: >-
+      #     {"onprem-ollama": {"base_url": "http://host.docker.internal:11434/v1",
+      #                        "external": false}}
+      #
+      # then `ollama pull qwen2.5:7b-instruct`. No API key, nothing leaves the
+      # machine, and private-fast becomes routable for RESTRICTED work.
+      AGENTIC_MODEL_ENDPOINTS: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile
+      target: api
+    environment: *app-env
+    ports: ["8000:8000"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile
+      target: worker
+    environment: *app-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    # Horizontal scale is safe: leases and FOR UPDATE SKIP LOCKED mean two
+    # workers never take the same run or the same outbox row.
+    deploy:
+      replicas: 1
+
+  web:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/Dockerfile.web
+    environment:
+      # Server components call the API over the compose network; the browser
+      # never talks to it directly, which is why the session cookie can stay
+      # httpOnly and SameSite=Lax.
+      AGENTIC_API_BASE_URL: http://api:8000
+      NODE_ENV: production
+    ports: ["3000:3000"]
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

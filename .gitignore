@@ -1,9 +1,31 @@
-.env
-.venv/
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
 node_modules/
 .next/
-dist/
-coverage/
+out/
+*.tsbuildinfo
+
+# Local state
+.env
+.env.local
+.data/
+/artifacts/
+/evidence-bundle/
+
+# Editors / OS
 .DS_Store
+.idea/
+.vscode/
+
+# Playwright browsers pulled in only for local accessibility runs
+apps/web/node_modules/

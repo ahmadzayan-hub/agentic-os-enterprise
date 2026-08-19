@@ -1,36 +1,21 @@
-from enum import Enum
-from fastapi import FastAPI
-from pydantic import BaseModel, Field
+"""Control plane deployable.
 
-app = FastAPI(title="Agentic OS Control Plane", version="3.0.0")
+In v3.0 this was a scaffold: it accepted a plan request and returned a canned
+``execution_allowed: false`` without consulting anything. That stub is gone.
+The control plane is now the real governed API — identity, authorization, risk,
+policy, approval, execution gateway, verification, audit — and this module is
+the thin entry point that serves it, kept so existing deployment descriptors
+that point at ``services/control-plane`` keep working.
 
-class AutonomyLevel(str, Enum):
-    A0 = "A0"
-    A1 = "A1"
-    A2 = "A2"
-    A3 = "A3"
-    A4 = "A4"
+    uvicorn app.main:app
 
-class PlanRequest(BaseModel):
-    tenant_id: str
-    user_id: str
-    objective: str = Field(min_length=3)
-    requested_autonomy: AutonomyLevel = AutonomyLevel.A1
+is equivalent to
 
-@app.get("/health")
-def health():
-    return {"status": "ok", "service": "control-plane", "version": "3.0.0"}
+    uvicorn agentic_os.api.app:app
+"""
 
-@app.post("/v1/plans")
-def create_plan(request: PlanRequest):
-    # Scaffold only: production implementation must call policy, risk,
-    # workflow and evidence services before any side effect is permitted.
-    return {
-        "status": "PLANNED",
-        "tenant_id": request.tenant_id,
-        "user_id": request.user_id,
-        "objective": request.objective,
-        "requested_autonomy": request.requested_autonomy,
-        "execution_allowed": False,
-        "next_gate": "POLICY_EVALUATION"
-    }
+from __future__ import annotations
+
+from agentic_os.api.app import app
+
+__all__ = ["app"]

@@ -1,18 +1,57 @@
+# Knowledge — governed retrieval with permission-aware citations.
 agent:
-  id: knowledge.primary
-  version: 3.0.0
-  owner: Knowledge
-  criticality: HIGH
+  id: knowledge
+  name: Knowledge Agent
+  version: 3.1.0
+  owner: Information Management
+  owner_email: knowledge@rta.example
+  risk_class: MEDIUM
+  status: ACTIVE
 purpose:
-  allowed: [enterprise_search, rag_answering, document_analysis]
+  business_purpose: >
+    Retrieve governed enterprise knowledge with permission-aware citations and
+    answer technical questions strictly from retrieved, authorised evidence.
+  allowed:
+    - governed_retrieval
+    - citation_generation
+    - technical_question_answering
+    - document_summarisation
+  prohibited:
+    - unsourced_assertion
+    - retrieval_outside_caller_permissions
+data:
+  permitted_domains: [knowledge, documents, standards, procedures, projects]
+  prohibited_domains: [payroll, employee_medical]
+  max_classification: CONFIDENTIAL
+models:
+  allowed: [general-primary, reasoning-primary, deterministic-local]
+  preferred: general-primary
 tools:
-  allow: [knowledge.search, object.read]
-  deny: [object.delete, acl.modify]
+  allowed:
+    - knowledge.search
+    - knowledge.fetch_document
+    - graph.query
+  denied: []
+skills:
+  allowed: [extract, retrieve, search, summarise, validate, verify, classify, compare]
 autonomy:
-  analysis: A1
-  draft: A2
+  max_level: A1
+  escalation_role: approver
+  consequential_actions: []
+limits:
+  token_budget: 150000
+  cost_budget_usd: 3.0
+  max_runtime_seconds: 180
+  max_tool_calls: 25
+slo:
+  success_rate: 0.95
+  p95_latency_ms: 15000
 requirements:
-  acl_before_retrieval: true
   citations: true
   provenance: true
-  context_firewall: true
+  confidence: true
+  evidence_record: true
+  evaluation:
+    required: true
+    min_score: 0.85
+    suites: [groundedness, citation_validity, acl_leakage]

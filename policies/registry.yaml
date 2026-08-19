@@ -1,0 +1,164 @@
+# Policy-as-code registry.
+#
+# Rules are evaluated top to bottom within a policy; the first matching rule
+# decides. A policy with no matching rule contributes nothing (it neither
+# allows nor denies), and the engine's global default is DENY for any action
+# that no policy allows.
+#
+# Effects: ALLOW | DENY | REQUIRE_APPROVAL | MONITOR
+# `enforcement: MONITOR` records the decision without blocking, for staged
+# rollout of a new policy.
+
+version: 1.0.0
+policies:
+  - key: core.autonomy-ceiling
+    name: Autonomy ceiling enforcement
+    description: >
+      Consequential actions may never execute below A4 authorisation, and no
+      action may exceed the acting agent's contract ceiling.
+    category: autonomy
+    owner_team: AI Governance
+    enforcement: ENFORCE
+    rules:
+      - name: consequential-requires-a4
+        when:
+          action_in: [tool.invoke]
+          side_effect_in: [FINANCIAL, DELETE, EXTERNAL]
+        effect: REQUIRE_APPROVAL
+        obligations: [RECORD_RISK_ASSESSMENT, DUAL_APPROVAL_IF_CRITICAL]
+        reason: Consequential side effects require human authorisation.
+      - name: irreversible-requires-approval
+        when:
+          reversibility_in: [IRREVERSIBLE]
+        effect: REQUIRE_APPROVAL
+        reason: Irreversible actions require human authorisation.
+      - name: reversible-write-under-policy
+        when:
+          side_effect_in: [WRITE]
+          reversibility_in: [REVERSIBLE]
+        effect: ALLOW
+        obligations: [VERIFY_SIDE_EFFECT, RECORD_RISK_ASSESSMENT]
+        reason: >
+          Reversible internal writes are the A3 band: permitted under policy,
+          but only with side-effect verification so the platform can prove the
+          change actually happened.
+      - name: allow-reversible-reads
+        when:
+          side_effect_in: [READ]
+        effect: ALLOW
+        reason: Read-only actions carry no external consequence.
+
+  - key: core.data-classification
+    name: Data classification boundary
+    description: Restricted data may not reach external providers or unapproved tools.
+    category: data_protection
+    owner_team: Security
+    enforcement: ENFORCE
+    rules:
+      - name: restricted-blocks-external-model
+        when:
+          classification_in: [RESTRICTED]
+          model_deployment_in: [cloud]
+        effect: DENY
+        reason: RESTRICTED data may not be sent to an external model provider.
+      - name: confidential-blocks-unapproved-provider
+        when:
+          classification_in: [CONFIDENTIAL, RESTRICTED]
+          model_approval_state_in: [PENDING, REJECTED, SUSPENDED]
+        effect: DENY
+        reason: Sensitive data requires an approved model deployment.
+      - name: restricted-blocks-untrusted-mcp
+        when:
+          classification_in: [RESTRICTED, CONFIDENTIAL]
+          mcp_trust_class_in: [EXPERIMENTAL, QUARANTINED, DISABLED]
+        effect: DENY
+        reason: Sensitive data may not transit a non-approved MCP server.
+
+  - key: finance.refund-authority
+    name: Refund and payment authority
+    description: >
+      Preserved from the v3.0 FIN-REFUND-001 policy and extended to the v3.1
+      rule schema. Financial execution is never automatic above the low-value,
+      high-confidence, verified-customer threshold.
+    category: financial
+    owner_team: Finance
+    enforcement: ENFORCE
+    rules:
+      - name: low-value-verified-auto
+        when:
+          action_in: [finance.refund]
+          amount_usd_lte: 136
+          confidence_gte: 0.95
+          fraud_risk_in: [LOW]
+          customer_verified_eq: true
+        effect: ALLOW
+        obligations: [RECORD_RISK_ASSESSMENT, VERIFY_SIDE_EFFECT]
+        reason: Low-value verified refunds are reversible and pre-authorised.
+      - name: material-value-dual-approval
+        when:
+          action_in: [finance.refund, finance.payment]
+          amount_usd_lte: 13600
+        effect: REQUIRE_APPROVAL
+        obligations: [DUAL_APPROVAL]
+        reason: Material financial actions require two human approvers.
+      - name: above-threshold-deny
+        when:
+          action_in: [finance.refund, finance.payment]
+        effect: DENY
+        reason: Amounts above the delegated authority limit are not executable by the platform.
+
+  - key: knowledge.retrieval-governance
+    name: Retrieval governance
+    description: Retrieval is authorised before ranking, never filtered afterwards.
+    category: knowledge
+    owner_team: Information Management
+    enforcement: ENFORCE
+    rules:
+      - name: deny-unauthenticated-retrieval
+        when:
+          action_in: [knowledge.search, knowledge.fetch_document]
+          principal_authenticated_eq: false
+        effect: DENY
+        reason: Retrieval requires an authenticated principal.
+      - name: allow-authorised-retrieval
+        when:
+          action_in: [knowledge.search, knowledge.fetch_document]
+        effect: ALLOW
+        obligations: [ACL_FILTER_BEFORE_RANK, REQUIRE_CITATIONS]
+        reason: Authorised retrieval must be ACL-filtered before ranking.
+
+  - key: security.context-firewall
+    name: Untrusted content handling
+    description: Content from untrusted tiers may be analysed but never obeyed.
+    category: security
+    owner_team: Security
+    enforcement: ENFORCE
+    rules:
+      - name: block-injection-derived-tool-call
+        when:
+          action_in: [tool.invoke]
+          origin_trust_tier_in: [EXTERNAL, UNTRUSTED_UPLOAD, TOOL_GENERATED, MODEL_GENERATED]
+          injection_detected_eq: true
+        effect: DENY
+        reason: A tool call traced to injected instructions is never executed.
+      - name: monitor-external-origin
+        when:
+          origin_trust_tier_in: [EXTERNAL, UNTRUSTED_UPLOAD]
+        effect: MONITOR
+        obligations: [RECORD_SECURITY_FINDING]
+        reason: External-origin activity is recorded for review.
+
+  - key: operations.safety-critical
+    name: Safety-critical change control
+    description: Safety-related changes always require named human authorisation.
+    category: operations
+    owner_team: Rail Maintenance Operations
+    enforcement: ENFORCE
+    rules:
+      - name: safety-critical-dual-approval
+        when:
+          action_in: [operations.close_work_order, operations.asset_decommission,
+                      engineering.production_change]
+        effect: REQUIRE_APPROVAL
+        obligations: [DUAL_APPROVAL, RECORD_RISK_ASSESSMENT, VERIFY_SIDE_EFFECT]
+        reason: Safety-critical changes require two named human approvers.

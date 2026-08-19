@@ -32,8 +32,20 @@ A critical failed or expired control blocks production certification regardless 
 | Privacy | 5 |
 | Reliability | 6 |
 | Observability | 5 |
-| Evaluation and assurance | 5 |
+| Evaluation and assurance | 6 |
 | DevSecOps | 4 |
 | DR and resilience | 2 |
 | Business value | 2 |
-| **Total** | **100** |
+| Deployment | 4 |
+| Independent assurance | 3 |
+| Performance | 3 |
+| **Total** | **111** |
+
+The total is deliberately not normalised to 100. Because the score is verified
+weight over total applicable weight, a control the platform cannot yet satisfy
+only counts against it if it is present in the catalogue. Were the total pinned
+at 100, admitting a new unmet control would require shrinking an existing one —
+raising the per-control score for doing nothing. The last two domains exist
+specifically to hold what the platform has not yet earned: it has never been
+applied to a cluster, never independently assessed, and never run in
+production. They are unevidenced today and are meant to be.

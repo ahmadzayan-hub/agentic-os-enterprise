@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agentic-config
+data:
+  AGENTIC_APP_ENV: development
+  # Monitor mode logs the decision a policy would have made without blocking,
+  # which is how a new policy is introduced. Only dev starts here.
+  AGENTIC_POLICY_MODE: monitor
+  AGENTIC_SECRET_BACKEND: env

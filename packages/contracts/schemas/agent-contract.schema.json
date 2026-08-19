@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentic-os.dev/schemas/agent-contract-3.1.json",
+  "title": "AgentContract",
+  "description": "Machine-readable contract governing one domain agent. Every field is enforced at runtime by the agent runtime, tool gateway and model gateway.",
+  "type": "object",
+  "required": ["agent", "purpose", "data", "models", "tools", "skills", "autonomy", "limits", "requirements"],
+  "additionalProperties": false,
+  "properties": {
+    "agent": {
+      "type": "object",
+      "required": ["id", "version", "owner", "risk_class"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{2,63}$"},
+        "name": {"type": "string"},
+        "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+        "owner": {"type": "string", "minLength": 1},
+        "owner_email": {"type": "string"},
+        "risk_class": {"enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]},
+        "status": {"enum": ["DRAFT", "ACTIVE", "DEPRECATED", "RETIRED", "QUARANTINED"]}
+      }
+    },
+    "purpose": {
+      "type": "object",
+      "required": ["business_purpose"],
+      "additionalProperties": false,
+      "properties": {
+        "business_purpose": {"type": "string", "minLength": 20},
+        "allowed": {"type": "array", "items": {"type": "string"}},
+        "prohibited": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "data": {
+      "type": "object",
+      "required": ["permitted_domains", "prohibited_domains", "max_classification"],
+      "additionalProperties": false,
+      "properties": {
+        "permitted_domains": {"type": "array", "items": {"type": "string"}},
+        "prohibited_domains": {"type": "array", "items": {"type": "string"}},
+        "max_classification": {"enum": ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"]}
+      }
+    },
+    "models": {
+      "type": "object",
+      "required": ["allowed"],
+      "additionalProperties": false,
+      "properties": {
+        "allowed": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "preferred": {"type": "string"}
+      }
+    },
+    "tools": {
+      "type": "object",
+      "required": ["allowed"],
+      "additionalProperties": false,
+      "properties": {
+        "allowed": {"type": "array", "items": {"type": "string"}},
+        "denied": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "skills": {
+      "type": "object",
+      "required": ["allowed"],
+      "additionalProperties": false,
+      "properties": {"allowed": {"type": "array", "items": {"type": "string"}}}
+    },
+    "autonomy": {
+      "type": "object",
+      "required": ["max_level"],
+      "additionalProperties": false,
+      "properties": {
+        "max_level": {"enum": ["A0", "A1", "A2", "A3", "A4"]},
+        "escalation_role": {"type": "string"},
+        "consequential_actions": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "limits": {
+      "type": "object",
+      "required": ["token_budget", "cost_budget_usd", "max_runtime_seconds", "max_tool_calls"],
+      "additionalProperties": false,
+      "properties": {
+        "token_budget": {"type": "integer", "minimum": 1},
+        "cost_budget_usd": {"type": "number", "minimum": 0},
+        "max_runtime_seconds": {"type": "integer", "minimum": 1},
+        "max_tool_calls": {"type": "integer", "minimum": 0},
+        "financial_execution_limit_usd": {"type": "number", "minimum": 0}
+      }
+    },
+    "slo": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "success_rate": {"type": "number", "minimum": 0, "maximum": 1},
+        "p95_latency_ms": {"type": "integer", "minimum": 1}
+      }
+    },
+    "requirements": {
+      "type": "object",
+      "required": ["citations", "provenance", "evaluation"],
+      "additionalProperties": false,
+      "properties": {
+        "citations": {"type": "boolean"},
+        "provenance": {"type": "boolean"},
+        "confidence": {"type": "boolean"},
+        "evidence_record": {"type": "boolean"},
+        "evaluation": {
+          "type": "object",
+          "required": ["required", "min_score"],
+          "additionalProperties": false,
+          "properties": {
+            "required": {"type": "boolean"},
+            "min_score": {"type": "number", "minimum": 0, "maximum": 1},
+            "suites": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      }
+    }
+  }
+}
