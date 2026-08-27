@@ -144,6 +144,11 @@ jobs:
       - name: Agentic red-team tests
         run: pytest tests/redteam -q
 
+      # Right-to-left correctness is a static property of the stylesheet and the
+      # message catalogue, so it is checked here rather than only in the browser.
+      - name: Bidirectional layout and translation tests
+        run: pytest tests/i18n -q
+
       # Measure the governed path under concurrency, then hold the measurement
       # to account. A load test that never runs would leave the SLO declared
       # rather than measured, which is the state this replaced.

@@ -1,6 +1,6 @@
 # Maturity Report — Agentic OS Enterprise v3.1
 
-**Score: 92.79 / 100. Not certified.**
+**Score: 92.92 / 100. Not certified.**
 
 This number was not chosen. It is what the evidence engine computes in CI, on
 every change, and it is the number that counts. The pipeline's `evidence` job
@@ -10,8 +10,8 @@ then computes
 
 ```
 score = verified applicable weight / total applicable weight * 100
-      = 103 / 111 * 100
-      = 92.79
+      = 105 / 113 * 100
+      = 92.92
 ```
 
 No status can be entered by hand. A control with no `test:` reference, or whose
@@ -20,18 +20,18 @@ is implemented.
 
 | | |
 |---|---|
-| Controls assessed | 59 |
-| Applicable weight | 111 |
-| Verified weight | 103 |
+| Controls assessed | 60 |
+| Applicable weight | 113 |
+| Verified weight | 105 |
 | Critical blockers | none |
 | Certified | **no** — certification requires 100 with no critical blocker |
-| Test run | 322 tests, 0 failures, 0 errors, 0 skipped |
+| Test run | 332 tests, 0 failures, 0 errors, 0 skipped |
 | Environment | CI, against PostgreSQL 16 with pgvector and Redis 7 |
-| Accessibility | 23 surfaces × 2 colour schemes, 0 violations, 0 serious or critical |
+| Accessibility | 23 surfaces × 2 colour schemes × 2 writing directions = 92 scans, 0 violations |
 
 ### Why this is the CI number and not a local one
 
-A developer's machine reports **94.59** — one control higher. The difference is
+A developer's machine reports **94.69** — one control higher. The difference is
 DRP-001, the disaster-recovery exercise, which needs a break-glass maintenance
 identity that CI does not have. Nothing else differs.
 
@@ -83,7 +83,7 @@ existing one, which raises the per-control score for doing nothing.
 | Business architecture | 100.00 | 7 | 3 | 0 | 0 |
 | Data architecture | 100.00 | 7 | 3 | 0 | 0 |
 | RAG and knowledge | 100.00 | 7 | 3 | 0 | 0 |
-| UX and accessibility | 100.00 | 7 | 3 | 0 | 0 |
+| UX and accessibility | 100.00 | 9 | 4 | 0 | 0 |
 | Reliability | 100.00 | 6 | 3 | 0 | 0 |
 | Observability | 100.00 | 5 | 3 | 0 | 0 |
 | Evaluation and assurance | 100.00 | 6 | 4 | 0 | 0 |
@@ -104,7 +104,7 @@ a hash-addressed `artifacts/evidence-bundle.json`.
 Using the vocabulary the build brief asks for — mapped / tested / verified /
 not verified:
 
-* **Verified (54 controls, 103 weight in CI; 55 and 105 with a DR identity).** An automated test names the control,
+* **Verified (55 controls, 105 weight in CI; 56 and 107 with a DR identity).** An automated test names the control,
   the test executed in this run, and it passed. The tests exercise a real
   PostgreSQL 16 instance with row level security enforced, a real HTTP surface,
   and a real browser for the accessibility pass. Nothing is mocked at the

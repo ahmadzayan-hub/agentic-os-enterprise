@@ -18,11 +18,11 @@
 # critical: true means a failure blocks certification regardless of the score.
 
 version: 1.1.0
-total_weight: 111
+total_weight: 113
 
 domains:
   business_architecture: 7
-  ux_accessibility: 7
+  ux_accessibility: 9
   enterprise_architecture: 8
   agent_architecture: 10
   workflow_orchestration: 8
@@ -101,7 +101,23 @@ controls:
     test: tests/accessibility/test_wcag_conformance.py::test_no_serious_or_critical_accessibility_violations
     expected: >
       axe-core reports zero serious or critical violations across every primary
-      surface in both light and dark colour schemes.
+      surface in both light and dark colour schemes and both writing directions.
+
+  - id: UX-004
+    domain: ux_accessibility
+    title: The interface renders correctly right-to-left
+    requirement: >-
+      The console must lay out correctly in a right-to-left language. Direction
+      follows the reader's locale and no rule may pin itself to a physical side
+      of the screen.
+    implementation: >-
+      Locale drives <html lang> and <html dir>; the stylesheet uses logical
+      properties only. tests/i18n/test_bidirectional_layout.py fails on any
+      physical direction property, and the axe audit runs the full surface set
+      in Arabic as well as English.
+    weight: 2
+    test: tests/i18n/test_bidirectional_layout.py::test_no_stylesheet_rule_pins_itself_to_a_physical_side
+    expected: No stylesheet rule uses a physical side; the document sets direction from the locale.
 
   # ----------------------------------------------- enterprise architecture (8)
   - id: EA-001

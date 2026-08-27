@@ -2,8 +2,13 @@
  * WCAG 2.2 AA accessibility audit.
  *
  * Drives the real application in a real browser and runs axe-core against every
- * primary surface, in both colour schemes. Violations are written to a JSON
- * report that the Evidence Engine consumes for control UX-003.
+ * primary surface, in both colour schemes and both writing directions.
+ * Violations are written to a JSON report that the Evidence Engine consumes for
+ * control UX-003.
+ *
+ * The right-to-left pass is not a formality. Mirroring a layout is where
+ * overlapping controls, clipped focus rings and reversed reading order show up,
+ * and none of those are visible to someone testing in English only.
  *
  *   node tests/accessibility/axe_audit.mjs --base http://127.0.0.1:3000 \
  *        --email operator@example --password ... --out artifacts/accessibility.json
@@ -67,6 +72,12 @@ const SURFACES = [
 // WCAG 2.2 AA plus the best-practice rules that catch real navigation problems.
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
 
+//: Locale drives `<html lang>` and `<html dir>`, so this is the direction axis.
+const LOCALES = [
+  { locale: "en", dir: "ltr" },
+  { locale: "ar", dir: "rtl" },
+];
+
 async function main() {
   const browser = await chromium.launch(
     EXECUTABLE ? { executablePath: EXECUTABLE } : {},
@@ -76,10 +87,15 @@ async function main() {
   let total = 0;
 
   for (const scheme of ["light", "dark"]) {
+   for (const { locale, dir } of LOCALES) {
     const context = await browser.newContext({
       colorScheme: scheme,
       viewport: { width: 1440, height: 960 },
     });
+    // The console reads its language from this cookie on every server render,
+    // so setting it before the first navigation means even the sign-in page is
+    // audited in the right direction.
+    await context.addCookies([{ name: "agentic_locale", value: locale, url: BASE }]);
     const page = await context.newPage();
 
     // Authenticate once per context using the real login form.
@@ -91,6 +107,16 @@ async function main() {
 
     for (const surface of SURFACES) {
       await page.goto(`${BASE}${surface.path}`, { waitUntil: "networkidle" });
+
+      // A direction mismatch would make every RTL result meaningless while
+      // still reporting zero violations, so it fails loudly instead.
+      const rendered = await page.getAttribute("html", "dir");
+      if (rendered !== dir) {
+        throw new Error(
+          `${surface.path} rendered dir="${rendered}" for locale ${locale}, expected "${dir}"`,
+        );
+      }
+
       const scan = await new AxeBuilder({ page }).withTags(TAGS).analyze();
 
       const violations = scan.violations.map((violation) => ({
@@ -107,12 +133,15 @@ async function main() {
         surface: surface.label,
         path: surface.path,
         colorScheme: scheme,
+        locale,
+        direction: dir,
         violations,
         passes: scan.passes.length,
         incomplete: scan.incomplete.length,
       });
     }
     await context.close();
+   }
   }
 
   await browser.close();
@@ -123,6 +152,9 @@ async function main() {
     generated_at: new Date().toISOString(),
     surfaces_scanned: SURFACES.length,
     color_schemes: ["light", "dark"],
+    locales: LOCALES.map((entry) => entry.locale),
+    directions: LOCALES.map((entry) => entry.dir),
+    scans: results.length,
     total_violations: total,
     serious_or_critical: serious,
     passed: serious === 0,
@@ -133,13 +165,14 @@ async function main() {
   writeFileSync(OUT, JSON.stringify(report, null, 2));
 
   console.log(
-    `axe: ${SURFACES.length} surfaces x 2 colour schemes — ` +
-      `${total} violations, ${serious} serious or critical`,
+    `axe: ${SURFACES.length} surfaces x 2 colour schemes x ${LOCALES.length} directions ` +
+      `= ${results.length} scans — ${total} violations, ${serious} serious or critical`,
   );
   for (const entry of results) {
     for (const violation of entry.violations) {
       console.log(
-        `  ${entry.colorScheme} ${entry.path}: [${violation.impact}] ${violation.id} — ` +
+        `  ${entry.colorScheme}/${entry.direction} ${entry.path}: ` +
+          `[${violation.impact}] ${violation.id} — ` +
           `${violation.help} (${violation.nodes} node(s), first: ${violation.target})`,
       );
     }
