@@ -260,5 +260,13 @@ Two details in there are load-bearing, both learned the hard way:
   adds the working directory to `sys.path` and will hide an import error that
   CI hits immediately.
 
-`mypy packages/agentic_os/src/agentic_os` is advisory and not in the script;
-annotation debt remains.
+`mypy packages/agentic_os/src/agentic_os` **blocks CI**. It is not in
+`preflight.sh` — the script mirrors the gates that fail fastest — so run it
+before pushing anything that touches types.
+
+`warn_unused_ignores` is on. That means a `# type: ignore` which stops
+suppressing anything becomes an error itself, so a comment cannot outlive the
+problem it was added for. It found five such comments the day it was switched
+on. If you need a new one, prefer narrowing the value instead: most of the
+backlog turned out to be a `str` standing where a `Literal` was meant, and
+typing the boundary was both shorter and more truthful than silencing it.

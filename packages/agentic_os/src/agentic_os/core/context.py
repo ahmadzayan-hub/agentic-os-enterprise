@@ -26,9 +26,36 @@ CLASSIFICATION_ORDER: tuple[DataClassification, ...] = (
 )
 
 
+#: Maps an untrusted string to a real classification. A dict rather than a
+#: membership test because the latter cannot narrow `str` to a Literal.
+_KNOWN_CLASSIFICATIONS: dict[str, DataClassification] = {
+    "PUBLIC": "PUBLIC",
+    "INTERNAL": "INTERNAL",
+    "CONFIDENTIAL": "CONFIDENTIAL",
+    "RESTRICTED": "RESTRICTED",
+}
+
+
+def as_classification(value: object) -> DataClassification:
+    """Narrow an untrusted value to a classification, clamping to PUBLIC.
+
+    Classifications reach the platform from three places that are not the
+    application's own code: a database column, a JWT claim, and a tool
+    parameter. The first is a PostgreSQL enum and cannot be wrong; the other two
+    are only as good as the signature or the schema in front of them.
+
+    Clamping to PUBLIC — the *least* privileged value — is the safe direction
+    for anything used as a clearance or a ceiling. Note the asymmetry with
+    `classification_rank`, which ranks an unknown value as maximally sensitive:
+    that is correct for a document's own label and exactly wrong for a viewer's
+    clearance, where it would admit everything.
+    """
+    return _KNOWN_CLASSIFICATIONS.get(str(value), "PUBLIC")
+
+
 def classification_rank(value: str) -> int:
     try:
-        return CLASSIFICATION_ORDER.index(value)  # type: ignore[arg-type]
+        return CLASSIFICATION_ORDER.index(value)
     except ValueError:
         # Unknown classifications are treated as the most sensitive.
         return len(CLASSIFICATION_ORDER)

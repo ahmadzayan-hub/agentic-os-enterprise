@@ -451,3 +451,25 @@ def test_conductor_cannot_be_given_tool_authority_by_a_plan() -> None:
     assert not result.valid
     codes = {i.code for i in result.issues}
     assert "TOOL_NOT_PERMITTED" in codes or "TOOL_DENIED" in codes or "TOOL_BUDGET_ZERO" in codes
+
+
+def test_an_anomalous_clearance_claim_clamps_to_public() -> None:
+    """A clearance arriving in a token must never outrank a real one.
+
+    Tokens are signed by the platform and `clr` is written from a database
+    column that is a PostgreSQL enum, so a bad value should be impossible. The
+    asymmetry is what makes it worth a floor anyway: `classification_rank`
+    ranks an unknown value *above* RESTRICTED, so if one ever did arrive — a
+    key compromise, a migration that widened the column, a hand-crafted token
+    in a test environment — the holder would read every classification rather
+    than none.
+    """
+    from agentic_os.core.context import as_classification, classification_rank
+
+    for anomalous in ("SUPERSECRET", "TOP_SECRET", "restricted", "", None, 7, "INTERNAL "):
+        narrowed = as_classification(anomalous)
+        assert narrowed == "PUBLIC", f"{anomalous!r} narrowed to {narrowed!r}"
+        assert classification_rank(narrowed) == 0
+
+    for legitimate in ("PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"):
+        assert as_classification(legitimate) == legitimate

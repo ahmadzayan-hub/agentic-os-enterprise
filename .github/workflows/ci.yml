@@ -37,9 +37,11 @@ jobs:
         run: ruff format --check .
       - name: Lint (ruff)
         run: ruff check .
+      # Blocking, not advisory. It was advisory while 42 errors stood; they are
+      # cleared, so leaving the escape hatch open would mean the next one rides
+      # in unnoticed — an advisory gate reports the same green as a passing one.
       - name: Type check (mypy)
         run: mypy packages/agentic_os/src/agentic_os
-        continue-on-error: true   # advisory until the annotation debt is cleared
 
   # ------------------------------------------------------------ contracts
   contract-validation:

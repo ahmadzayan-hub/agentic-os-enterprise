@@ -89,13 +89,20 @@ class SecretBroker:
     # -- public surface ----------------------------------------------------
     def resolve(self, key: str, *, tenant_id: str = "", connector_key: str = "") -> tuple[str, SecretHandle]:
         """Return (value, handle). Only the gateway calls this."""
+        # Two different things were sharing one variable here: the *configured*
+        # backend, which can only be env/file/vault, and the source a value was
+        # actually read from, which may also be the connector-credential table.
+        # "database" is never a configurable backend, so widening the setting's
+        # type would have been the wrong repair — they are separate facts and
+        # are now separate names.
         backend = self._settings.secret_backend
+        source: str = backend
         value: str | None = None
 
         if connector_key and tenant_id:
             value = self._from_database(connector_key, key, tenant_id)
             if value is not None:
-                backend = "database"
+                source = "database"
         if value is None:
             if backend == "env":
                 value = self._from_env(key)
@@ -114,7 +121,7 @@ class SecretBroker:
             key=key,
             fingerprint=sha256_hex(value),
             scopes=frozenset(),
-            backend=backend,
+            backend=source,
         )
 
     def store(

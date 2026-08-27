@@ -124,3 +124,7 @@ skips = ["B608", "B314"]
 python_version = "3.11"
 ignore_missing_imports = true
 plugins = []
+# The suppression budget is zero. Every `type: ignore` that was in the tree was
+# either removed or replaced by a real narrowing while clearing the backlog, and
+# an unused one now fails rather than lingering after the error it hid is gone.
+warn_unused_ignores = true

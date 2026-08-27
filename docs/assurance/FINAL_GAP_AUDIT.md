@@ -230,8 +230,14 @@ business claim.
 
 ## 3. Smaller gaps and known debt
 
-* **mypy is advisory in CI** (`continue-on-error: true`). Type-annotation debt
-  remains; type errors do not fail the build.
+* **mypy is blocking, with six suppressions left.** The 42-error backlog is
+  cleared and `continue-on-error` is gone, so a new type error fails the build.
+  `warn_unused_ignores` is on, so a suppression outliving the error it hid also
+  fails. Six `type: ignore` comments remain: three on audit `outcome` arguments,
+  one on a subprocess `stdout` slice, and two in `api/deps.py` that attach
+  attributes to a function object — legitimately dynamic Python that a type
+  system has no clean answer for. They are suppressing real mismatches, not
+  decoration, and are worth returning to.
 * **Outbox handlers are in-process.** The event bus is a durable transactional
   outbox with retries and a dead-letter queue, but every handler runs inside
   the worker. There is no external subscriber transport.

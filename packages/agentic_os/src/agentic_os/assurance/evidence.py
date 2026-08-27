@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 from agentic_os.assurance.audit import AuditEntry, AuditLedger
 from agentic_os.core.context import ExecutionContext
 from agentic_os.core.crypto import content_hash, sha256_hex
+from agentic_os.core.db import affected_rows
 from agentic_os.core.ids import utcnow
 from agentic_os.core.registry import CONTROLS_FILE, REPO_ROOT
 
@@ -363,7 +364,7 @@ def apply_expiry(session: Session, tenant_id: str) -> int:
         ),
         {"t": tenant_id},
     )
-    return result.rowcount
+    return affected_rows(result)
 
 
 def record_evidence(

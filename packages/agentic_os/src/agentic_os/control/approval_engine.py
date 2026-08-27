@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from agentic_os.assurance.audit import AuditEntry, AuditLedger
 from agentic_os.core.context import ExecutionContext
+from agentic_os.core.db import affected_rows
 from agentic_os.core.errors import Conflict, NotFound, ValidationError
 from agentic_os.core.ids import utcnow
 
@@ -376,7 +377,7 @@ def expire_due_approvals(session: Session, tenant_id: str) -> int:
         ),
         {"t": tenant_id},
     )
-    return result.rowcount
+    return affected_rows(result)
 
 
 def pending_for_principal(session: Session, ctx: ExecutionContext, limit: int = 50) -> list[dict]:

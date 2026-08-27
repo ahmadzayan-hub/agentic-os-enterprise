@@ -13,9 +13,14 @@ from sqlalchemy.orm import Session
 
 from agentic_os.assurance.audit import AuditEntry, AuditLedger
 from agentic_os.core.config import get_settings
-from agentic_os.core.context import ExecutionContext, HumanIdentity
+from agentic_os.core.context import (
+    DataClassification,
+    ExecutionContext,
+    HumanIdentity,
+    as_classification,
+)
 from agentic_os.core.crypto import hash_password, sha256_hex, verify_password
-from agentic_os.core.db import bind_tenant
+from agentic_os.core.db import affected_rows, bind_tenant
 from agentic_os.core.errors import AuthenticationError, ValidationError
 from agentic_os.core.ids import random_token, utcnow
 from agentic_os.identity.mfa import user_requires_mfa, verify_totp
@@ -31,7 +36,7 @@ class AuthenticatedPrincipal:
     roles: frozenset[str]
     permissions: frozenset[str]
     groups: frozenset[str]
-    clearance: str
+    clearance: DataClassification
     mfa_satisfied: bool
     session_id: str
 
@@ -45,7 +50,7 @@ class AuthenticatedPrincipal:
             groups=self.groups,
             mfa_satisfied=self.mfa_satisfied,
             session_id=self.session_id,
-            clearance=self.clearance,  # type: ignore[arg-type]
+            clearance=self.clearance,
         )
 
     def to_context(self, **overrides: Any) -> ExecutionContext:
@@ -217,7 +222,7 @@ def authenticate_password(
         roles=roles,
         permissions=permissions,
         groups=groups,
-        clearance=str(row["clearance"]),
+        clearance=as_classification(row["clearance"]),
         mfa_satisfied=mfa_satisfied,
         session_id=str(session_row.id),
     )
@@ -286,7 +291,7 @@ def verify_access_token(token: str) -> AuthenticatedPrincipal:
         roles=frozenset(claims.get("roles", [])),
         permissions=frozenset(claims.get("perms", [])),
         groups=frozenset(claims.get("groups", [])),
-        clearance=claims.get("clr", "INTERNAL"),
+        clearance=as_classification(claims.get("clr", "INTERNAL")),
         mfa_satisfied=bool(claims.get("mfa", False)),
         session_id=claims.get("sid", ""),
     )
@@ -300,7 +305,7 @@ def revoke_session(session: Session, tenant_id: str, session_id: str) -> bool:
         ),
         {"sid": session_id, "tid": tenant_id},
     )
-    return result.rowcount > 0
+    return affected_rows(result) > 0
 
 
 def session_is_active(session: Session, session_id: str) -> bool:

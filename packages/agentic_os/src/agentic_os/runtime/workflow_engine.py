@@ -20,7 +20,7 @@ Guarantees:
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 
 from agentic_os.core.context import ExecutionContext, WorkflowIdentity
 from agentic_os.core.crypto import content_hash
+from agentic_os.core.db import affected_rows
 from agentic_os.core.errors import AgenticError, Conflict, NotFound, ValidationError
 from agentic_os.core.ids import utcnow
 from agentic_os.runtime.events import Event, publish
@@ -257,7 +258,7 @@ def start(
     return workflow_run_id
 
 
-def _load_definition(session: Session, tenant_id: str, run: dict) -> dict[str, Any]:
+def _load_definition(session: Session, tenant_id: str, run: Mapping[str, Any]) -> dict[str, Any]:
     row = session.execute(
         text(
             "SELECT definition FROM workflow_versions "
@@ -307,7 +308,7 @@ def advance(
     session: Session, ctx: ExecutionContext, workflow_run_id: str, *, worker_id: str = "inline"
 ) -> WorkflowRunState:
     """Advance one workflow run by one step."""
-    run = (
+    row = (
         session.execute(
             text("SELECT * FROM workflow_runs WHERE tenant_id = :t AND id = CAST(:i AS uuid)"),
             {"t": ctx.tenant_id, "i": workflow_run_id},
@@ -315,8 +316,14 @@ def advance(
         .mappings()
         .first()
     )
-    if run is None:
+    if row is None:
         raise NotFound(f"workflow run {workflow_run_id} not found")
+
+    # A RowMapping is keyed `Any`, not `str`, and Mapping is invariant in its
+    # key type — so it never satisfies Mapping[str, Any]. Converting once here
+    # gives every helper below a genuine str-keyed mapping instead of pushing a
+    # cast into each of their signatures.
+    run: Mapping[str, Any] = dict(row)
 
     state = run["state"] if isinstance(run["state"], dict) else json.loads(run["state"] or "{}")
     if run["status"] in ("SUCCEEDED", "FAILED", "CANCELLED", "COMPENSATED", "TIMED_OUT"):
@@ -469,7 +476,11 @@ def pause_for_approval(approval_id: str) -> _WorkflowPaused:
 
 
 def _next_step(
-    session: Session, ctx: ExecutionContext, run: dict, state: dict, next_index: int
+    session: Session,
+    ctx: ExecutionContext,
+    run: Mapping[str, Any],
+    state: dict,
+    next_index: int,
 ) -> WorkflowRunState:
     session.execute(
         text(
@@ -485,7 +496,7 @@ def _next_step(
 def _handle_step_failure(
     session: Session,
     ctx: ExecutionContext,
-    run: dict,
+    run: Mapping[str, Any],
     state: dict,
     step: dict,
     step_id: str,
@@ -539,7 +550,7 @@ def _handle_step_failure(
 def _compensate_and_fail(
     session: Session,
     ctx: ExecutionContext,
-    run: dict,
+    run: Mapping[str, Any],
     state: dict,
     error_class: str,
     message: str,
@@ -601,7 +612,7 @@ def _compensate_and_fail(
 def _finish(
     session: Session,
     ctx: ExecutionContext,
-    run: dict,
+    run: Mapping[str, Any],
     status: str,
     state: dict,
     *,
@@ -679,7 +690,7 @@ def cancel(session: Session, ctx: ExecutionContext, workflow_run_id: str, reason
         ),
         {"t": ctx.tenant_id, "i": workflow_run_id},
     )
-    return result.rowcount > 0
+    return affected_rows(result) > 0
 
 
 def resume(session: Session, ctx: ExecutionContext, workflow_run_id: str) -> bool:
@@ -690,4 +701,4 @@ def resume(session: Session, ctx: ExecutionContext, workflow_run_id: str) -> boo
         ),
         {"t": ctx.tenant_id, "i": workflow_run_id},
     )
-    return result.rowcount > 0
+    return affected_rows(result) > 0

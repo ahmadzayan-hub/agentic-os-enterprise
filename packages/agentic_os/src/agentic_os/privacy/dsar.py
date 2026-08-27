@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 
 from agentic_os.assurance.audit import AuditEntry, AuditLedger
 from agentic_os.core.context import ExecutionContext
+from agentic_os.core.db import affected_rows
 from agentic_os.core.errors import Conflict, NotFound, ValidationError
 from agentic_os.core.ids import utcnow
 
@@ -334,8 +335,8 @@ def _erase(
                 f"UPDATE {table} SET {column} = NULL WHERE tenant_id = :t AND {column} = CAST(:u AS uuid)"
             )
         result = session.execute(text(statement), {"t": ctx.tenant_id, "u": user_id})
-        if result.rowcount:
-            affected[table] = result.rowcount
+        if affected_rows(result):
+            affected[table] = affected_rows(result)
 
     pseudonym = f"erased+{user_id[:8]}@invalid.local"
     session.execute(
@@ -453,15 +454,15 @@ def apply_retention(session: Session, ctx: ExecutionContext) -> dict[str, int]:
         ),
         {"t": ctx.tenant_id},
     )
-    if result.rowcount:
-        removed["documents"] = result.rowcount
+    if affected_rows(result):
+        removed["documents"] = affected_rows(result)
 
     result = session.execute(
         text("DELETE FROM sessions WHERE tenant_id = :t AND expires_at < now() - interval '30 days'"),
         {"t": ctx.tenant_id},
     )
-    if result.rowcount:
-        removed["sessions"] = result.rowcount
+    if affected_rows(result):
+        removed["sessions"] = affected_rows(result)
 
     result = session.execute(
         text(
@@ -470,6 +471,6 @@ def apply_retention(session: Session, ctx: ExecutionContext) -> dict[str, int]:
         ),
         {"t": ctx.tenant_id},
     )
-    if result.rowcount:
-        removed["memory_records"] = result.rowcount
+    if affected_rows(result):
+        removed["memory_records"] = affected_rows(result)
     return removed

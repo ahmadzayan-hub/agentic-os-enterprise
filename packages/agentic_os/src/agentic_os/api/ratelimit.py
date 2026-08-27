@@ -26,7 +26,7 @@ import hashlib
 import logging
 import time
 from collections import defaultdict, deque
-from typing import Protocol
+from typing import Any, Protocol
 
 log = logging.getLogger("agentic_os.api.ratelimit")
 
@@ -82,20 +82,30 @@ class InProcessRateLimiter:
         return True, self.limit - len(window)
 
 
+class RedisLike(Protocol):
+    """The slice of a Redis client this limiter needs.
+
+    Structural rather than a real import: redis is an optional dependency, and
+    typing the parameter as `object` only moved the problem to the call site.
+    """
+
+    def register_script(self, script: str) -> Any: ...
+
+
 class SharedRateLimiter:
     """Sliding-window limiter shared by every replica through Redis."""
 
-    def __init__(self, limit_per_minute: int, client: object, *, namespace: str = "rl") -> None:
+    def __init__(self, limit_per_minute: int, client: RedisLike, *, namespace: str = "rl") -> None:
         self.limit = limit_per_minute
         self._client = client
         self._namespace = namespace
         self._fallback = InProcessRateLimiter(limit_per_minute)
-        self._script = None
+        self._script: Any = None
         self._degraded = False
 
-    def _register(self):  # type: ignore[no-untyped-def]
+    def _register(self) -> Any:
         if self._script is None:
-            self._script = self._client.register_script(_SLIDING_WINDOW)  # type: ignore[attr-defined]
+            self._script = self._client.register_script(_SLIDING_WINDOW)
         return self._script
 
     def allow(self, key: str) -> tuple[bool, int]:

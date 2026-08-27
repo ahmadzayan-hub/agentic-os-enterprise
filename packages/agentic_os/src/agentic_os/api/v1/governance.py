@@ -15,13 +15,14 @@ from agentic_os.assurance import evidence as evidence_engine
 from agentic_os.assurance.audit import AuditLedger
 from agentic_os.control import approval_engine
 from agentic_os.core.errors import AgenticError
+from agentic_os.privacy import dsar
 
 router = APIRouter(tags=["governance"])
 
 
 # ------------------------------------------------------------------ approvals
 class DecisionRequest(BaseModel):
-    decision: str = Field(pattern="^(APPROVED|REJECTED|CHANGES_REQUESTED)$")
+    decision: approval_engine.Decision
     comment: str = Field(default="", max_length=2000)
 
 
@@ -75,7 +76,7 @@ def decide_approval(approval_id: str, payload: DecisionRequest, ctx: CtxDep, db:
             ctx,
             approval_id,
             payload.decision,
-            comment=payload.comment,  # type: ignore[arg-type]
+            comment=payload.comment,
         )
     except AgenticError as exc:
         raise HTTPException(status_code=exc.http_status, detail=exc.to_dict()) from exc
@@ -296,7 +297,9 @@ def set_kill_switch(payload: KillSwitchRequest, ctx: CtxDep, db: DbDep) -> dict:
 
 # -------------------------------------------------------------------- privacy
 class DsarRequest(BaseModel):
-    request_type: str = Field(pattern="^(ACCESS|EXPORT|DELETE|RECTIFY)$")
+    # As with the approval decision above: the Literal is the validation, and
+    # it is the thing the DSAR engine's signature actually asks for.
+    request_type: dsar.RequestType
     subject_email: str = Field(min_length=3, max_length=320)
 
 
@@ -350,13 +353,12 @@ def privacy_register(ctx: CtxDep, db: DbDep) -> dict:
     dependencies=[Depends(require_permission("privacy:write", resource_type="privacy"))],
 )
 def raise_dsar(payload: DsarRequest, ctx: CtxDep, db: DbDep) -> dict:
-    from agentic_os.privacy import dsar
 
     try:
         request_id = dsar.raise_request(
             db,
             ctx,
-            request_type=payload.request_type,  # type: ignore[arg-type]
+            request_type=payload.request_type,
             subject_email=payload.subject_email,
         )
     except AgenticError as exc:
@@ -376,7 +378,6 @@ def process_dsar(request_id: str, ctx: CtxDep, db: DbDep) -> dict:
     complete dossier on a person and belongs in a delivery channel with its own
     identity verification. The response reports what was collected or changed.
     """
-    from agentic_os.privacy import dsar
 
     try:
         result = dsar.process(db, ctx, request_id)

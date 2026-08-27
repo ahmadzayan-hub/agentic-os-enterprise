@@ -20,7 +20,11 @@ router = APIRouter(tags=["knowledge"])
 class SearchRequest(BaseModel):
     query: str = Field(min_length=2, max_length=1000)
     top_k: int = Field(default=8, ge=1, le=50)
-    strategy: str = Field(default="hybrid", pattern="^(hybrid|semantic|lexical)$")
+    # The Literal is the validation. A regex on a `str` constrains the value at
+    # runtime but leaves the type as `str`, so the core function's Literal
+    # parameter had nothing to check against — and a fourth strategy added there
+    # would not have shown up as a mismatch here.
+    strategy: retrieval.Strategy = "hybrid"
 
 
 @router.post(

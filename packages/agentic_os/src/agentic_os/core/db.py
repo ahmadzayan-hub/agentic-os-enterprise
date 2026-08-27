@@ -14,7 +14,8 @@ import uuid
 from collections.abc import Iterator
 from typing import Any
 
-from sqlalchemy import Engine, create_engine, event, text
+from sqlalchemy import CursorResult, Engine, create_engine, event, text
+from sqlalchemy.engine import Result
 from sqlalchemy.orm import Session, sessionmaker
 
 from agentic_os.core.config import Settings, get_settings
@@ -23,6 +24,23 @@ from agentic_os.core.context import ExecutionContext
 _engine: Engine | None = None
 _owner_engine: Engine | None = None
 _session_factory: sessionmaker[Session] | None = None
+
+
+def affected_rows(result: Result[Any]) -> int:
+    """Rows touched by an INSERT, UPDATE or DELETE.
+
+    ``Session.execute`` is annotated as returning ``Result``, which has no
+    ``rowcount`` — that lives on ``CursorResult``, which is what a DML statement
+    actually returns at runtime. Reaching through the declared type in one place
+    beats nineteen scattered ``# type: ignore`` comments, each of which would
+    also suppress the next, unrelated error on its line.
+
+    Only valid for DML. A SELECT's rowcount is undefined in DBAPI terms, so this
+    refuses rather than returning a number that means nothing.
+    """
+    if not isinstance(result, CursorResult):
+        raise TypeError(f"affected_rows expects a DML result, got {type(result).__name__}")
+    return result.rowcount
 
 
 def _build_engine(url: str, settings: Settings) -> Engine:

@@ -92,7 +92,7 @@ def create_app(*, include_docs: bool = True) -> FastAPI:
     limiter = build_rate_limiter(settings.rate_limit_per_minute, settings.redis_url)
 
     @app.middleware("http")
-    async def security_and_limits(request: Request, call_next):  # type: ignore[no-untyped-def]
+    async def security_and_limits(request: Request, call_next: Any) -> Any:
         correlation = request.headers.get("x-correlation-id") or new_correlation_id()
 
         identity = request.headers.get("authorization", "")
@@ -124,7 +124,7 @@ def create_app(*, include_docs: bool = True) -> FastAPI:
         return response
 
     @app.exception_handler(AgenticError)
-    async def agentic_error_handler(request: Request, exc: AgenticError):  # type: ignore[no-untyped-def]
+    async def agentic_error_handler(request: Request, exc: AgenticError) -> Any:
         return JSONResponse(
             status_code=exc.http_status, content=exc.to_dict(), headers=dict(_SECURITY_HEADERS)
         )

@@ -14,6 +14,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from agentic_os.core.crypto import content_hash
+from agentic_os.core.db import affected_rows
 from agentic_os.core.errors import Conflict, NotFound
 
 
@@ -165,7 +166,7 @@ def deploy_version(
         ),
         {"p": prompt.id, "v": version, "by": approved_by},
     )
-    if result.rowcount == 0:
+    if affected_rows(result) == 0:
         raise NotFound(f"prompt '{prompt_key}' has no version {version}")
     session.execute(
         text("UPDATE prompts SET current_version = :v WHERE id = :p"),

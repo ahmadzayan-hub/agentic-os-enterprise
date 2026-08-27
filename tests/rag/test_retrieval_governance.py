@@ -235,3 +235,31 @@ def test_citation_verification_rejects_unsupported_claims() -> None:
     assert "no citation" in reasons
     assert "cited source not found" in reasons
     assert 0.0 < result["coverage"] < 1.0
+
+
+def test_an_unrecognised_agent_ceiling_cannot_widen_access() -> None:
+    """A bogus ceiling must clamp to PUBLIC, not outrank RESTRICTED.
+
+    `classification_rank` deliberately ranks unknown values above every real
+    classification, so that an unrecognised *document* classification is treated
+    as maximally sensitive. Applied to a *ceiling* that arithmetic inverts: with
+    no human in context, an unrecognised ceiling would be the only candidate and
+    would outrank every document, admitting all of them.
+
+    The tool gateway validates this parameter against an enum before dispatch,
+    so nothing reaches it today. This asserts the floor underneath that check.
+    """
+    from agentic_os.core.context import ExecutionContext, classification_rank
+    from agentic_os.knowledge.retrieval import effective_clearance
+
+    agentless = ExecutionContext(tenant_id="t", organization_id="o")
+    assert agentless.human is None
+
+    for bogus in ("SUPERSECRET", "restricted", "", "PUBLIC ", "TOP_SECRET"):
+        resolved = effective_clearance(agentless, bogus)
+        assert resolved == "PUBLIC", f"{bogus!r} resolved to {resolved!r}"
+        assert classification_rank(resolved) == 0
+
+    # Real values are still honoured exactly.
+    for good in ("PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"):
+        assert effective_clearance(agentless, good) == good

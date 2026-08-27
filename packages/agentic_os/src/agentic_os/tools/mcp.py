@@ -30,6 +30,7 @@ from agentic_os.assurance.audit import AuditEntry, AuditLedger
 from agentic_os.core.config import get_settings
 from agentic_os.core.context import ExecutionContext
 from agentic_os.core.crypto import content_hash
+from agentic_os.core.db import affected_rows
 from agentic_os.core.errors import (
     AuthorizationError,
     NotFound,
@@ -157,7 +158,7 @@ def classify_server(
         ),
         {"tc": trust_class, "t": ctx.tenant_id, "k": server_key},
     )
-    if result.rowcount == 0:
+    if affected_rows(result) == 0:
         raise NotFound(f"MCP server '{server_key}' is not registered")
     AuditLedger(session).append(
         ctx,
@@ -328,7 +329,7 @@ def approve_tool(session: Session, ctx: ExecutionContext, server_key: str, tool_
         ),
         {"t": ctx.tenant_id, "n": tool_name, "k": server_key, "u": ctx.human.user_id},
     )
-    if result.rowcount == 0:
+    if affected_rows(result) == 0:
         raise NotFound(f"MCP tool '{tool_name}' on server '{server_key}' not found")
     AuditLedger(session).append(
         ctx,

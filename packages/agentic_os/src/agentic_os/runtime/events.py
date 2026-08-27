@@ -20,6 +20,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from agentic_os.core.context import ExecutionContext
+from agentic_os.core.db import affected_rows
 
 #: Canonical event types. Publishing an unknown type is allowed but logged, so
 #: the taxonomy can grow without a deployment while staying visible.
@@ -231,7 +232,7 @@ def replay_dead_letter(session: Session, tenant_id: str, outbox_id: str) -> bool
         ),
         {"t": tenant_id, "i": outbox_id},
     )
-    return result.rowcount > 0
+    return affected_rows(result) > 0
 
 
 def backlog(session: Session, tenant_id: str) -> dict[str, int]:
