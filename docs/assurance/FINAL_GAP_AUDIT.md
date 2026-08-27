@@ -230,14 +230,16 @@ business claim.
 
 ## 3. Smaller gaps and known debt
 
-* **mypy is blocking, with six suppressions left.** The 42-error backlog is
-  cleared and `continue-on-error` is gone, so a new type error fails the build.
-  `warn_unused_ignores` is on, so a suppression outliving the error it hid also
-  fails. Six `type: ignore` comments remain: three on audit `outcome` arguments,
-  one on a subprocess `stdout` slice, and two in `api/deps.py` that attach
-  attributes to a function object — legitimately dynamic Python that a type
-  system has no clean answer for. They are suppressing real mismatches, not
-  decoration, and are worth returning to.
+* **mypy is blocking, with no suppressions left.** The 42-error backlog is
+  cleared, `continue-on-error` is gone, and a repository test fails if it is
+  reinstated. `warn_unused_ignores` is on, so a suppression outliving the error
+  it hid also fails the build. Every `type: ignore` in shipped code is gone —
+  the three on audit `outcome` arguments were parameters typed `str` where only
+  three literals are ever passed; the one on a subprocess result was hiding a
+  return annotation that was simply wrong (`dict[str, int]` for a dict
+  containing a string); and the two in `api/deps.py` are replaced by a Protocol
+  declaring the attributes the route table is introspected for, with a cast that
+  is erased at runtime so FastAPI resolves the dependency exactly as before.
 * **Outbox handlers are in-process.** The event bus is a durable transactional
   outbox with retries and a dead-letter queue, but every handler runs inside
   the worker. There is no external subscriber transport.

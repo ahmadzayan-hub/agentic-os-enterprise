@@ -11,7 +11,7 @@ import jwt
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from agentic_os.assurance.audit import AuditEntry, AuditLedger
+from agentic_os.assurance.audit import AuditEntry, AuditLedger, Outcome
 from agentic_os.core.config import get_settings
 from agentic_os.core.context import (
     DataClassification,
@@ -327,7 +327,12 @@ def set_user_password(session: Session, user_id: str, password: str) -> None:
 
 
 def _audit_auth(
-    session: Session, tenant_id: str, user_id: str, email: str, action: str, outcome: str
+    session: Session,
+    tenant_id: str,
+    user_id: str,
+    email: str,
+    action: str,
+    outcome: Outcome,
 ) -> None:
     # The tenant GUC is transaction-scoped, so re-bind before writing: this
     # helper is also reached on paths that have just committed.
@@ -342,7 +347,7 @@ def _audit_auth(
         AuditEntry(
             category="AUTH",
             action=action,
-            outcome=outcome,  # type: ignore[arg-type]
+            outcome=outcome,
             resource_type="user",
             resource_id=user_id,
             payload={"email": email},

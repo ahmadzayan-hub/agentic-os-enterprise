@@ -28,7 +28,7 @@ from agentic_os.ai.providers import (
     ModelResponse,
     provider_for_model,
 )
-from agentic_os.assurance.audit import AuditEntry, AuditLedger
+from agentic_os.assurance.audit import AuditEntry, AuditLedger, Outcome
 from agentic_os.core.context import ExecutionContext, classification_rank
 from agentic_os.core.errors import (
     AgenticError,
@@ -466,7 +466,7 @@ class ModelGateway:
         response: ModelResponse | None,
         cost: float,
         *,
-        outcome: str,
+        outcome: Outcome,
         error: str = "",
     ) -> None:
         payload: dict[str, Any] = {
@@ -494,7 +494,7 @@ class ModelGateway:
             AuditEntry(
                 category="MODEL_CALL",
                 action="model.complete",
-                outcome=outcome,  # type: ignore[arg-type]
+                outcome=outcome,
                 resource_type="model",
                 resource_id=decision.model_key,
                 payload=payload,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import Annotated
+from typing import Annotated, Protocol, cast
 
 from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
@@ -77,7 +77,26 @@ CtxDep = Annotated[ExecutionContext, Depends(get_context)]
 DbDep = Annotated[Session, Depends(get_db)]
 
 
-def require_permission(permission: str, *, resource_type: str = "api"):
+class PermissionDependency(Protocol):
+    """A route dependency that carries the permission it enforces.
+
+    The attributes are read back by introspection — the generated API reference
+    and the test asserting every mutating route declares a permission both walk
+    the route table looking for them. Declaring the shape here replaces two
+    `type: ignore[attr-defined]` comments without altering anything at runtime:
+    the cast below is erased, so FastAPI still receives the same plain function
+    and resolves it exactly as before. Making this a callable class would type
+    just as well but would change how FastAPI introspects the dependency, which
+    is not a change worth making to the authorization path for tidiness.
+    """
+
+    required_permission: str
+    resource_type: str
+
+    def __call__(self, ctx: CtxDep) -> ExecutionContext: ...
+
+
+def require_permission(permission: str, *, resource_type: str = "api") -> PermissionDependency:
     """Dependency factory enforcing one permission through the authz engine."""
 
     def dependency(ctx: CtxDep) -> ExecutionContext:
@@ -99,12 +118,11 @@ def require_permission(permission: str, *, resource_type: str = "api"):
             )
         return ctx
 
-    # Recorded so the route's requirement can be read back by introspection —
-    # the generated API reference and the tests that check every mutating
-    # route declares a permission both rely on it.
-    dependency.required_permission = permission  # type: ignore[attr-defined]
-    dependency.resource_type = resource_type  # type: ignore[attr-defined]
-    return dependency
+    # Recorded so the route's requirement can be read back by introspection.
+    declared = cast(PermissionDependency, dependency)
+    declared.required_permission = permission
+    declared.resource_type = resource_type
+    return declared
 
 
 def to_http(exc: AgenticError) -> HTTPException:

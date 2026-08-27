@@ -81,6 +81,28 @@ def test_a_piped_ci_step_cannot_swallow_its_own_failure() -> None:
     assert offenders == [], f"CI steps pipe without pipefail, so a failure would report success: {offenders}"
 
 
+def test_the_type_check_is_not_advisory() -> None:
+    """mypy must fail the build, not report its findings in green.
+
+    It ran with `continue-on-error: true` while a 42-error backlog stood, which
+    meant the pipeline printed those errors and passed anyway — the same shape
+    as a skipped test or a check whose exit status came from `tee`. Two of those
+    42 turned out to describe a real inversion in the clearance arithmetic. The
+    backlog is cleared; this stops the escape hatch being reinstated the next
+    time an error is inconvenient.
+    """
+    workflow = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text())
+    steps = [
+        step
+        for job in workflow["jobs"].values()
+        for step in job.get("steps", [])
+        if "mypy" in str(step.get("run", ""))
+    ]
+    assert steps, "no CI step runs mypy"
+    tolerated = [s.get("name", s["run"]) for s in steps if s.get("continue-on-error")]
+    assert tolerated == [], f"mypy steps allowed to fail silently: {tolerated}"
+
+
 def test_no_hardcoded_secrets_in_source() -> None:
     """Source must never contain a credential-shaped literal."""
     patterns = [
