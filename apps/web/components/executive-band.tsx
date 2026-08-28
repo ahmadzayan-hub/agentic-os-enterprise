@@ -20,11 +20,25 @@ import type { DecisionQueue, Effectiveness, KpiDefinition } from "@/lib/types";
 
 const AWAITING_A_PERSON = ["AWAITING_REVIEW", "AWAITING_APPROVAL", "VERIFICATION_PENDING"];
 
+/**
+ * Round a measurement for display.
+ *
+ * The stored value keeps full precision because the computation record has to
+ * reconstruct it, but 87.610619% on an executive surface reads as false
+ * precision — it implies the sixth decimal means something. Two decimals, and
+ * trailing zeros dropped so a clean figure stays clean.
+ */
+function formatMeasurement(value: number): string {
+  return Number(value.toFixed(2)).toLocaleString();
+}
+
 export async function ExecutiveBand() {
   const [queue, effectiveness, kpis] = await Promise.all([
     apiTry<DecisionQueue>("/api/v1/decisions?limit=200"),
     apiTry<Effectiveness>("/api/v1/decisions/effectiveness"),
-    apiTry<{ items: KpiDefinition[] }>("/api/v1/kpis"),
+    apiTry<{ items: KpiDefinition[]; measurable: number; unmeasurable: number }>(
+      "/api/v1/kpis",
+    ),
   ]);
 
   // A viewer without decisions:read is not shown a broken panel; the surface
@@ -94,6 +108,13 @@ export async function ExecutiveBand() {
           {!kpis.data || kpis.data.items.length === 0 ? (
             <Empty>No KPIs have been defined for your domains.</Empty>
           ) : (
+            <>
+              {kpis.data.unmeasurable > 0 ? (
+                <p className="muted" style={{ fontSize: 13, marginBlockStart: 0 }}>
+                  {kpis.data.measurable} of {kpis.data.items.length} are measurable from
+                  data the platform holds. The rest are defined and unmeasured.
+                </p>
+              ) : null}
             <ul className="stack-sm" style={{ paddingInlineStart: 18 }}>
               {kpis.data.items.map((kpi) => (
                 <li key={kpi.id}>
@@ -106,12 +127,13 @@ export async function ExecutiveBand() {
                   <div style={{ fontSize: 14 }}>
                     {kpi.latest_value === null ? (
                       <span className="muted">
-                        Not measured yet — no value has been recorded against this
-                        definition
+                        {kpi.computation === "NO_COMPUTATION"
+                          ? "Not measurable — this KPI is defined, and the platform holds no data it can be computed from"
+                          : "Not measured yet — nothing to measure in the current period"}
                       </span>
                     ) : (
                       <>
-                        {kpi.latest_value} {kpi.unit}
+                        {formatMeasurement(kpi.latest_value)} {kpi.unit}
                         {kpi.target_value !== null ? (
                           <span className="muted">
                             {" "}
@@ -126,7 +148,8 @@ export async function ExecutiveBand() {
                   </div>
                 </li>
               ))}
-            </ul>
+              </ul>
+            </>
           )}
         </Card>
       </div>

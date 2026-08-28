@@ -3,7 +3,7 @@
 Generated from the application's own OpenAPI document by
 `scripts/generate_api_reference.py`. Do not edit by hand.
 
-**68 endpoints** under `/api/v1`, plus `/health` and `/ready`.
+**69 endpoints** under `/api/v1`, plus `/health` and `/ready`.
 
 Authentication is a session cookie issued by `POST /api/v1/auth/login`;
 the cookie is httpOnly and the console exchanges it server-side, so the
@@ -52,6 +52,7 @@ caller's navigation shows.
 | POST | `/api/v1/decisions/{decision_id}/recommendation` | `decisions:analyse` | Add Recommendation |
 | POST | `/api/v1/decisions/{decision_id}/transitions` | `decisions:read` | Move Decision |
 | GET | `/api/v1/kpis` | `kpis:read` | Kpi List |
+| POST | `/api/v1/kpis/compute` | `kpis:write` | Kpi Compute |
 | GET | `/api/v1/notifications` | `notifications:read` | Inbox |
 | POST | `/api/v1/notifications/{notification_id}/read` | `notifications:read` | Mark Read |
 

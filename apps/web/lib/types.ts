@@ -250,6 +250,11 @@ export interface KpiDefinition {
   latest_value: number | null;
   latest_period_end: string | null;
   latest_basis: string | null;
+  // Why a KPI has no value. "REGISTERED" with a null value means nothing
+  // happened in the period; "NO_COMPUTATION" means the platform cannot measure
+  // this at all. A reader acts differently on each, so they must not render
+  // the same.
+  computation: "REGISTERED" | "NO_COMPUTATION";
 }
 
 export interface NotificationItem {

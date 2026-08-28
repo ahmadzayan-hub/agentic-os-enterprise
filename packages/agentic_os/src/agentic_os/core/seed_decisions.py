@@ -73,6 +73,44 @@ KPIS: tuple[dict[str, Any], ...] = (
         "domain": None,
     },
     {
+        "key": "decision.lead_time_days",
+        "name": "Decision lead time",
+        "description": "Mean days from a decision being detected to being closed.",
+        "formula": "avg(closed_at - created_at) over decisions closed in the period",
+        "unit": "days",
+        "direction": "DOWN_IS_GOOD",
+        "target": 21.0,
+        "warning": 35.0,
+        "domain": None,
+    },
+    {
+        "key": "incident.mttr_hours",
+        "name": "Incident mean time to resolve",
+        "description": "Mean hours from an incident being detected to being resolved.",
+        "formula": "avg(resolved_at - detected_at) over incidents resolved in the period",
+        "unit": "hours",
+        "direction": "DOWN_IS_GOOD",
+        "target": 4.0,
+        "warning": 12.0,
+        "domain": None,
+    },
+    {
+        "key": "run.success_rate",
+        "name": "Agent run success rate",
+        "description": "Share of finished agent runs that succeeded. Runs still in flight are excluded.",
+        "formula": "count(status=SUCCEEDED) / count(status in (SUCCEEDED, FAILED))",
+        "unit": "%",
+        "direction": "UP_IS_GOOD",
+        "target": 99.5,
+        "warning": 97.0,
+        "domain": None,
+    },
+    # The next two are defined by the business and the platform cannot measure
+    # them: the incident register carries no asset class, and nothing feeds it
+    # service hours. They are left here deliberately. Deleting them would make
+    # the KPI surface look complete; leaving them visible and unmeasured is the
+    # honest report of where the platform actually is.
+    {
         "key": "signalling.point_machine_failures",
         "name": "Point machine failures per month",
         "description": "Recorded in-service failures of point machines across the network.",

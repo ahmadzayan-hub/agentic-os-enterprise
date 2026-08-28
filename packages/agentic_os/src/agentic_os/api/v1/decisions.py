@@ -20,6 +20,8 @@ from agentic_os.api.serialization import rows as json_rows
 from agentic_os.core.db import affected_rows
 from agentic_os.decisions import (
     calculate_confidence,
+    computation_status,
+    compute_all,
     create_decision,
     decision_effectiveness_rate,
     get_decision,
@@ -424,11 +426,15 @@ def record_lesson(ctx: CtxDep, db: DbDep, decision_id: str, body: NewLesson) -> 
 def kpi_list(ctx: CtxDep, db: DbDep) -> dict[str, Any]:
     """KPI definitions with their latest value.
 
-    A definition with no value reports ``latest_value: null`` rather than zero.
-    A KPI nobody has measured is not a KPI reading zero.
+    A definition with no value reports ``latest_value: null`` rather than zero —
+    a KPI nobody has measured is not a KPI reading zero. ``computation`` then
+    says *why* it is unmeasured, because "nothing happened this period" and "the
+    platform cannot measure this at all" are different facts and a reader acts
+    differently on each.
     """
-    return {
-        "items": json_rows(
+    items = [
+        {**row, "computation": computation_status(str(row["kpi_key"]))}
+        for row in json_rows(
             db.execute(
                 text(
                     """
@@ -449,6 +455,34 @@ def kpi_list(ctx: CtxDep, db: DbDep) -> dict[str, Any]:
                 {"t": ctx.tenant_id},
             ).mappings()
         )
+    ]
+    return {
+        "items": items,
+        "measurable": sum(1 for i in items if i["computation"] == "REGISTERED"),
+        "unmeasurable": sum(1 for i in items if i["computation"] == "NO_COMPUTATION"),
+    }
+
+
+@router.post(
+    "/kpis/compute",
+    dependencies=[Depends(require_permission("kpis:write", resource_type="kpi"))],
+)
+def kpi_compute(ctx: CtxDep, db: DbDep) -> dict[str, Any]:
+    """Measure every active KPI for the current month.
+
+    Reports one outcome per definition. A KPI the platform cannot measure comes
+    back NO_COMPUTATION and no value is written for it — the pass does not
+    quietly succeed by skipping what it cannot do.
+    """
+    outcomes = compute_all(db, ctx)
+    db.commit()
+    counts: dict[str, int] = {}
+    for outcome in outcomes:
+        counts[outcome.status] = counts.get(outcome.status, 0) + 1
+    return {
+        "period": "current_month",
+        "counts": counts,
+        "outcomes": [o.to_dict() for o in outcomes],
     }
 
 
