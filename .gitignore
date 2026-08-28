@@ -29,3 +29,6 @@ out/
 
 # Playwright browsers pulled in only for local accessibility runs
 apps/web/node_modules/
+
+# Redis snapshot, written by redis-server when started from the repo root.
+dump.rdb
