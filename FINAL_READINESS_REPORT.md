@@ -7,21 +7,38 @@
 
 ---
 
-## FINAL SCORE: 95.59/100
+## FINAL SCORE: 94.12/100
 
-**Certification is refused**, by the platform's own evidence engine, which certifies only
+That is the figure **CI** computed on the head commit, and it is the one to quote: CI is
+the reproducible environment, and the release gate cleared its floor of 90 there.
+
+```
+score            : 94.12/100 (gate 90.0)
+certified        : False
+critical blockers: none
+controls         : 70
+```
+
+Locally the same commit scores **95.59**. The 1.47-point difference is exactly the
+disaster-recovery control's weight (2 of 136). The DR exercise runs here because a
+maintenance identity is configured; CI has none, so the control is `NOT_EVIDENCED` there
+rather than failed. Both numbers are honest about their own environment, and CI's is the
+lower one, which is why it is the headline.
+
+**Certification is refused** by the platform's own evidence engine, which certifies only
 at a perfect 100 with no critical control unevidenced. There are no critical blockers —
-all 70 controls that can be evidenced are — and the 4.41 points missing are exactly three
-things the platform has not earned:
+every control that can be evidenced is — and the missing points are things the platform
+has not earned:
 
 | Domain | Score | Why |
 |---|---:|---|
 | Independent assurance | 0 / 3 | Nobody outside this work has assessed it |
 | Deployment | 2 / 4 | Never applied to a cluster |
 | Performance | 2 / 3 | One control has no load profile behind it |
+| DR and resilience (in CI only) | 0 / 2 | No maintenance identity in the CI environment |
 
-Those three domains exist in the catalogue for this purpose. Removing them would raise
-the score to 100 without changing anything about the platform, which is precisely the
+Those domains exist in the catalogue for this purpose. Removing them would raise the
+score to 100 without changing anything about the platform, which is precisely the
 manoeuvre the catalogue is designed to prevent.
 
 The score is *not* the readiness verdict. §11 is, and every cell of its Production Ready
@@ -195,7 +212,21 @@ violations of any impact**, including the two new surfaces in Arabic right-to-le
 That number is only trustworthy because the audit now refuses to produce one it did not
 earn — see §6.6.
 
-### 6.7 The audit that would not lie
+### 6.7 The constraints, enforced in CI's own database
+
+Not only mine. CI's PostgreSQL log for the head commit shows every guarantee firing
+against a clean database:
+
+```
+permission denied for table decision_transitions   (UPDATE, DELETE, TRUNCATE)
+recommendation_confidence_is_calculated            ({}, "trust me", [], {})
+outcome_verdict_requires_verification
+null value in column "domain_id" of relation "decisions"
+null value in column "kpi_definition_id" of relation "kpi_values"
+decision_options_score_check
+```
+
+### 6.8 The audit that would not lie
 
 Worth recording because it is the whole discipline in one incident. An earlier run of the
 accessibility audit reported *zero serious violations* across 100 scans. Half of those
