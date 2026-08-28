@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from agentic_os.ai import prompt_registry
 from agentic_os.ai.context_firewall import TrustTier
-from agentic_os.assurance.audit import AuditEntry, AuditLedger
+from agentic_os.assurance.audit import AuditEntry, AuditLedger, Outcome
 from agentic_os.control import risk_engine
 from agentic_os.control.approval_engine import ApprovalCard, request_approval
 from agentic_os.control.intent_router import Intent, interpret
@@ -653,14 +653,14 @@ class Conductor:
         action: str,
         outcome: RunOutcome,
         *,
-        outcome_status: str = "SUCCESS",
+        outcome_status: Outcome = "SUCCESS",
     ) -> None:
         self._ledger.append(
             ctx,
             AuditEntry(
                 category="AGENT_ACTION",
                 action=action,
-                outcome=outcome_status,  # type: ignore[arg-type]
+                outcome=outcome_status,
                 resource_type="run",
                 resource_id=run_id,
                 payload={

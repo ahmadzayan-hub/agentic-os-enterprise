@@ -23,6 +23,7 @@ import logging
 import math
 import re
 from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -116,6 +117,23 @@ def _tokenise(text: str) -> list[str]:
     return [w for w in re.findall(r"[a-z0-9']+", text.lower()) if w not in _STOPWORDS and len(w) > 1]
 
 
+def _confidence_of(structured: Mapping[str, Any]) -> float:
+    """Read a confidence score without trusting its type.
+
+    The value comes from whichever handler produced the structured payload. A
+    non-numeric one used to reach ``float()`` and raise, turning a malformed
+    response into a crash in the model gateway; it now degrades to zero
+    confidence, which is what an unreadable score actually means.
+    """
+    raw = structured.get("confidence", 0.0)
+    if isinstance(raw, bool) or not isinstance(raw, (int, float, str)):
+        return 0.0
+    try:
+        return float(raw)
+    except ValueError:
+        return 0.0
+
+
 class DeterministicProvider:
     """Rule-based, reproducible text operations. Never generative."""
 
@@ -156,7 +174,7 @@ class DeterministicProvider:
             provider=self.name,
             model_id=model_id,
             generative=False,
-            confidence=float(structured.get("confidence", 0.0)),
+            confidence=_confidence_of(structured),
         )
 
     # -- operations --------------------------------------------------------

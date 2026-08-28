@@ -12,10 +12,32 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from agentic_os.control.approval_engine import ApprovalCard, request_approval
+from agentic_os.control.approval_engine import ApprovalCard, ApprovalMode, request_approval
 from agentic_os.core.context import ExecutionContext
 from agentic_os.core.errors import Conflict, NotFound, ValidationError
 from agentic_os.runtime.workflow_engine import pause_for_approval, register_step_type
+
+#: Approval modes a workflow definition may name.
+_APPROVAL_MODES: dict[str, ApprovalMode] = {
+    "SINGLE": "SINGLE",
+    "DUAL": "DUAL",
+    "SEQUENTIAL": "SEQUENTIAL",
+    "PARALLEL": "PARALLEL",
+}
+
+
+def _approval_mode(value: Any) -> ApprovalMode:
+    """Narrow a workflow definition's approval mode.
+
+    Workflow definitions are data, authored outside this module, so this value
+    is untrusted. An unrecognised mode used to be passed straight through as a
+    string; refusing is the only safe reading, because silently defaulting to
+    SINGLE would weaken a step that asked for DUAL because of a typo.
+    """
+    mode = _APPROVAL_MODES.get(str(value))
+    if mode is None:
+        raise ValidationError(f"unknown approval mode {value!r}; expected one of {sorted(_APPROVAL_MODES)}")
+    return mode
 
 
 def _resolve(value: Any, state: dict[str, Any]) -> Any:
@@ -142,7 +164,7 @@ def approval_step(
             evidence=list(config.get("evidence", [])) or [{"workflow_step": step["key"]}],
             sources=list(config.get("sources", [])),
         ),
-        mode=str(config.get("mode", "SINGLE")),
+        mode=_approval_mode(config.get("mode", "SINGLE")),
         required_approvals=int(config.get("required_approvals", 1)),
         approver_roles=list(config.get("approver_roles", ["approver"])),
         run_id=ctx.run_id or None,

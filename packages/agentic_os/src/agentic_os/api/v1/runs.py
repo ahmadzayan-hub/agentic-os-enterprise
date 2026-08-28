@@ -13,6 +13,7 @@ from agentic_os.api.serialization import jsonify
 from agentic_os.api.serialization import row as json_row
 from agentic_os.api.serialization import rows as json_rows
 from agentic_os.control.conductor import Conductor
+from agentic_os.core.db import affected_rows
 from agentic_os.core.errors import AgenticError, NotFound
 
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -167,7 +168,7 @@ def cancel_run(run_id: str, ctx: CtxDep, db: DbDep) -> dict:
         ),
         {"t": ctx.tenant_id, "i": run_id},
     )
-    if result.rowcount == 0:
+    if affected_rows(result) == 0:
         raise HTTPException(
             status_code=409,
             detail={"error": "CONFLICT", "message": "run is not in a cancellable state"},

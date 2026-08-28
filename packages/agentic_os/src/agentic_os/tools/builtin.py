@@ -80,18 +80,21 @@ def _eval_node(node: ast.AST, variables: dict[str, Any]) -> Any:
             return _CONSTANTS[node.id]
         raise ValidationError(f"unknown variable '{node.id}'")
     if isinstance(node, ast.BinOp):
-        op = _BINARY_OPS.get(type(node.op))
-        if op is None:
+        binary_op = _BINARY_OPS.get(type(node.op))
+        if binary_op is None:
             raise ValidationError(f"unsupported operator: {type(node.op).__name__}")
         left, right = _eval_node(node.left, variables), _eval_node(node.right, variables)
         if isinstance(node.op, ast.Pow) and abs(float(right)) > _MAX_EXPONENT:
             raise ValidationError(f"exponent exceeds the limit of {_MAX_EXPONENT}")
-        return op(left, right)
+        return binary_op(left, right)
     if isinstance(node, ast.UnaryOp):
-        op = _UNARY_OPS.get(type(node.op))
-        if op is None:
+        # A separate name from the binary operator above: one takes two
+        # arguments and one takes one, so sharing `op` gave the second branch
+        # the first branch's signature.
+        unary_op = _UNARY_OPS.get(type(node.op))
+        if unary_op is None:
             raise ValidationError(f"unsupported unary operator: {type(node.op).__name__}")
-        return op(_eval_node(node.operand, variables))
+        return unary_op(_eval_node(node.operand, variables))
     if isinstance(node, ast.Call):
         if not isinstance(node.func, ast.Name) or node.func.id not in _FUNCTIONS:
             raise ValidationError("only whitelisted mathematical functions may be called")
@@ -301,12 +304,13 @@ def dataset_query(session: Session, ctx: ExecutionContext, params: dict[str, Any
             numbers = [_num(v) for v in values if not math.isnan(_num(v))]
             if not numbers:
                 return None
-            return {
+            aggregators: dict[str, Callable[[list[Any]], Any]] = {
                 "sum": sum,
                 "avg": lambda xs: round(statistics.fmean(xs), 6),
                 "min": min,
                 "max": max,
-            }[aggregate](numbers)
+            }
+            return aggregators[aggregate](numbers)
 
         if group_by:
             groups: dict[Any, list[Any]] = {}
@@ -512,15 +516,15 @@ def analytics_query_metrics(
 def tasks_create(session: Session, ctx: ExecutionContext, params: dict[str, Any]) -> dict[str, Any]:
     assignee_id = None
     if email := params.get("assignee_email"):
-        row = session.execute(
+        assignee = session.execute(
             text("SELECT id FROM users WHERE tenant_id = :t AND email = :e"),
             {"t": ctx.tenant_id, "e": str(email).lower()},
         ).first()
-        if row is None:
+        if assignee is None:
             raise NotFound(f"no user with email '{email}' in this tenant")
-        assignee_id = row.id
+        assignee_id = assignee.id
 
-    row = (
+    created = (
         session.execute(
             text(
                 """
@@ -545,7 +549,7 @@ def tasks_create(session: Session, ctx: ExecutionContext, params: dict[str, Any]
         .mappings()
         .one()
     )
-    return {"task_id": str(row["id"]), **{k: v for k, v in row.items() if k != "id"}}
+    return {"task_id": str(created["id"]), **{k: v for k, v in created.items() if k != "id"}}
 
 
 #: Only tools registered here can execute. A registry entry without an

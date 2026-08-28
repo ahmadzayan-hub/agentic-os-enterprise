@@ -20,7 +20,12 @@ from typing import Any, Literal
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from agentic_os.core.context import ExecutionContext, classification_rank
+from agentic_os.core.context import (
+    DataClassification,
+    ExecutionContext,
+    as_classification,
+    classification_rank,
+)
 from agentic_os.core.errors import AuthorizationError
 from agentic_os.knowledge.embeddings import get_embedder
 
@@ -109,17 +114,26 @@ def principal_acl_keys(ctx: ExecutionContext) -> list[str]:
     return keys
 
 
-def effective_clearance(ctx: ExecutionContext, agent_ceiling: str | None = None) -> str:
+def effective_clearance(ctx: ExecutionContext, agent_ceiling: str | None = None) -> DataClassification:
     """The lower of the human's clearance and the acting agent's ceiling.
 
     An agent can never see more than the person it is acting for, and a person
     can never see more through an agent than the agent's contract allows.
+
+    The ceiling arrives as an untrusted string — it reaches this function from a
+    tool parameter. The gateway validates it against the tool's enum before
+    dispatch, so a bad value does not get here today, but the arithmetic below
+    would be unforgiving if one ever did: `classification_rank` ranks an unknown
+    value *above* RESTRICTED, and with no human in context that ceiling would be
+    the only candidate and would rank higher than every document. So an
+    unrecognised ceiling is clamped to PUBLIC here — the most restrictive
+    answer — and the guarantee stops depending on a YAML enum staying correct.
     """
-    candidates = []
+    candidates: list[DataClassification] = []
     if ctx.human is not None:
         candidates.append(ctx.human.clearance)
     if agent_ceiling:
-        candidates.append(agent_ceiling)
+        candidates.append(as_classification(agent_ceiling))
     if not candidates:
         return "PUBLIC"
     return min(candidates, key=classification_rank)

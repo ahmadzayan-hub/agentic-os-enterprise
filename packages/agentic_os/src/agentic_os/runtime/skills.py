@@ -91,7 +91,7 @@ def _skill_compare(ctx: ExecutionContext, params: dict, deps: dict) -> dict[str,
         values = [float(o.get(key, 0) or 0) for o in options]
         ranges[key] = (min(values), max(values))
 
-    ranking = []
+    ranking: list[dict[str, Any]] = []
     for option in options:
         score = 0.0
         for criterion in criteria:
@@ -110,7 +110,7 @@ def _skill_compare(ctx: ExecutionContext, params: dict, deps: dict) -> dict[str,
                 "score": round(score / total_weight, 6),
             }
         )
-    ranking.sort(key=lambda r: -r["score"])
+    ranking.sort(key=lambda r: float(r["score"]), reverse=True)
     return {"ranking": ranking}
 
 

@@ -6,7 +6,7 @@
 # reported as NOT_EVIDENCED and contributes zero, however well implemented it
 # may be.
 #
-# Weights total 107 across eighteen domains, matching
+# Weights total 136 across twenty domains, matching
 # docs/governance/MATURITY_MODEL.md. The total is deliberately not normalised to
 # 100: the score is verified weight over total applicable weight, so a control
 # the platform cannot yet satisfy has to be *in* the catalogue to be counted
@@ -18,11 +18,12 @@
 # critical: true means a failure blocks certification regardless of the score.
 
 version: 1.1.0
-total_weight: 111
+total_weight: 136
 
 domains:
+  decision_intelligence: 23
   business_architecture: 7
-  ux_accessibility: 7
+  ux_accessibility: 9
   enterprise_architecture: 8
   agent_architecture: 10
   workflow_orchestration: 8
@@ -43,6 +44,132 @@ domains:
 
 controls:
   # ------------------------------------------------ business architecture (7)
+  # --------------------------------------------------------- decision intelligence
+  #
+  # The product's own promise, expressed as controls. DEC-002 and DEC-005 are
+  # critical: a decision whose state can be moved illegally, or a confidence
+  # figure with nothing behind it, are the two failures that would make every
+  # other number on this platform untrustworthy.
+
+  - id: DEC-001
+    domain: decision_intelligence
+    title: A decision case exists as a first-class governed record
+    requirement: >-
+      The organisation's decisions are recorded with their domain, owner,
+      evidence and history — not inferred from agent runs.
+    implementation: database/migrations/0013_decision_intelligence.sql
+    weight: 2
+    standards: [{framework: "ISO/IEC 42001", clause: "9.1 monitoring"}]
+    test: tests/decisions/test_schema_guarantees.py::test_every_new_table_forces_row_level_security
+    expected: Every decision table enforces FORCE ROW LEVEL SECURITY.
+
+  - id: DEC-002
+    domain: decision_intelligence
+    title: Decision state transitions are enforced server-side
+    requirement: >-
+      A decision may move only along the lifecycle's declared edges, and only
+      by a principal holding the permission the destination requires.
+    implementation: agentic_os.decisions.lifecycle.transition — the sole writer of the column.
+    weight: 3
+    critical: true
+    standards: [{framework: "ISO/IEC 42001", clause: "8.1 operational control"}]
+    test: tests/decisions/test_lifecycle.py::test_every_ordered_pair_of_states_is_legal_or_illegal_as_declared
+    expected: All 121 ordered pairs of states behave as the transition table declares.
+
+  - id: DEC-003
+    domain: decision_intelligence
+    title: The lifecycle has exactly one writer
+    requirement: The decision state column is written in one place and nowhere else.
+    implementation: A source scan over the package, run as a test.
+    weight: 2
+    test: tests/decisions/test_lifecycle.py::test_nothing_outside_the_lifecycle_module_writes_the_state_column
+    expected: No module other than the lifecycle engine issues UPDATE decisions.
+
+  - id: DEC-004
+    domain: decision_intelligence
+    title: A decision's history cannot be rewritten
+    requirement: >-
+      The transition log is append-only for every role including the one that
+      provisions tenants, and survives TRUNCATE.
+    implementation: Triggers on decision_transitions modelled on the audit ledger's.
+    weight: 2
+    standards: [{framework: "ISO 27001", clause: "A.8.15 logging"}]
+    test: tests/decisions/test_schema_guarantees.py::test_the_transition_log_refuses_update_even_for_the_provisioning_role
+    expected: UPDATE, DELETE and TRUNCATE on the transition log are all refused.
+
+  - id: DEC-005
+    domain: decision_intelligence
+    title: AI confidence is calculated or absent, never invented
+    requirement: >-
+      A confidence figure is derived from stored, countable inputs. Where the
+      inputs do not support one, the platform reports "Not Calculated" rather
+      than substituting a number.
+    implementation: >-
+      agentic_os.decisions.confidence, plus a CHECK constraint that refuses a
+      non-null confidence whose calculation carries no inputs.
+    weight: 3
+    critical: true
+    standards: [{framework: "ISO/IEC 42001", clause: "6.1.2 AI risk assessment"}]
+    test: tests/decisions/test_schema_guarantees.py::test_a_confidence_with_the_default_empty_calculation_is_refused
+    expected: The database refuses to store a confidence unaccompanied by its inputs.
+
+  - id: DEC-006
+    domain: decision_intelligence
+    title: Cross-domain decision access is zero
+    requirement: >-
+      A principal outside a decision's domain retrieves nothing and is told the
+      decision does not exist, rather than being told it is forbidden.
+    implementation: Domain membership is a join inside the query, not a filter after it.
+    weight: 3
+    critical: true
+    standards: [{framework: "ISO 27001", clause: "A.5.15 access control"}]
+    test: tests/decisions/test_domain_isolation.py::test_the_database_returns_nothing_rather_than_filtering_afterwards
+    expected: The scoped query returns zero rows for a non-member.
+
+  - id: DEC-007
+    domain: decision_intelligence
+    title: Review and approval are separate stations
+    requirement: >-
+      A role that reviews a recommendation may not also approve it, and the
+      platform administrator holds no authority over business decisions.
+    implementation: BUSINESS_DECISION_AUTHORITY excluded from the blanket admin grant.
+    weight: 2
+    standards: [{framework: "ISO 27001", clause: "A.5.3 segregation of duties"}]
+    test: tests/decisions/test_lifecycle.py::test_a_section_lead_can_review_but_cannot_approve
+    expected: A section lead reviewing a case is refused when they try to approve it.
+
+  - id: DEC-008
+    domain: decision_intelligence
+    title: An agent cannot carry a decision past a human station
+    requirement: >-
+      An agent may advance analysis and may never review, approve, execute or
+      verify on its own.
+    implementation: The lifecycle engine refuses those destinations without a human principal.
+    weight: 2
+    standards: [{framework: "ISO/IEC 42001", clause: "8.4 human oversight"}]
+    test: tests/decisions/test_lifecycle.py::test_an_agent_cannot_approve_or_verify_on_its_own
+    expected: An agent context is refused at AWAITING_APPROVAL and beyond.
+
+  - id: DEC-009
+    domain: decision_intelligence
+    title: The North Star rate is honest over an empty set
+    requirement: >-
+      Decision Effectiveness Rate is null where nothing has reached
+      verification — not 0% and not 100%.
+    implementation: agentic_os.decisions.effectiveness.
+    weight: 2
+    test: tests/decisions/test_confidence_and_effectiveness.py::test_the_rate_is_not_calculated_over_an_empty_set
+    expected: The rate is None and displays as "Not Calculated".
+
+  - id: DEC-010
+    domain: decision_intelligence
+    title: Every KPI carries its own definition
+    requirement: A displayed KPI has a formula, a unit, a direction and a target.
+    implementation: kpi_definitions, with kpi_values unable to exist without one.
+    weight: 2
+    test: tests/decisions/test_decision_api.py::test_every_kpi_carries_its_definition
+    expected: Every KPI returned by the API states how it is computed.
+
   - id: BUS-001
     domain: business_architecture
     title: Governed domain agent catalogue exists
@@ -101,7 +228,23 @@ controls:
     test: tests/accessibility/test_wcag_conformance.py::test_no_serious_or_critical_accessibility_violations
     expected: >
       axe-core reports zero serious or critical violations across every primary
-      surface in both light and dark colour schemes.
+      surface in both light and dark colour schemes and both writing directions.
+
+  - id: UX-004
+    domain: ux_accessibility
+    title: The interface renders correctly right-to-left
+    requirement: >-
+      The console must lay out correctly in a right-to-left language. Direction
+      follows the reader's locale and no rule may pin itself to a physical side
+      of the screen.
+    implementation: >-
+      Locale drives <html lang> and <html dir>; the stylesheet uses logical
+      properties only. tests/i18n/test_bidirectional_layout.py fails on any
+      physical direction property, and the axe audit runs the full surface set
+      in Arabic as well as English.
+    weight: 2
+    test: tests/i18n/test_bidirectional_layout.py::test_no_stylesheet_rule_pins_itself_to_a_physical_side
+    expected: No stylesheet rule uses a physical side; the document sets direction from the locale.
 
   # ----------------------------------------------- enterprise architecture (8)
   - id: EA-001

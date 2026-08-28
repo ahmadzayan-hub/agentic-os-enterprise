@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 from agentic_os.assurance.audit import AuditEntry, AuditLedger
 from agentic_os.core.context import ExecutionContext
 from agentic_os.core.crypto import content_hash, sha256_hex
+from agentic_os.core.db import affected_rows
 from agentic_os.core.ids import utcnow
 from agentic_os.core.registry import CONTROLS_FILE, REPO_ROOT
 
@@ -129,7 +130,7 @@ class MaturityReport:
 # ---------------------------------------------------------------------------
 def run_test_suite(
     *, junit_path: Path, paths: list[str] | None = None, extra_args: list[str] | None = None
-) -> dict[str, int]:
+) -> dict[str, Any]:
     """Run pytest and write a JUnit report. Returns the run summary."""
     junit_path.parent.mkdir(parents=True, exist_ok=True)
     # ``sys.executable`` is the interpreter already running this process, so the
@@ -150,9 +151,12 @@ def run_test_suite(
     completed = subprocess.run(  # noqa: S603 - fixed argv, no shell
         command, cwd=REPO_ROOT, capture_output=True, text=True, timeout=1800
     )
+    # exit_code is an int and stdout_tail is a str, so `dict[str, int]` was
+    # simply wrong: the suppression was hiding an incorrect signature rather
+    # than working around a limitation of the checker.
     return {
         "exit_code": completed.returncode,
-        "stdout_tail": completed.stdout[-2000:],  # type: ignore[dict-item]
+        "stdout_tail": completed.stdout[-2000:],
     }
 
 
@@ -363,7 +367,7 @@ def apply_expiry(session: Session, tenant_id: str) -> int:
         ),
         {"t": tenant_id},
     )
-    return result.rowcount
+    return affected_rows(result)
 
 
 def record_evidence(

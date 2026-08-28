@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { type Locale, type MessageKey, translator } from "@/lib/i18n";
+
 /**
  * Primary navigation.
  *
@@ -14,72 +16,92 @@ import { usePathname } from "next/navigation";
  * link that would only ever return "not permitted" is not shown. This is
  * presentation, not enforcement: the API authorises every request on its own
  * and a hidden link is still refused if it is typed into the address bar.
+ *
+ * Labels are message keys, not literals, so the navigation reads in the
+ * signed-in user's language and a missing translation fails to compile.
  */
 
-type NavItem = { href: string; label: string; permission?: string };
+type NavItem = { href: string; label: MessageKey; permission?: string };
 
-const GROUPS: { label: string; items: NavItem[] }[] = [
+const GROUPS: { label: MessageKey; items: NavItem[] }[] = [
+  // Decide comes first, and the ordering is deliberate. The platform groups
+  // below answer "is the machinery correct?"; this one answers "what does the
+  // organisation need to do?", which is why most people open the product.
   {
-    label: "Operate",
+    label: "nav.group.decide",
     items: [
-      { href: "/", label: "Command Center", permission: "analytics:read" },
-      { href: "/runs", label: "Runs", permission: "runs:read" },
-      { href: "/approvals", label: "Approvals", permission: "approvals:read" },
-      { href: "/operations/incidents", label: "Incidents", permission: "incidents:read" },
-      { href: "/operations/workflows", label: "Workflows", permission: "workflows:read" },
-      { href: "/operations/resilience", label: "Resilience", permission: "incidents:read" },
+      { href: "/", label: "nav.commandCenter", permission: "analytics:read" },
+      { href: "/decisions", label: "nav.decisions", permission: "decisions:read" },
+      { href: "/notifications", label: "nav.inbox", permission: "notifications:read" },
+      { href: "/approvals", label: "nav.approvals", permission: "approvals:read" },
     ],
   },
   {
-    label: "Build",
+    label: "nav.group.operate",
     items: [
-      { href: "/agents", label: "Agents", permission: "agents:read" },
-      { href: "/agents/skills", label: "Skills", permission: "skills:read" },
-      { href: "/agents/models", label: "Models", permission: "models:read" },
-      { href: "/agents/prompts", label: "Prompt Registry", permission: "prompts:read" },
-      { href: "/agents/tools", label: "Tools", permission: "tools:read" },
-      { href: "/agents/mcp", label: "MCP Registry", permission: "mcp:read" },
+      { href: "/runs", label: "nav.runs", permission: "runs:read" },
+      { href: "/operations/incidents", label: "nav.incidents", permission: "incidents:read" },
+      { href: "/operations/workflows", label: "nav.workflows", permission: "workflows:read" },
+      { href: "/operations/resilience", label: "nav.resilience", permission: "incidents:read" },
     ],
   },
   {
-    label: "Know",
+    label: "nav.group.build",
     items: [
-      { href: "/knowledge", label: "Knowledge", permission: "knowledge:read" },
-      { href: "/knowledge/documents", label: "Documents", permission: "knowledge:read" },
-      { href: "/knowledge/datasets", label: "Datasets", permission: "knowledge:read" },
-      { href: "/knowledge/graph", label: "G-Brain", permission: "graph:read" },
+      { href: "/agents", label: "nav.agents", permission: "agents:read" },
+      { href: "/agents/skills", label: "nav.skills", permission: "skills:read" },
+      { href: "/agents/models", label: "nav.models", permission: "models:read" },
+      { href: "/agents/prompts", label: "nav.prompts", permission: "prompts:read" },
+      { href: "/agents/tools", label: "nav.tools", permission: "tools:read" },
+      { href: "/agents/mcp", label: "nav.mcp", permission: "mcp:read" },
     ],
   },
   {
-    label: "Govern",
+    label: "nav.group.know",
     items: [
-      { href: "/governance/evidence", label: "Evidence", permission: "evidence:read" },
-      { href: "/governance/policies", label: "Policies", permission: "policies:read" },
-      { href: "/governance/risks", label: "Risks", permission: "risks:read" },
-      { href: "/governance/audit", label: "Audit", permission: "audit:read" },
-      { href: "/governance/privacy", label: "Privacy", permission: "privacy:read" },
-      { href: "/security", label: "Security", permission: "security:read" },
+      { href: "/knowledge", label: "nav.knowledge", permission: "knowledge:read" },
+      { href: "/knowledge/documents", label: "nav.documents", permission: "knowledge:read" },
+      { href: "/knowledge/datasets", label: "nav.datasets", permission: "knowledge:read" },
+      { href: "/knowledge/graph", label: "nav.graph", permission: "graph:read" },
     ],
   },
   {
-    label: "Measure",
+    label: "nav.group.govern",
     items: [
-      { href: "/operations/analytics", label: "Analytics", permission: "analytics:read" },
-      { href: "/operations/costs", label: "Cost", permission: "costs:read" },
-      { href: "/operations/outcomes", label: "Business Outcomes", permission: "outcomes:read" },
+      { href: "/governance/evidence", label: "nav.evidence", permission: "evidence:read" },
+      { href: "/governance/policies", label: "nav.policies", permission: "policies:read" },
+      { href: "/governance/risks", label: "nav.risks", permission: "risks:read" },
+      { href: "/governance/audit", label: "nav.audit", permission: "audit:read" },
+      { href: "/governance/privacy", label: "nav.privacy", permission: "privacy:read" },
+      { href: "/security", label: "nav.security", permission: "security:read" },
     ],
   },
   {
-    label: "Administer",
+    label: "nav.group.measure",
     items: [
-      { href: "/operations/organization", label: "Organization", permission: "org:read" },
-      { href: "/operations/capabilities", label: "Capabilities" },
+      { href: "/operations/analytics", label: "nav.analytics", permission: "analytics:read" },
+      { href: "/operations/costs", label: "nav.costs", permission: "costs:read" },
+      { href: "/operations/outcomes", label: "nav.outcomes", permission: "outcomes:read" },
+    ],
+  },
+  {
+    label: "nav.group.administer",
+    items: [
+      { href: "/operations/organization", label: "nav.organization", permission: "org:read" },
+      { href: "/operations/capabilities", label: "nav.capabilities" },
     ],
   },
 ];
 
-export function Nav({ permissions = [] }: { permissions?: string[] }) {
+export function Nav({
+  permissions = [],
+  locale,
+}: {
+  permissions?: string[];
+  locale: Locale;
+}) {
   const pathname = usePathname();
+  const t = translator(locale);
   const granted = new Set(permissions);
   const allowed = (item: NavItem) =>
     !item.permission || granted.has("*") || granted.has(item.permission);
@@ -90,10 +112,10 @@ export function Nav({ permissions = [] }: { permissions?: string[] }) {
   })).filter((group) => group.items.length > 0);
 
   return (
-    <nav aria-label="Primary">
+    <nav aria-label={t("nav.primary")}>
       {groups.map((group) => (
         <div key={group.label}>
-          <div className="nav-group-label">{group.label}</div>
+          <div className="nav-group-label">{t(group.label)}</div>
           {group.items.map((item) => {
             const current =
               item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -104,7 +126,7 @@ export function Nav({ permissions = [] }: { permissions?: string[] }) {
                 className="nav-link"
                 aria-current={current ? "page" : undefined}
               >
-                {item.label}
+                {t(item.label)}
               </Link>
             );
           })}

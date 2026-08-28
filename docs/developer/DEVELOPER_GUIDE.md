@@ -211,6 +211,32 @@ node tests/accessibility/axe_audit.mjs --base http://127.0.0.1:3000 \
 pytest tests/accessibility
 ```
 
+### Language and direction
+
+The console reads its locale from the `agentic_locale` cookie and sets
+`<html lang>` and `<html dir>` from it on the server. To see a surface in
+Arabic:
+
+```bash
+curl -b 'agentic_locale=ar' http://127.0.0.1:3000/runs | grep -o '<html[^>]*>'
+# <html lang="ar" dir="rtl">
+```
+
+Two rules keep it working, both enforced by `pytest tests/i18n`:
+
+* **No stylesheet rule may name a physical side.** `margin-left`, `text-align:
+  right`, a bare `left:` offset and `float` all break when the page mirrors.
+  Use `margin-inline-start`, `text-align: start`, `inset-inline-start`, and
+  flex or grid. The test reads declarations wherever they sit on a line, so a
+  one-line rule is caught too.
+* **A message key must exist in every locale.** English is the source of
+  truth; adding a key without its Arabic translation fails the build rather
+  than rendering English inside an Arabic page.
+
+The accessibility audit runs the full surface set in both directions and
+asserts the rendered `dir` matches the locale it asked for, so an RTL pass
+cannot report zero violations because it silently ran in English.
+
 ## Quality gates
 
 ```bash
@@ -234,5 +260,13 @@ Two details in there are load-bearing, both learned the hard way:
   adds the working directory to `sys.path` and will hide an import error that
   CI hits immediately.
 
-`mypy packages/agentic_os/src/agentic_os` is advisory and not in the script;
-annotation debt remains.
+`mypy packages/agentic_os/src/agentic_os` **blocks CI**. It is not in
+`preflight.sh` — the script mirrors the gates that fail fastest — so run it
+before pushing anything that touches types.
+
+`warn_unused_ignores` is on. That means a `# type: ignore` which stops
+suppressing anything becomes an error itself, so a comment cannot outlive the
+problem it was added for. It found five such comments the day it was switched
+on. If you need a new one, prefer narrowing the value instead: most of the
+backlog turned out to be a `str` standing where a `Literal` was meant, and
+typing the boundary was both shorter and more truthful than silencing it.

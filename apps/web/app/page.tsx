@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { AskForm } from "@/components/ask-form";
+import { ExecutiveBand } from "@/components/executive-band";
 import {
   Card,
   DataTable,
@@ -97,8 +98,10 @@ export default async function CommandCenterPage() {
       <div>
         <h1>Command Center</h1>
         <p className="page-lede">
-          Organised around what needs a decision, not around what happens to be
-          countable. Every figure below is computed from recorded platform activity.
+          What the organisation is deciding, and whether those decisions worked.
+          Platform health follows underneath. Every figure is computed from
+          recorded activity — where one cannot be computed defensibly, the surface
+          says so instead of showing a number.
         </p>
       </div>
 
@@ -112,12 +115,14 @@ export default async function CommandCenterPage() {
         </Notice>
       ) : null}
 
+      <ExecutiveBand />
+
       <AskForm />
 
-      {/* ------------------------------------------------ requires attention */}
+      {/* --------------------------------------- platform health and operations */}
       <section aria-labelledby="attention-heading" className="stack">
         <h2 id="attention-heading">
-          Requires attention{" "}
+          Platform requires attention{" "}
           <span className={`badge badge-${attentionCount ? "warn" : "ok"}`}>
             {attentionCount} item{attentionCount === 1 ? "" : "s"}
           </span>

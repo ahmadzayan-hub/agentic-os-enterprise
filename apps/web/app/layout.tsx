@@ -1,9 +1,18 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { LanguageSwitch } from "@/components/language-switch";
 import { Nav } from "@/components/nav";
 import { apiTry, isAuthenticated } from "@/lib/api";
+import {
+  DEFAULT_LOCALE,
+  LOCALE_COOKIE,
+  directionOf,
+  resolveLocale,
+  translator,
+} from "@/lib/i18n";
 import type { Principal } from "@/lib/types";
 import "./globals.css";
 
@@ -19,10 +28,17 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Direction is decided before anything renders, so the browser lays the page
+  // out right-to-left itself rather than the stylesheet trying to mirror it.
+  const store = await cookies();
+  const locale = resolveLocale(store.get(LOCALE_COOKIE)?.value);
+  const dir = directionOf(locale);
+  const t = translator(locale);
+
   const authenticated = await isAuthenticated();
   if (!authenticated) {
     return (
-      <html lang="en">
+      <html lang={locale} dir={dir}>
         <body>{children}</body>
       </html>
     );
@@ -34,10 +50,10 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="en">
+    <html lang={locale} dir={dir}>
       <body>
         <a className="skip-link" href="#main-content">
-          Skip to main content
+          {t("app.skipToContent")}
         </a>
         <div className="app">
           <aside className="sidebar">
@@ -46,37 +62,46 @@ export default async function RootLayout({
                 A
               </span>
               <span>
-                <span className="brand-name">Agentic OS</span>
+                <span className="brand-name">{t("app.name")}</span>
                 <br />
-                <span className="brand-sub">enterprise 3.1</span>
+                <span className="brand-sub">{t("app.edition")}</span>
               </span>
             </Link>
-            <Nav permissions={me.permissions} />
+            <Nav permissions={me.permissions} locale={locale} />
           </aside>
 
           <div className="main">
             <header className="topbar">
               <div>
                 <div className="mono muted">
-                  tenant {me.tenant_id.slice(0, 8)} · clearance {me.clearance}
+                  {t("chrome.tenant")} {me.tenant_id.slice(0, 8)} · {t("chrome.clearance")}{" "}
+                  {me.clearance}
                 </div>
               </div>
               <div className="row">
                 <span className="mono muted">{me.email}</span>
-                <span className="badge badge-muted">{me.roles.join(", ") || "no roles"}</span>
+                <span className="badge badge-muted">
+                  {me.roles.join(locale === "ar" ? "، " : ", ") || t("chrome.noRoles")}
+                </span>
                 {me.mfa_satisfied ? (
-                  <span className="badge badge-ok">MFA</span>
+                  <span className="badge badge-ok">{t("chrome.mfa")}</span>
                 ) : (
-                  <span className="badge badge-muted">no MFA</span>
+                  <span className="badge badge-muted">{t("chrome.noMfa")}</span>
                 )}
+                <LanguageSwitch locale={locale} label={t("chrome.language")} />
                 <form action="/api/session/logout" method="post">
                   <button className="btn" type="submit">
-                    Sign out
+                    {t("chrome.signOut")}
                   </button>
                 </form>
               </div>
             </header>
             <main className="content" id="main-content">
+              {locale !== DEFAULT_LOCALE ? (
+                <p className="notice" role="note">
+                  {t("notice.untranslated")}
+                </p>
+              ) : null}
               {children}
             </main>
           </div>

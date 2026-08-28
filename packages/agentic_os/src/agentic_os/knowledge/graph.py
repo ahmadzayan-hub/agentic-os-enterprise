@@ -23,6 +23,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from agentic_os.core.context import ExecutionContext, classification_rank
+from agentic_os.core.db import affected_rows
 from agentic_os.core.errors import NotFound
 
 #: Identifier conventions the extractor recognises, mapped to node types.
@@ -130,7 +131,7 @@ def upsert_edge(session: Session, ctx: ExecutionContext, edge: GraphEdge) -> boo
             "src": edge.source_ref,
         },
     )
-    return result.rowcount > 0
+    return affected_rows(result) > 0
 
 
 def extract_entities(content: str) -> list[GraphNode]:

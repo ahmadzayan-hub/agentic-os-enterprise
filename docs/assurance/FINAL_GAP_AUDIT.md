@@ -141,7 +141,7 @@ at rest (the exercise writes an unencrypted dump to a volume).
 One more thing about this control's provenance: the exercise needs a break-glass
 maintenance identity, and CI has none. So DRP-001 is **NOT_EVIDENCED in the
 published score**, which is CI's. A developer with the credential scores it
-VERIFIED and reads 94.59 instead of 92.79; the report names that gap rather than
+VERIFIED and reads 94.69 instead of 92.92; the report names that gap rather than
 averaging it away. CI deliberately does not require the `dr` service gate for the
 same reason — see section 3 below.
 
@@ -194,9 +194,29 @@ walkthrough by a person, no testing with users**, and only Chromium was
 exercised. WCAG 2.2 AA conformance is therefore *not* claimed; what is claimed
 is that the automated pass is clean.
 
-### 2.12 No internationalisation
-The console is English-only, `lang="en"`, with no RTL support. For an Arabic-
-first authority this is a material product gap, not a technical detail.
+### 2.12 Bidirectional layout is done; the translation is not
+Right-to-left support is complete and verified. Locale drives `<html lang>` and
+`<html dir>`, the stylesheet contains no physical direction property — a test
+fails the build on `margin-left`, `text-align: right`, a bare `left:` offset or
+a `float`, in a rule written on one line as readily as on five — and the axe
+audit now runs all 23 surfaces in Arabic as well as English, 92 scans, zero
+violations. A language switch posts to a real route and the choice survives in a
+cookie. That is UX-004.
+
+**The translation is a different matter, and the gap is narrower but real.** The
+application chrome is translated: navigation, the six group headings, the
+topbar, the sign-out and skip links. Page bodies are not. They stay in English
+under a notice, in the reader's own language, saying so.
+
+That boundary is deliberate. Machine-translating governance and rail-maintenance
+terminology into Arabic without a native reviewer produces text that reads as
+authoritative and is not — an operator acting on a mistranslated risk
+classification is a worse outcome than an operator reading English. The strings
+are structured so a reviewer supplies them and the catalogue-completeness test
+starts enforcing them; what is missing is the reviewer, not the mechanism.
+
+Also absent: Arabic-Indic numerals, Hijri dates, and a translated API surface.
+Error messages from the API are English regardless of console locale.
 
 ### 2.13 Cost figures are computed, not reconciled
 Cost records are derived from configured unit prices in the model registry.
@@ -210,8 +230,16 @@ business claim.
 
 ## 3. Smaller gaps and known debt
 
-* **mypy is advisory in CI** (`continue-on-error: true`). Type-annotation debt
-  remains; type errors do not fail the build.
+* **mypy is blocking, with no suppressions left.** The 42-error backlog is
+  cleared, `continue-on-error` is gone, and a repository test fails if it is
+  reinstated. `warn_unused_ignores` is on, so a suppression outliving the error
+  it hid also fails the build. Every `type: ignore` in shipped code is gone —
+  the three on audit `outcome` arguments were parameters typed `str` where only
+  three literals are ever passed; the one on a subprocess result was hiding a
+  return annotation that was simply wrong (`dict[str, int]` for a dict
+  containing a string); and the two in `api/deps.py` are replaced by a Protocol
+  declaring the attributes the route table is introspected for, with a cast that
+  is erased at runtime so FastAPI resolves the dependency exactly as before.
 * **Outbox handlers are in-process.** The event bus is a durable transactional
   outbox with retries and a dead-letter queue, but every handler runs inside
   the worker. There is no external subscriber transport.
@@ -305,7 +333,7 @@ Listed so the audit is balanced, and because each is reproducible.
    the worker and to end-to-end governed runs, and close PRF-003.
 5. Exercise DR at production scale with WAL archiving and point-in-time
    recovery, and encrypt the dump artefact.
-6. Manual accessibility and screen-reader audit; add Arabic and RTL.
+6. Manual accessibility and screen-reader audit, including a right-to-left pass with a native reader; commission Arabic review of the page bodies.
 7. Only then consider a production certification claim — and only from a
    collection run against production, which is what would make IND-002
    evidenceable.
