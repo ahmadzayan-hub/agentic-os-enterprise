@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { useApi } from "@/lib/use-api";
-import { Card, DataTable, Status, SurfaceError, formatWhen } from "@/components/ui";
-import { apiTry } from "@/lib/api";
+import { Card, DataTable, Notice, Status, SurfaceError, formatWhen } from "@/components/ui";
+import { apiFetch } from "@/lib/api";
 
 interface Document {
   id: string;
@@ -20,9 +21,35 @@ interface Document {
 }
 
 export default function DocumentsPage() {
-  const { data, error, status , loading } = useApi<{ documents: Document[] }>(
+  const { data, error, status, refetch } = useApi<{ documents: Document[] }>(
     "/api/v1/documents",
   );
+  const [message, setMessage] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function ingest(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+    setMessage(null);
+    const form = new FormData(event.currentTarget);
+    try {
+      await apiFetch("/api/v1/documents", {
+        method: "POST",
+        body: JSON.stringify({
+          title: form.get("title"),
+          content: form.get("content"),
+          classification: form.get("classification"),
+        }),
+      });
+      event.currentTarget.reset();
+      setMessage("Document ingested and added to governed knowledge.");
+      refetch();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Ingestion failed.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <div className="stack">
@@ -34,6 +61,31 @@ export default function DocumentsPage() {
           from a partially extracted source can be qualified.
         </p>
       </div>
+      <Card title="Ingest a document">
+        <form onSubmit={ingest} className="stack">
+          <div className="grid grid-2">
+            <div className="field">
+              <label htmlFor="document-title">Title</label>
+              <input id="document-title" name="title" required minLength={3} />
+            </div>
+            <div className="field">
+              <label htmlFor="document-classification">Classification</label>
+              <select id="document-classification" name="classification" defaultValue="INTERNAL">
+                <option>PUBLIC</option><option>INTERNAL</option><option>CONFIDENTIAL</option>
+              </select>
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="document-content">Document text</label>
+            <textarea id="document-content" name="content" required minLength={10} rows={5} />
+            <p className="field-hint">Text is scanned, classified, chunked, and persisted for governed retrieval.</p>
+          </div>
+          <button className="btn btn-primary" disabled={submitting}>
+            {submitting ? "Ingesting…" : "Ingest document"}
+          </button>
+        </form>
+        {message ? <Notice tone={message.includes("failed") ? "danger" : "info"}>{message}</Notice> : null}
+      </Card>
       {!data ? (
         <SurfaceError error={error ?? ""} status={status} what="documents" />
       ) : (

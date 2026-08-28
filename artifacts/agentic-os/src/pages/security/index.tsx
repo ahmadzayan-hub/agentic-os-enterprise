@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { useApi } from "@/lib/use-api";
 import { Card, DataTable, Empty, Notice, Stat, Status, SurfaceError, formatWhen } from "@/components/ui";
-import { apiTry } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 
 interface SecurityPosture {
   findings: {
@@ -22,7 +23,10 @@ interface SecurityPosture {
 }
 
 export default function SecurityPage() {
-  const { data, error, status , loading } = useApi<SecurityPosture>("/api/v1/security");
+  const { data, error, status, loading, refetch } = useApi<SecurityPosture>("/api/v1/security");
+  const [reason, setReason] = useState("");
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const [changing, setChanging] = useState(false);
   if (loading) return <div className="empty">Loading...</div>;
 
 
@@ -37,6 +41,27 @@ export default function SecurityPage() {
 
   const engaged = data.kill_switches.filter((k) => k.engaged);
   const severe = data.findings.filter((f) => ["HIGH", "CRITICAL"].includes(f.severity));
+  async function setKillSwitch(switchRow: SecurityPosture["kill_switches"][number], engaged: boolean) {
+    if (engaged && reason.trim().length < 5) {
+      setMutationError("Enter a reason of at least 5 characters before engaging a kill switch.");
+      return;
+    }
+    if (!window.confirm(`${engaged ? "Engage" : "Release"} the ${switchRow.scope} kill switch?`)) return;
+    setChanging(true);
+    setMutationError(null);
+    try {
+      await apiFetch("/api/v1/security/kill-switches", {
+        method: "POST",
+        body: JSON.stringify({ ...switchRow, engaged, reason: reason.trim() || "Operator release" }),
+      });
+      setReason("");
+      refetch();
+    } catch (cause) {
+      setMutationError(cause instanceof Error ? cause.message : "Kill-switch update failed.");
+    } finally {
+      setChanging(false);
+    }
+  }
 
   return (
     <div className="stack">
@@ -95,6 +120,11 @@ export default function SecurityPage() {
         </Card>
 
         <Card title="Kill switches">
+          <div className="field">
+            <label htmlFor="kill-switch-reason">Change reason</label>
+            <input id="kill-switch-reason" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Required when engaging" />
+          </div>
+          {mutationError ? <Notice tone="danger">{mutationError}</Notice> : null}
           <DataTable
             caption="Kill switch state"
             empty="No kill switch is configured."
@@ -103,6 +133,7 @@ export default function SecurityPage() {
               { key: "target", label: "Target" },
               { key: "state", label: "State" },
               { key: "reason", label: "Reason" },
+              { key: "action", label: "Action" },
             ]}
             rows={data.kill_switches.map((switchRow, index) => ({
               __key: index,
@@ -114,6 +145,11 @@ export default function SecurityPage() {
                 <Status value="released" tone="ok" />
               ),
               reason: <span className="muted">{switchRow.reason || "—"}</span>,
+              action: (
+                <button className={`btn ${switchRow.engaged ? "" : "btn-primary"}`} disabled={changing} onClick={() => setKillSwitch(switchRow, !switchRow.engaged)}>
+                  {switchRow.engaged ? "Release" : "Engage"}
+                </button>
+              ),
             }))}
           />
         </Card>

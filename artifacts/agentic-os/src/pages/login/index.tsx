@@ -20,6 +20,7 @@ export default function LoginPage() {
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
+    const tenant = formData.get("tenant") as string;
     const mfaCode = formData.get("mfa_code") as string;
 
     try {
@@ -28,6 +29,7 @@ export default function LoginPage() {
         body: JSON.stringify({
           email,
           password,
+          tenant,
           ...(mfaCode ? { mfa_code: mfaCode.trim() } : {})
         })
       });
@@ -94,6 +96,10 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit}>
             <div className="field">
+              <label htmlFor="tenant">Tenant</label>
+              <input id="tenant" name="tenant" required defaultValue="northstar-demo" />
+            </div>
+            <div className="field">
               <label htmlFor="email">Work email</label>
               <input
                 id="email"
@@ -130,8 +136,8 @@ export default function LoginPage() {
                 required={mfaRequired}
               />
               <p className="field-hint" id="mfa-hint">
-                Privileged roles — approver, auditor, security, governance and platform
-                administration — always require a second factor.
+                Sessions are tenant-scoped, expiring, revocable, and stored securely
+                by the API.
               </p>
             </div>
             <button className="btn btn-primary" type="submit" disabled={isSubmitting} style={{ width: "100%" }}>

@@ -1,10 +1,11 @@
-# [Project name]
+# Agentic OS Enterprise
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A governed enterprise AI control plane for operating agents, approvals, knowledge, policy, security, and audit evidence.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/api-server run dev` — run the API server (port 8080 by default)
+- `pnpm --filter @workspace/agentic-os run dev` — run the web console (port 22832 by default)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
@@ -22,15 +23,21 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/agentic-os` — Vite + React console and preserved product styling
+- `artifacts/api-server` — Express API, authentication, authorization, persistence, and audit behavior
+- `lib/db/src/schema` — PostgreSQL schema
+- `lib/api-spec/openapi.yaml` — shared API contract and generated-client source
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- PostgreSQL is the source of truth for users, sessions, mutable business records, and audit events.
+- Demo records are seeded idempotently and never overwrite operator changes.
+- Session identifiers are random, stored only as hashes, and delivered in HTTP-only cookies.
+- The active runtime is Vite/React plus TypeScript/Express; archived Next.js/Python topology is not restored.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Operators can launch governed runs, decide approvals, inspect agent contracts, ingest and search knowledge, review governance/privacy posture, operate security kill switches, and inspect audit evidence.
 
 ## User preferences
 
@@ -38,7 +45,9 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Push development schema changes with `pnpm --filter @workspace/db run push`.
+- Use the managed workflows for the proxied preview. Package builds also have safe local defaults.
+- Development can seed a demo identity; production requires `DEMO_PASSWORD` to be configured explicitly before bootstrap.
 
 ## Pointers
 

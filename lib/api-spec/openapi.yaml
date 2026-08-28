@@ -24,6 +24,93 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /v1/auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Authenticated session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+  /v1/runs:
+    post:
+      operationId: createRun
+      tags: [runs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRunRequest"
+      responses:
+        "201":
+          description: Run created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunCreated"
+  /v1/audit/verify:
+    get:
+      operationId: verifyAudit
+      tags: [audit]
+      responses:
+        "200":
+          description: Audit chain verification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditVerification"
+  /v1/documents:
+    post:
+      operationId: ingestDocument
+      tags: [knowledge]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IngestDocumentRequest"
+      responses:
+        "201":
+          description: Document ingested
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [document]
+                properties:
+                  document:
+                    $ref: "#/components/schemas/Document"
+  /v1/security/kill-switches:
+    post:
+      operationId: updateKillSwitch
+      tags: [security]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KillSwitchUpdate"
+      responses:
+        "200":
+          description: Kill switch updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [kill_switch]
+                properties:
+                  kill_switch:
+                    $ref: "#/components/schemas/KillSwitch"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +120,88 @@ components:
           type: string
       required:
         - status
+    LoginRequest:
+      type: object
+      required: [tenant, email, password]
+      properties:
+        tenant: { type: string, minLength: 1 }
+        email: { type: string }
+        password: { type: string, minLength: 1 }
+        mfa_code: { type: string }
+    Principal:
+      type: object
+      required: [user_id, email, display_name, tenant_id, organization_id, roles, permissions, clearance, mfa_satisfied]
+      properties:
+        user_id: { type: string }
+        email: { type: string }
+        display_name: { type: string }
+        tenant_id: { type: string }
+        organization_id: { type: string }
+        roles: { type: array, items: { type: string } }
+        permissions: { type: array, items: { type: string } }
+        clearance: { type: string }
+        mfa_satisfied: { type: boolean }
+    AuthSession:
+      type: object
+      required: [authenticated, expires_in, principal]
+      properties:
+        authenticated: { type: boolean }
+        expires_in: { type: number }
+        principal: { $ref: "#/components/schemas/Principal" }
+    CreateRunRequest:
+      type: object
+      required: [objective]
+      properties:
+        objective: { type: string, minLength: 3 }
+    RunCreated:
+      type: object
+      required: [run_id, status, validation]
+      properties:
+        run_id: { type: string }
+        status: { type: string }
+        validation: { type: object, additionalProperties: true }
+    AuditVerification:
+      type: object
+      required: [entries_checked, intact, broken_at]
+      properties:
+        entries_checked: { type: number }
+        intact: { type: boolean }
+        broken_at: { type: [number, "null"] }
+    IngestDocumentRequest:
+      type: object
+      required: [title, content, classification]
+      properties:
+        title: { type: string, minLength: 3 }
+        content: { type: string, minLength: 10 }
+        classification: { type: string, enum: [PUBLIC, INTERNAL, CONFIDENTIAL] }
+    Document:
+      type: object
+      required: [id, title, source_system, mime_type, byte_size, classification, owner_team, ingest_status, malware_scan_status, dlp_labels, parse_confidence, unsupported_elements, chunk_count, created_at]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        source_system: { type: string }
+        mime_type: { type: string }
+        byte_size: { type: number }
+        classification: { type: string }
+        owner_team: { type: string }
+        ingest_status: { type: string }
+        malware_scan_status: { type: string }
+        dlp_labels: { type: array, items: { type: string } }
+        parse_confidence: { type: number }
+        unsupported_elements: { type: array, items: { type: string } }
+        chunk_count: { type: number }
+        created_at: { type: string, format: date-time }
+    KillSwitch:
+      type: object
+      required: [scope, target_key, engaged, reason, engaged_at]
+      properties:
+        scope: { type: string }
+        target_key: { type: string }
+        engaged: { type: boolean }
+        reason: { type: string }
+        engaged_at: { type: [string, "null"], format: date-time }
+    KillSwitchUpdate:
+      allOf:
+        - $ref: "#/components/schemas/KillSwitch"
 

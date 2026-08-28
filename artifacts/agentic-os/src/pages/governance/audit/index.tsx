@@ -32,9 +32,8 @@ export default function AuditPage() {
       <div>
         <h1>Audit ledger</h1>
         <p className="page-lede">
-          Append-only and hash-chained. The database refuses UPDATE, DELETE and
-          TRUNCATE for every role including the owner, so tamper-evidence does not
-          depend on application discipline.
+          Application append-only and hash-chained. Every entry includes the prior
+          digest, so verification detects alteration or missing links.
         </p>
       </div>
 

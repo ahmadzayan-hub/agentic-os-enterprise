@@ -7,6 +7,7 @@ export function useApi<T>(path: string | null) {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(path !== null);
+  const [revision, setRevision] = useState(0);
   const [, navigate] = useLocation();
 
   useEffect(() => {
@@ -24,7 +25,7 @@ export function useApi<T>(path: string | null) {
       }
     });
     return () => { mounted = false; };
-  }, [path, navigate]);
+  }, [path, navigate, revision]);
 
-  return { data, error, status, loading };
+  return { data, error, status, loading, refetch: () => setRevision((value) => value + 1) };
 }

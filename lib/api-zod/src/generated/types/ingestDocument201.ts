@@ -5,7 +5,8 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { Document } from './document';
 
-export interface HealthStatus {
-  status: string;
-}
+export type IngestDocument201 = {
+  document: Document;
+};
