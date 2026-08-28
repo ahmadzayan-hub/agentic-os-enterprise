@@ -143,6 +143,18 @@ async def main_async(args: argparse.Namespace) -> int:
             "/api/v1/command-center",
             "the widest read on the platform, many aggregates in one request",
         ),
+        Scenario(
+            "decision_queue",
+            "GET",
+            "/api/v1/decisions",
+            "the decision queue with the domain-membership predicate joined in",
+        ),
+        Scenario(
+            "decision_effectiveness",
+            "GET",
+            "/api/v1/decisions/effectiveness",
+            "the North Star aggregate, a lateral join per decision",
+        ),
     ]
 
     async with httpx.AsyncClient(base_url=args.base, timeout=30.0) as client:

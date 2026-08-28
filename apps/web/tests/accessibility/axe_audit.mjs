@@ -107,8 +107,30 @@ async function main() {
     await page.click('button[type="submit"]');
     await page.waitForLoadState("networkidle");
 
+    // A failed sign-in is the quiet way this audit lies. Every surface would
+    // redirect to /login, axe would scan the login page twenty-five times, and
+    // the report would say "0 serious violations" about pages it never loaded.
+    // That happened: the API's rate limiter refused the second context's login
+    // after the first pass had spent the budget, and the run looked clean.
+    if (new URL(page.url()).pathname.startsWith("/login")) {
+      throw new Error(
+        `sign-in failed for ${scheme}/${locale}: still on ${page.url()}. ` +
+          `Raise AGENTIC_RATE_LIMIT_PER_MINUTE on the API this audit points at.`,
+      );
+    }
+
     for (const surface of SURFACES) {
       await page.goto(`${BASE}${surface.path}`, { waitUntil: "networkidle" });
+
+      // The same failure can appear mid-run if the session is lost, so each
+      // authenticated surface confirms it is actually the surface it claims.
+      const landed = new URL(page.url()).pathname;
+      if (surface.authenticated !== false && landed !== surface.path) {
+        throw new Error(
+          `${surface.path} redirected to ${landed} during ${scheme}/${locale}; ` +
+            `the session was lost and the remaining results would be meaningless`,
+        );
+      }
 
       // A direction mismatch would make every RTL result meaningless while
       // still reporting zero violations, so it fails loudly instead.

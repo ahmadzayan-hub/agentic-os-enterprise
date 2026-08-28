@@ -149,7 +149,57 @@ that decisions exist in domains the recipient cannot open.
 Verified: an engineer's inbox contains no `APPROVAL_REQUESTED` or `REVIEW_REQUESTED`
 item, and marking a lead's notification read as an engineer returns `updated: 0`.
 
-### 1.11 MFA replay protection is real, and the tests do not defeat it — **verified**
+### 1.11 Console redirects named an origin, not a path — **FIXED, verified**
+
+**Severity:** Medium (session integrity; open-redirect surface behind a proxy)
+
+Every console route handler built its redirect as `new URL(path, request.url)`. In the
+standalone server `request.url` carries the *bind* address, so a console reached on
+127.0.0.1 sent the browser to `http://0.0.0.0:3000/` — a different origin, which meant
+the session cookie set on that very response was not sent with the follow-up request and
+the user bounced straight back to the sign-in page. Behind a reverse proxy the same
+construction takes its host from whatever upstream passes along, which is the classic
+host-header redirect problem.
+
+Observed before the fix:
+
+```
+console login: 303
+location: http://0.0.0.0:3500/
+```
+
+**Fix:** `lib/redirect.ts` emits a path-only `Location`, which the client resolves
+against the request it actually made and which cannot name another origin at all. All
+five console route handlers converted. After:
+
+```
+login: 303
+location: /
+```
+
+Guarded by `tests/i18n/test_console_redirects.py`, which scans every route handler for
+the two constructions that reintroduce it and was confirmed to fail when one was
+restored.
+
+### 1.12 The accessibility audit could report a clean run it never performed — **FIXED**
+
+**Severity:** Medium (evidence integrity)
+
+This is the project's recurring failure mode in its own tooling. If the audit's sign-in
+failed, every surface redirected to `/login`, axe scanned the login page twenty-five
+times, and the report said "0 serious violations" about pages it had never loaded. It
+happened here: the API rate limiter refused the second browser context's login after the
+first pass had spent the budget, and half the report described the sign-in page.
+
+The script already guarded text direction with a comment saying a mismatch "would make
+every RTL result meaningless while still reporting zero violations" — the authentication
+case is exactly that and was not guarded.
+
+**Fix:** the audit now fails loudly if it is still on `/login` after signing in, and each
+authenticated surface confirms it did not redirect. Verified: the guard fired and
+refused to write a report.
+
+### 1.13 MFA replay protection is real, and the tests do not defeat it — **verified**
 
 Signing in twice as an MFA-required user inside one 30-second window genuinely fails.
 The suite caches tokens per run and, when an earlier module has spent the current code,

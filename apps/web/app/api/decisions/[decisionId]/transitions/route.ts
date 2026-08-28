@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
-
 import { ApiError, apiFetch } from "@/lib/api";
+import { redirectTo } from "@/lib/redirect";
 
 /**
  * Move a decision.
@@ -19,19 +18,16 @@ export async function POST(
   const toState = String(form.get("to_state") ?? "");
   const reason = String(form.get("reason") ?? "");
 
-  const back = new URL(`/decisions/${decisionId}`, request.url);
+  const back = `/decisions/${encodeURIComponent(decisionId)}`;
   try {
     await apiFetch(`/api/v1/decisions/${decisionId}/transitions`, {
       method: "POST",
       body: JSON.stringify({ to_state: toState, reason }),
     });
-    back.searchParams.set("moved", toState);
-    return NextResponse.redirect(back, { status: 303 });
+    return redirectTo(back, { moved: toState });
   } catch (error) {
-    back.searchParams.set(
-      "error",
-      error instanceof ApiError ? error.message : "The decision could not be moved",
-    );
-    return NextResponse.redirect(back, { status: 303 });
+    return redirectTo(back, {
+      error: error instanceof ApiError ? error.message : "The decision could not be moved",
+    });
   }
 }
