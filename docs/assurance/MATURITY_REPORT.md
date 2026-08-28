@@ -1,188 +1,109 @@
-# Maturity Report — Agentic OS Enterprise v3.1
+# Evidence-Based Maturity Report
 
-**Score: 92.92 / 100. Not certified.**
+- **Score**: 95.59/100
+- **Certified**: no
+- **Environment**: development
+- **Commit**: `unknown`
+- **Generated**: 2026-08-28T13:28:56.454683+00:00
 
-This number was not chosen. It is what the evidence engine computes in CI, on
-every change, and it is the number that counts. The pipeline's `evidence` job
-runs the suite against a real PostgreSQL and Redis, builds and serves the
-console, audits it with axe-core, drives the API under a concurrency sweep, and
-then computes
-
-```
-score = verified applicable weight / total applicable weight * 100
-      = 105 / 113 * 100
-      = 92.92
-```
-
-No status can be entered by hand. A control with no `test:` reference, or whose
-test did not run, is reported NOT_EVIDENCED and contributes zero however well it
-is implemented.
-
-| | |
-|---|---|
-| Controls assessed | 60 |
-| Applicable weight | 113 |
-| Verified weight | 105 |
-| Critical blockers | none |
-| Certified | **no** — certification requires 100 with no critical blocker |
-| Test run | 332 tests, 0 failures, 0 errors, 0 skipped |
-| Environment | CI, against PostgreSQL 16 with pgvector and Redis 7 |
-| Accessibility | 23 surfaces × 2 colour schemes × 2 writing directions = 92 scans, 0 violations |
-
-### Why this is the CI number and not a local one
-
-A developer's machine reports **94.69** — one control higher. The difference is
-DRP-001, the disaster-recovery exercise, which needs a break-glass maintenance
-identity that CI does not have. Nothing else differs.
-
-That gap was found rather than designed. The evidence job originally ran with
-only a database, so the accessibility and performance controls had no report to
-read and scored NOT_EVIDENCED — the pipeline computed **89.19** while this
-document claimed 94.59. A score that depends on whose machine ran it is not
-evidence, and the higher number was the one being published. The job now
-provisions everything CI can provide, and the number it produces is the one
-quoted here. The remaining 1.8-point gap to a fully-equipped run is named above
-rather than averaged away.
-
-The release gate that should have caught this was set to a floor of 70 — twenty
-points of slack, so it passed at 89.19 exactly as it would have at 94.59. It now
-sits at 90, just under the score, where a control quietly losing its evidence
-fails the build instead of moving a number nobody was checking.
-
-## Why it is not 100
-
-Eight weight is unevidenced, in five controls. None of them is a bug and none is
-hidden:
-
-| Control | Weight | Status | Why |
-|---|---:|---|---|
-| DEP-003 | 2 | NOT_EVIDENCED | The platform has never been applied to a Kubernetes cluster. CI now builds and scans the image, renders all four kustomize overlays and runs `terraform fmt`, `init` and `validate` — but `validate` checks coherence, not reality, and no apply has been performed anywhere. |
-| IND-001 | 2 | NOT_EVIDENCED | No independent security assessment has been performed. The repository contains a red-team suite, but a suite written by the same author as the control it tests is not independent assurance and is not reported as such. |
-| IND-002 | 1 | NOT_EVIDENCED | No control is PRODUCTION_PROVEN. Every passing control is VERIFIED by an automated test in a development or CI environment. The engine keeps the two statuses distinct precisely so this distinction survives. |
-| PRF-003 | 1 | NOT_EVIDENCED | Capacity has not been established on representative hardware. The platform is now measured under concurrency — see below — but on a shared CI runner with a seeded corpus, which characterises saturation without establishing capacity. |
-| DRP-001 | 2 | NOT_EVIDENCED in CI | The restore exercise is real and passes — it dumps, restores into a scratch database, compares every table and re-hashes the audit chain — but it needs a maintenance identity CI does not hold. A run with one scores it VERIFIED. Closing this in the pipeline is a credential decision, not a code change. |
-
-The first four were **added** to the catalogue during this build. Before
-they existed the same test run scored 100.00 / 100 and the engine certified it.
-That number was arithmetically correct and substantively misleading: it measured
-only the ground the catalogue had chosen to cover. Adding the domains the
-platform has not earned is the correction, and the score fell to 95.33 as a
-result. The catalogue's total is no longer pinned at 100 for the same reason —
-a fixed total means a new unmet control can only be admitted by shrinking an
-existing one, which raises the per-control score for doing nothing.
+Test run: 428 tests, 0 failures, 0 errors, 0 skipped.
 
 ## Domain scores
 
 | Domain | Score | Weight | Verified | Failed | Not evidenced |
 |---|---:|---:|---:|---:|---:|
-| Agent architecture | 100.00 | 10 | 4 | 0 | 0 |
-| Workflow and orchestration | 100.00 | 8 | 4 | 0 | 0 |
-| Enterprise architecture | 100.00 | 8 | 3 | 0 | 0 |
-| Security | 100.00 | 10 | 7 | 0 | 0 |
-| AI governance | 100.00 | 7 | 4 | 0 | 0 |
-| Business architecture | 100.00 | 7 | 3 | 0 | 0 |
-| Data architecture | 100.00 | 7 | 3 | 0 | 0 |
-| RAG and knowledge | 100.00 | 7 | 3 | 0 | 0 |
-| UX and accessibility | 100.00 | 9 | 4 | 0 | 0 |
-| Reliability | 100.00 | 6 | 3 | 0 | 0 |
-| Observability | 100.00 | 5 | 3 | 0 | 0 |
-| Evaluation and assurance | 100.00 | 6 | 4 | 0 | 0 |
-| Privacy | 100.00 | 5 | 3 | 0 | 0 |
-| DevSecOps | 100.00 | 4 | 2 | 0 | 0 |
-| **Deployment** | **50.00** | 4 | 2 | 0 | 1 |
-| **Performance** | **66.67** | 3 | 2 | 0 | 1 |
-| **DR and resilience** | **0.00** | 2 | 0 | 0 | 1 |
-| Business value | 100.00 | 2 | 1 | 0 | 0 |
-| **Independent assurance** | **0.00** | 3 | 0 | 0 | 2 |
+| agent_architecture | 100.0 | 10 | 4 | 0 | 0 |
+| ai_governance | 100.0 | 7 | 4 | 0 | 0 |
+| business_architecture | 100.0 | 7 | 3 | 0 | 0 |
+| business_value | 100.0 | 2 | 1 | 0 | 0 |
+| data_architecture | 100.0 | 7 | 3 | 0 | 0 |
+| decision_intelligence | 100.0 | 23 | 10 | 0 | 0 |
+| deployment | 50.0 | 4 | 2 | 0 | 1 |
+| devsecops | 100.0 | 4 | 2 | 0 | 0 |
+| dr_resilience | 100.0 | 2 | 1 | 0 | 0 |
+| enterprise_architecture | 100.0 | 8 | 3 | 0 | 0 |
+| evaluation_assurance | 100.0 | 6 | 4 | 0 | 0 |
+| independent_assurance | 0.0 | 3 | 0 | 0 | 2 |
+| observability | 100.0 | 5 | 3 | 0 | 0 |
+| performance | 66.7 | 3 | 2 | 0 | 1 |
+| privacy | 100.0 | 5 | 3 | 0 | 0 |
+| rag_knowledge | 100.0 | 7 | 3 | 0 | 0 |
+| reliability | 100.0 | 6 | 3 | 0 | 0 |
+| security | 100.0 | 10 | 7 | 0 | 0 |
+| ux_accessibility | 100.0 | 9 | 4 | 0 | 0 |
+| workflow_orchestration | 100.0 | 8 | 4 | 0 | 0 |
 
-The full control-by-control table, with the test that evidences each one, is
-regenerated into `artifacts/MATURITY_REPORT.md` on every collection, alongside
-a hash-addressed `artifacts/evidence-bundle.json`.
+## Controls
 
-## What "verified" means here, precisely
-
-Using the vocabulary the build brief asks for — mapped / tested / verified /
-not verified:
-
-* **Verified (55 controls, 105 weight in CI; 56 and 107 with a DR identity).** An automated test names the control,
-  the test executed in this run, and it passed. The tests exercise a real
-  PostgreSQL 16 instance with row level security enforced, a real HTTP surface,
-  and a real browser for the accessibility pass. Nothing is mocked at the
-  boundary the control is about.
-* **Not verified (5 controls, 8 weight).** Listed above.
-* **Not claimed at all.** No control asserts conformance with an external
-  standard. The security architecture maps to recognised control families for
-  navigation, but this platform has not been assessed against ISO 27001,
-  SOC 2, NIST AI RMF, the EU AI Act or any other scheme by anybody, and no
-  document in this repository should be read as saying otherwise.
-
-## Measured, not declared
-
-The platform is now measured under concurrency rather than carrying a declared
-latency target. A sweep at concurrency 1, 8 and 32 against the running API,
-120 requests per scenario per level, 100% success at every level:
-
-| Scenario | p50 @1 | p50 @8 | p50 @32 |
-|---|---:|---:|---:|
-| `/health` | 5.2 ms | 26.3 ms | 133.0 ms |
-| runs list (authorization + RLS read) | 12.3 ms | 82.0 ms | 355.1 ms |
-| knowledge search (hybrid retrieval, ACL in SQL) | 13.6 ms | 85.2 ms | 367.8 ms |
-| command centre (widest read) | 17.3 ms | 128.4 ms | 495.9 ms |
-
-Throughput: 75.2 req/s at concurrency 1, **91.7 at 8**, 79.4 at 32.
-
-The useful finding is the shape, not any single number: **throughput peaks near
-concurrency 8 and falls at 32 while latency roughly quadruples.** Past that
-point the platform queues rather than doing more work. Nothing failed at any
-level — no pool exhaustion, no lost tenant binding — but a deployment sizing
-itself from the concurrency-1 numbers would be sizing from the wrong end of the
-curve.
-
-This is a saturation characterisation on one shared host, not a capacity
-statement. PRF-003 stays NOT_EVIDENCED for exactly that reason.
-
-## The run itself is now gated
-
-A number derived from a test run inherits that run's honesty. The weakest link
-was the suite's own skip behaviour: `requires_db` and `requires_redis` turned an
-unreachable service into a skip, and a skipped test is indistinguishable from a
-passing one in an exit code. Had PostgreSQL died partway through a CI job, every
-integration test would have skipped, the job would have reported green, and the
-evidence engine would have derived control statuses from a run that proved
-nothing.
-
-`AGENTIC_REQUIRE_SERVICES` names the services whose absence must fail the run.
-The CI test job sets it to `db,redis` — the two it provisions — and a repository
-test holds that wiring in place, so adding a service container without requiring
-it fails. `dr` is deliberately excluded: no maintenance identity exists in CI, so
-DRP-001 stays NOT_EVIDENCED there rather than being forced to pass.
-
-This is EVL-004, and it is critical: if the gate is broken, every other control's
-evidence is suspect. It was verified in both directions before being claimed —
-with the service absent and required, the run fails; with it absent and not
-required, it skips politely.
-
-## What this score does not tell you
-
-* **It is a development-environment result.** Correct behaviour under seeded
-  data and a single-node database is not the same as correct behaviour under
-  production load, adversarial users and real integrations. See
-  `FINAL_GAP_AUDIT.md` for the full list.
-* **The catalogue is self-authored.** 59 controls chosen by the builder,
-  weighted by the builder. That is a reasonable engineering instrument and a
-  weak assurance instrument. It is why IND-001 exists and why it is
-  unevidenced.
-* **Deterministic providers are the default.** The AI plane runs against
-  deterministic local providers unless an external one is configured, so the
-  model-facing controls verify the *governance* of model calls — routing,
-  classification ceilings, prompt-registry pinning, context-firewall trust
-  tiers — rather than the quality of any particular vendor model.
-
-## Recorded evidence
-
-Every collection writes to the database as well as to disk: `evidence_records`
-per control per tenant, a `maturity_snapshots` row, and an `audit_events` entry
-in the hash-chained ledger. `agentic-evidence report` prints the latest
-recorded state; the Evidence surface in the console renders the same rows. The
-score in this document, the score in the API and the score on the screen all
-come from one computation in `agentic_os.assurance.evidence`.
+| Control | Domain | Weight | Critical | Status | Test |
+|---|---|---:|:---:|---|---|
+| AGT-001 | agent_architecture | 3 | yes | VERIFIED | `tests/security/test_tool_gateway.py::test_tool_outside_the_agent_contract_is_denied` |
+| AGT-002 | agent_architecture | 3 | yes | VERIFIED | `tests/redteam/test_agentic_red_team.py::test_agent_cannot_exceed_its_autonomy_ceiling` |
+| AGT-003 | agent_architecture | 2 | yes | VERIFIED | `tests/redteam/test_agentic_red_team.py::test_no_contract_grants_autonomous_a4` |
+| AGT-004 | agent_architecture | 2 |  | VERIFIED | `tests/redteam/test_agentic_red_team.py::test_agent_budget_stops_at_the_limit` |
+| AIG-001 | ai_governance | 2 | yes | VERIFIED | `tests/redteam/test_agentic_red_team.py::test_financial_actions_are_always_critical_and_a4` |
+| AIG-002 | ai_governance | 2 | yes | VERIFIED | `tests/redteam/test_agentic_red_team.py::test_the_same_person_cannot_satisfy_a_dual_approval` |
+| AIG-003 | ai_governance | 1 | yes | VERIFIED | `tests/redteam/test_agentic_red_team.py::test_an_approval_for_one_action_does_not_authorise_another` |
+| AIG-004 | ai_governance | 2 |  | VERIFIED | `tests/integration/test_prompt_registry.py::test_tampered_prompt_body_is_rejected` |
+| BUS-001 | business_architecture | 2 |  | VERIFIED | `tests/agents/test_contract_validation.py::test_all_declared_domain_agents_exist` |
+| BUS-002 | business_architecture | 2 |  | VERIFIED | `tests/agents/test_contract_validation.py::test_registries_are_internally_consistent` |
+| BUS-003 | business_architecture | 3 |  | VERIFIED | `tests/integration/test_business_outcomes.py::test_measured_outcome_requires_evidence` |
+| BVL-001 | business_value | 2 |  | VERIFIED | `tests/integration/test_business_outcomes.py::test_roi_excludes_estimated_outcomes` |
+| DAT-001 | data_architecture | 3 | yes | VERIFIED | `tests/tenant_isolation/test_rls_isolation.py::test_every_tenant_table_has_forced_rls` |
+| DAT-002 | data_architecture | 3 | yes | VERIFIED | `tests/tenant_isolation/test_rls_isolation.py::test_unbound_session_sees_nothing` |
+| DAT-003 | data_architecture | 1 | yes | VERIFIED | `tests/tenant_isolation/test_rls_isolation.py::test_application_role_cannot_bypass_rls` |
+| DEC-001 | decision_intelligence | 2 |  | VERIFIED | `tests/decisions/test_schema_guarantees.py::test_every_new_table_forces_row_level_security` |
+| DEC-002 | decision_intelligence | 3 | yes | VERIFIED | `tests/decisions/test_lifecycle.py::test_every_ordered_pair_of_states_is_legal_or_illegal_as_declared` |
+| DEC-003 | decision_intelligence | 2 |  | VERIFIED | `tests/decisions/test_lifecycle.py::test_nothing_outside_the_lifecycle_module_writes_the_state_column` |
+| DEC-004 | decision_intelligence | 2 |  | VERIFIED | `tests/decisions/test_schema_guarantees.py::test_the_transition_log_refuses_update_even_for_the_provisioning_role` |
+| DEC-005 | decision_intelligence | 3 | yes | VERIFIED | `tests/decisions/test_schema_guarantees.py::test_a_confidence_with_the_default_empty_calculation_is_refused` |
+| DEC-006 | decision_intelligence | 3 | yes | VERIFIED | `tests/decisions/test_domain_isolation.py::test_the_database_returns_nothing_rather_than_filtering_afterwards` |
+| DEC-007 | decision_intelligence | 2 |  | VERIFIED | `tests/decisions/test_lifecycle.py::test_a_section_lead_can_review_but_cannot_approve` |
+| DEC-008 | decision_intelligence | 2 |  | VERIFIED | `tests/decisions/test_lifecycle.py::test_an_agent_cannot_approve_or_verify_on_its_own` |
+| DEC-009 | decision_intelligence | 2 |  | VERIFIED | `tests/decisions/test_confidence_and_effectiveness.py::test_the_rate_is_not_calculated_over_an_empty_set` |
+| DEC-010 | decision_intelligence | 2 |  | VERIFIED | `tests/decisions/test_decision_api.py::test_every_kpi_carries_its_definition` |
+| DEP-001 | deployment | 1 |  | VERIFIED | `tests/unit/test_deployables.py::test_kubernetes_workloads_run_unprivileged_and_carry_no_secrets` |
+| DEP-002 | deployment | 1 | yes | VERIFIED | `tests/unit/test_deployables.py::test_only_the_dr_cronjob_mounts_the_maintenance_identity` |
+| DEP-003 | deployment | 2 |  | NOT_EVIDENCED | `—` |
+| DEV-001 | devsecops | 2 |  | VERIFIED | `tests/database/test_migrations.py::test_modified_migration_is_rejected` |
+| DEV-002 | devsecops | 2 |  | VERIFIED | `tests/api/test_repository_hygiene.py::test_ci_pipeline_covers_required_gates` |
+| DRP-001 | dr_resilience | 2 |  | VERIFIED | `tests/integration/test_disaster_recovery.py::test_a_restore_is_performed_and_verified_end_to_end` |
+| EA-001 | enterprise_architecture | 3 | yes | VERIFIED | `tests/agents/test_contract_validation.py::test_registries_are_internally_consistent` |
+| EA-002 | enterprise_architecture | 3 | yes | VERIFIED | `tests/agents/test_contract_validation.py::test_conductor_holds_no_tool_authority` |
+| EA-003 | enterprise_architecture | 2 |  | VERIFIED | `tests/security/test_tool_gateway.py::test_unimplemented_tool_is_refused_not_faked` |
+| EVL-001 | evaluation_assurance | 2 | yes | VERIFIED | `tests/integration/test_evidence_engine.py::test_maturity_is_derived_only_from_test_results` |
+| EVL-002 | evaluation_assurance | 2 | yes | VERIFIED | `tests/integration/test_evidence_engine.py::test_critical_failure_blocks_certification` |
+| EVL-003 | evaluation_assurance | 1 |  | VERIFIED | `tests/integration/test_evidence_engine.py::test_expired_evidence_does_not_count` |
+| EVL-004 | evaluation_assurance | 1 | yes | VERIFIED | `tests/test_service_gates.py::test_an_absent_service_fails_when_it_is_required` |
+| IND-001 | independent_assurance | 2 |  | NOT_EVIDENCED | `—` |
+| IND-002 | independent_assurance | 1 |  | NOT_EVIDENCED | `—` |
+| OBS-001 | observability | 2 | yes | VERIFIED | `tests/security/test_tool_gateway.py::test_every_call_is_recorded_and_audited` |
+| OBS-002 | observability | 2 | yes | VERIFIED | `tests/database/test_audit_ledger.py::test_ledger_rejects_mutation` |
+| OBS-003 | observability | 1 |  | VERIFIED | `tests/api/test_api_surface.py::test_run_detail_exposes_governance_record` |
+| PRF-001 | performance | 1 |  | VERIFIED | `tests/performance/test_slo_conformance.py::test_every_request_succeeded_at_every_concurrency` |
+| PRF-002 | performance | 1 |  | VERIFIED | `tests/performance/test_slo_conformance.py::test_uncontended_latency_has_not_regressed` |
+| PRF-003 | performance | 1 |  | NOT_EVIDENCED | `—` |
+| PRV-001 | privacy | 2 |  | VERIFIED | `tests/integration/test_ingestion_pipeline.py::test_pii_raises_document_classification` |
+| PRV-002 | privacy | 2 |  | VERIFIED | `tests/integration/test_ingestion_pipeline.py::test_redaction_leaves_no_residual_fragments` |
+| PRV-003 | privacy | 1 |  | VERIFIED | `tests/integration/test_privacy_dsar.py::test_erasure_is_blocked_by_an_active_legal_hold` |
+| RAG-001 | rag_knowledge | 3 | yes | VERIFIED | `tests/rag/test_retrieval_governance.py::test_restricted_content_never_leaks_below_clearance` |
+| RAG-002 | rag_knowledge | 2 |  | VERIFIED | `tests/rag/test_retrieval_governance.py::test_fetch_document_denies_unauthorised_and_hides_existence` |
+| RAG-003 | rag_knowledge | 2 |  | VERIFIED | `tests/rag/test_retrieval_governance.py::test_citation_verification_rejects_unsupported_claims` |
+| REL-001 | reliability | 2 | yes | VERIFIED | `tests/security/test_tool_gateway.py::test_repeated_call_with_the_same_key_does_not_re_execute` |
+| REL-002 | reliability | 2 |  | VERIFIED | `tests/workflows/test_workflow_engine.py::test_claim_leases_runs_exclusively` |
+| REL-003 | reliability | 2 |  | VERIFIED | `tests/integration/test_event_bus.py::test_outbox_commits_with_the_state_change` |
+| SEC-001 | security | 2 | yes | VERIFIED | `tests/security/test_tool_gateway.py::test_unauthenticated_call_is_denied_at_identity` |
+| SEC-002 | security | 2 | yes | VERIFIED | `tests/security/test_context_firewall.py::test_only_the_top_two_tiers_may_instruct` |
+| SEC-003 | security | 1 |  | VERIFIED | `tests/security/test_context_firewall.py::test_high_confidence_injection_is_blocked_not_rendered` |
+| SEC-004 | security | 2 | yes | VERIFIED | `tests/redteam/test_agentic_red_team.py::test_secrets_never_survive_audit_redaction` |
+| SEC-005 | security | 1 | yes | VERIFIED | `tests/redteam/test_agentic_red_team.py::test_forged_token_claims_do_not_grant_access` |
+| SEC-006 | security | 1 | yes | VERIFIED | `tests/redteam/test_agentic_red_team.py::test_sandboxed_evaluator_refuses_code_execution` |
+| SEC-007 | security | 1 | yes | VERIFIED | `tests/security/test_tool_gateway.py::test_kill_switch_blocks_every_tool` |
+| UX-001 | ux_accessibility | 2 |  | VERIFIED | `tests/api/test_api_surface.py::test_openapi_document_is_served` |
+| UX-002 | ux_accessibility | 3 |  | VERIFIED | `tests/api/test_api_surface.py::test_run_detail_exposes_governance_record` |
+| UX-003 | ux_accessibility | 2 |  | VERIFIED | `tests/accessibility/test_wcag_conformance.py::test_no_serious_or_critical_accessibility_violations` |
+| UX-004 | ux_accessibility | 2 |  | VERIFIED | `tests/i18n/test_bidirectional_layout.py::test_no_stylesheet_rule_pins_itself_to_a_physical_side` |
+| WKF-001 | workflow_orchestration | 2 |  | VERIFIED | `tests/workflows/test_workflow_engine.py::test_workflow_runs_to_completion` |
+| WKF-002 | workflow_orchestration | 2 | yes | VERIFIED | `tests/workflows/test_workflow_engine.py::test_completed_step_is_never_re_executed` |
+| WKF-003 | workflow_orchestration | 2 |  | VERIFIED | `tests/workflows/test_workflow_engine.py::test_retryable_failure_retries_then_dead_letters` |
+| WKF-004 | workflow_orchestration | 2 |  | VERIFIED | `tests/workflows/test_workflow_engine.py::test_failure_compensates_completed_steps_in_reverse` |

@@ -299,9 +299,21 @@ drops the scratch database afterwards. It **refuses to run without a maintenance
 identity**, so an unconfigured environment produces no evidence rather than fake
 evidence.
 
-The honest deduction: **in this environment `AGENTIC_DR_ADMIN_URL` is not set, so the
-exercise has never actually run here.** The control is `NOT_VERIFIED`. Per the directive's
-own rule, DR is not marked verified without recovery evidence — and it is not.
+**Correction to an earlier draft of this audit:** I initially recorded DR as
+`NOT_VERIFIED` on the assumption that no maintenance identity was configured. That was
+wrong. `AGENTIC_DR_ADMIN_URL` *is* set in this environment and the exercise genuinely
+runs, in about two seconds:
+
+```
+outcome=SUCCESS  rpo=0s  rto=1s  rows_verified=12250
+pg_dump/pg_restore round trip verified: 96 tables and 12250 rows matched, and
+4459 audit entries across 2 tenants re-hashed intact in the restored database
+```
+
+DR is therefore **verified in this environment**, which is a materially better position
+than the one I first reported. What remains unverified is DR against a *production*
+dataset and topology — a 12,250-row restore in one second says nothing about a
+terabyte across availability zones.
 
 No chaos testing, no documented failover, no multi-region posture.
 
@@ -398,7 +410,7 @@ on-call model; no capacity plan; DR unverified; no rollback procedure tested.
 | 9 | AI & Agent Architecture | 72 | CODE + TEST | Honest about its gaps |
 | 10 | Human-in-the-Loop | 58 | CODE + TEST | Approval only; 1 of 5 stations |
 | 11 | Observability | 55 | CODE | Recorded, not operable |
-| 12 | Reliability & Resilience | 62 | CODE + TEST | DR designed, never run here |
+| 12 | Reliability & Resilience | 71 | CODE + TEST | DR runs and passes; production scale unproven |
 | 13 | Testing Quality | 76 | TEST | Real services; no frontend tests |
 | 14 | Accessibility | 70 | RUNTIME | axe passes; humans have not tried it |
 | 15 | Internationalization | 68 | CODE + TEST | Chrome only, honestly labelled |
@@ -406,7 +418,7 @@ on-call model; no capacity plan; DR unverified; no rollback procedure tested.
 | 17 | Integration Readiness | 30 | CODE | Shape without substance |
 | 18 | Production Readiness | 57 | CODE + RUNTIME | Strong CI, no production |
 
-**Unweighted mean: 61.2 / 100.**
+**Unweighted mean: 61.7 / 100.**
 
 That number should not be read as "61% done". The distribution is the finding: the
 platform-engineering categories cluster at 70–83, the product categories at 30–58. This
@@ -436,7 +448,7 @@ Per the directive, every console surface classified by value.
 | `/operations/outcomes` | **LOW VALUE as built** | The right *idea*, unlinked to any decision — this is where the LEARN stage belongs. |
 | `/operations/incidents` | SUPPORTING | No routing or assignment. |
 | `/operations/workflows` | SUPPORTING | |
-| `/operations/resilience` | SUPPORTING | DR evidence; `NOT_VERIFIED` here. |
+| `/operations/resilience` | SUPPORTING | DR evidence, and the exercise genuinely runs. |
 | `/operations/organization` | ADMIN ONLY | |
 | `/operations/capabilities` | CORE VALUE | Honest `NOT_IMPLEMENTED` register — rare and worth keeping. |
 
@@ -490,8 +502,8 @@ and are to be extended, never replaced:
 
 - No production deployment has occurred. Everything about production behaviour is
   `NOT_VERIFIED`.
-- The DR exercise has never run in this environment (`AGENTIC_DR_ADMIN_URL` unset). DR is
-  `NOT_VERIFIED`.
+- DR runs and passes here, against a development dataset. Against production volumes and
+  topology it is `NOT_VERIFIED`.
 - No penetration test, no external security review.
 - No performance SLO is asserted by any automated check. All eight are `NOT_VERIFIED`.
 - Test coverage percentage is not measured.

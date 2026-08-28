@@ -232,7 +232,7 @@ mechanism. It reuses:
 | Rate limiting of the transition endpoint under load | `NOT_VERIFIED` | The shared limiter applies platform-wide but has not been load-tested against these routes specifically |
 | Threat model document for the decision layer | `NOT_IMPLEMENTED` | Not written |
 | Secret rotation exercised | `NOT_VERIFIED` | Designed, never executed — unchanged from the prior audit |
-| Disaster recovery for the new tables | `NOT_VERIFIED` | `PRODUCTION_CONFIGURATION_REQUIRED` — `AGENTIC_DR_ADMIN_URL` is unset, and the exercise refuses to fabricate evidence |
+| Disaster recovery at production scale | `NOT_VERIFIED` | The exercise runs and passes here — 96 tables, 12,250 rows, 4,459 audit entries re-hashed intact, RPO 0s, RTO 1s — but against a development dataset. Production volume and topology are unproven |
 
 ---
 
