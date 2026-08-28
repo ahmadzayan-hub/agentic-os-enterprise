@@ -58,14 +58,23 @@ def owner(db, tenant_id, organization_id, seeded):
     return _ctx(tenant_id, organization_id, user_id)
 
 
-def _values(db, tenant_id: str) -> dict[str, float]:
+def _values(db, tenant_id: str, *, start=None, end=None) -> dict[str, float]:
+    """Recorded values, optionally confined to one period.
+
+    The period filter matters: this database is shared with the seed and with
+    whatever a live verification run left behind, so asserting the table is
+    globally empty would only hold on a fresh instance. What each test actually
+    means is "the pass I just ran wrote nothing", which is a statement about a
+    period.
+    """
+    clause = " AND v.period_start = :start AND v.period_end = :end" if start else ""
     rows = db.execute(
         text(
-            "SELECT k.kpi_key, v.value FROM kpi_values v "
+            "SELECT k.kpi_key, v.value FROM kpi_values v "  # noqa: S608
             "JOIN kpi_definitions k ON k.id = v.kpi_definition_id "
-            "WHERE v.tenant_id = CAST(:t AS uuid)"
+            f"WHERE v.tenant_id = CAST(:t AS uuid){clause}"
         ),
-        {"t": tenant_id},
+        {"t": tenant_id, **({"start": start, "end": end} if start else {})},
     ).mappings()
     return {str(r["kpi_key"]): float(r["value"]) for r in rows}
 
@@ -97,7 +106,8 @@ def test_there_is_no_generic_formula_evaluator() -> None:
 # ----------------------------------------------------- nothing to measure yet
 def test_an_unmeasurable_kpi_records_no_value(db, owner, tenant_id) -> None:
     """The case this whole module exists for."""
-    outcomes = {o.kpi_key: o for o in compute_all(db, owner)}
+    start, end = month_bounds()
+    outcomes = {o.kpi_key: o for o in compute_all(db, owner, start=start, end=end)}
     db.flush()
 
     for key in UNMEASURABLE:
@@ -105,9 +115,8 @@ def test_an_unmeasurable_kpi_records_no_value(db, owner, tenant_id) -> None:
         assert outcomes[key].value is None
         assert "does not hold the data" in outcomes[key].reason
 
-    assert set(_values(db, tenant_id)) & set(UNMEASURABLE) == set(), (
-        "a KPI the platform cannot measure acquired a value"
-    )
+    recorded = _values(db, tenant_id, start=start, end=end)
+    assert set(recorded) & set(UNMEASURABLE) == set(), "a KPI the platform cannot measure acquired a value"
 
 
 def test_an_empty_period_records_no_value(db, owner, tenant_id) -> None:
@@ -120,7 +129,7 @@ def test_an_empty_period_records_no_value(db, owner, tenant_id) -> None:
 
     assert outcomes["decision.effectiveness_rate"].status == "INSUFFICIENT_DATA"
     assert outcomes["decision.effectiveness_rate"].value is None
-    assert _values(db, tenant_id) == {}
+    assert _values(db, tenant_id, start=far_past_start, end=far_past_end) == {}
 
 
 def test_insufficient_data_is_distinct_from_no_computation(db, owner) -> None:
@@ -165,7 +174,7 @@ def test_a_closed_decision_produces_a_measured_lead_time(db, owner, tenant_id) -
     assert lead_time.status == "COMPUTED"
     assert lead_time.value is not None and lead_time.value >= 0
     assert lead_time.sample_count >= 1
-    assert "decision.lead_time_days" in _values(db, tenant_id)
+    assert "decision.lead_time_days" in _values(db, tenant_id, start=start, end=end)
 
 
 def test_a_recorded_value_carries_the_counts_it_came_from(db, owner, tenant_id) -> None:
