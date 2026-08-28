@@ -47,9 +47,7 @@ REAL_CALCULATION = json.dumps(
 @pytest.fixture()
 def probe(provisioning_db, seeded):
     """A throwaway domain and decision to aim constraints at."""
-    tenant = provisioning_db.execute(
-        text("SELECT id FROM tenants ORDER BY created_at LIMIT 1")
-    ).scalar_one()
+    tenant = provisioning_db.execute(text("SELECT id FROM tenants ORDER BY created_at LIMIT 1")).scalar_one()
     slug = f"probe-{uuid.uuid4().hex[:8]}"
     domain = provisioning_db.execute(
         text("INSERT INTO domains (tenant_id, slug, name) VALUES (:t, :s, 'Probe') RETURNING id"),
@@ -94,14 +92,10 @@ def test_every_new_table_forces_row_level_security(provisioning_db, seeded) -> N
     assert unforced == [], f"row level security is not forced on: {unforced}"
 
 
-def test_a_second_tenant_cannot_see_another_tenants_decisions(
-    db, db_other, tenant_id, seeded
-) -> None:
+def test_a_second_tenant_cannot_see_another_tenants_decisions(db, db_other, tenant_id, seeded) -> None:
     """The brief's target: unauthorized cross-tenant access is zero rows."""
     domain = db.execute(
-        text(
-            "INSERT INTO domains (tenant_id, slug, name) VALUES (:t, :s, 'Isolation') RETURNING id"
-        ),
+        text("INSERT INTO domains (tenant_id, slug, name) VALUES (:t, :s, 'Isolation') RETURNING id"),
         {"t": tenant_id, "s": f"iso-{uuid.uuid4().hex[:8]}"},
     ).scalar_one()
     reference = f"ISO-{uuid.uuid4().hex[:8]}"
@@ -121,13 +115,10 @@ def test_a_second_tenant_cannot_see_another_tenants_decisions(
 
 
 # -------------------------------------------------------------- append-only log
-def test_the_transition_log_refuses_update_even_for_the_provisioning_role(
-    provisioning_db, probe
-) -> None:
+def test_the_transition_log_refuses_update_even_for_the_provisioning_role(provisioning_db, probe) -> None:
     provisioning_db.execute(
         text(
-            "INSERT INTO decision_transitions (tenant_id, decision_id, to_state) "
-            "VALUES (:t, :d, 'DETECTED')"
+            "INSERT INTO decision_transitions (tenant_id, decision_id, to_state) VALUES (:t, :d, 'DETECTED')"
         ),
         probe_params(probe),
     )
@@ -142,8 +133,7 @@ def test_the_transition_log_refuses_update_even_for_the_provisioning_role(
 def test_the_transition_log_refuses_delete(provisioning_db, probe) -> None:
     provisioning_db.execute(
         text(
-            "INSERT INTO decision_transitions (tenant_id, decision_id, to_state) "
-            "VALUES (:t, :d, 'DETECTED')"
+            "INSERT INTO decision_transitions (tenant_id, decision_id, to_state) VALUES (:t, :d, 'DETECTED')"
         ),
         probe_params(probe),
     )
@@ -161,9 +151,7 @@ def test_the_transition_log_refuses_truncate(provisioning_db, probe) -> None:
 
 
 # ------------------------------------------------------- confidence is computed
-def test_a_confidence_with_the_default_empty_calculation_is_refused(
-    provisioning_db, probe
-) -> None:
+def test_a_confidence_with_the_default_empty_calculation_is_refused(provisioning_db, probe) -> None:
     """The exact case the first version of this constraint let through."""
     _refused(
         provisioning_db,
@@ -177,9 +165,7 @@ def test_a_confidence_with_the_default_empty_calculation_is_refused(
     ['{"inputs": "trust me"}', '{"inputs": []}', '{"inputs": {}}', "{}"],
     ids=["not-an-array", "empty-array", "an-object", "absent"],
 )
-def test_a_confidence_without_real_inputs_is_refused(
-    provisioning_db, probe, calculation: str
-) -> None:
+def test_a_confidence_without_real_inputs_is_refused(provisioning_db, probe, calculation: str) -> None:
     _refused(
         provisioning_db,
         "INSERT INTO recommendations (tenant_id, decision_id, confidence, confidence_calculation) "

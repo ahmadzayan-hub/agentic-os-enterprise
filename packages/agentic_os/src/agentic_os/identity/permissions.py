@@ -158,8 +158,7 @@ SYSTEM_ROLES: tuple[SystemRole, ...] = (
         slug="executive",
         name="Executive",
         description="Business oversight: outcomes, risk posture and approvals.",
-        permissions=READ_ONLY
-        + ("approvals:decide", "runs:create", "decisions:review", "decisions:approve"),
+        permissions=READ_ONLY + ("approvals:decide", "runs:create", "decisions:review", "decisions:approve"),
         max_autonomy="A2",
     ),
     SystemRole(
@@ -324,9 +323,7 @@ SYSTEM_ROLES: tuple[SystemRole, ...] = (
             "Full administrative authority over the platform within the tenant. "
             "Explicitly excludes authority over business decisions."
         ),
-        permissions=tuple(
-            p.id for p in CATALOGUE if p.id not in BUSINESS_DECISION_AUTHORITY
-        ),
+        permissions=tuple(p.id for p in CATALOGUE if p.id not in BUSINESS_DECISION_AUTHORITY),
         requires_mfa=True,
         max_autonomy="A3",
     ),
