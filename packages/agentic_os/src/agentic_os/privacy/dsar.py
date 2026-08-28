@@ -71,6 +71,10 @@ NON_ERASABLE = {
         "the audit ledger is append-only and tamper-evident; identifiers are "
         "pseudonymised in place rather than deleted"
     ),
+    "decision_transitions": (
+        "a decision's state history is evidence and is append-only under the "
+        "same triggers as the ledger; the acting user is pseudonymised in place"
+    ),
 }
 
 
