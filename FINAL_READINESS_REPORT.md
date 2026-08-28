@@ -248,7 +248,7 @@ Stated plainly, with the marker the brief asks for.
 
 | Item | Marker | Why |
 |---|---|---|
-| Disaster recovery at production scale | `NOT_VERIFIED` | The exercise runs and passes here (see §6.5); a 12,250-row restore in one second says nothing about a terabyte across availability zones |
+| Disaster recovery at production topology | `NOT_VERIFIED` | Now measured to 700k ledger rows / 386 MB (`docs/operations/DISASTER_RECOVERY_SCALE.md`), still on one machine with synthetic rows, no concurrent write traffic and no network between dump and restore |
 | Seven outbound integrations (ERP, payment rail, mail relay, CRM, MAXIMO, asset register) | `EXTERNAL_DEPENDENCY` | No credentials, no sandboxes, no backing systems. They remain `NOT_IMPLEMENTED` and the planner refuses to plan with them |
 | Penetration test | `EXTERNAL_DEPENDENCY` | Requires an external party |
 | Screen reader verification | `EXTERNAL_DEPENDENCY` | Requires a human using assistive technology |
@@ -275,12 +275,15 @@ Stated plainly, with the marker the brief asks for.
    applies equally to the audit ledger. Mitigated by the owner not being the
    application role; **not** claimed as tamper-proof against a superuser.
 4. **A decision with history cannot be deleted, and neither can its tenant.** Intended —
-   a record whose history can be erased is not a record — but it means tenant
-   offboarding is a documented procedure, not a `DELETE`. Erasure pseudonymises, as it
-   already does for the ledger.
-5. **The KPI framework has definitions and no values.** `kpi_values` is empty because
-   nothing computes it yet. The console says "Not measured yet" rather than showing
-   zero, which is honest but is not the same as working.
+   a record whose history can be erased is not a record. Offboarding is now that
+   documented procedure (`docs/operations/TENANT_OFFBOARDING.md`): retire, revoke,
+   pseudonymise, keep the ledger. The retention purge that would eventually remove
+   the retained records is deliberately `NOT_IMPLEMENTED`, and neither retirement nor
+   the purge has run against a real tenant.
+5. **Two KPIs remain unmeasurable, and that is a data gap rather than a code gap.**
+   Point machine failures needs an asset class the incident register does not carry;
+   door availability needs a service-hours feed nothing supplies. They stay defined
+   and visibly unmeasured. Deleting them would make the surface look complete.
 6. **The cross-domain exemption is a list.** Three roles see every domain. That list
    growing quietly is how "zero cross-domain access" stops being true, so a test pins
    it — but a test cannot judge whether a fourth role belongs there.
@@ -289,18 +292,20 @@ Stated plainly, with the marker the brief asks for.
 
 **Before any production use**
 
-1. Repeat the restore exercise against a production-sized dataset and topology. It
-   passes here in one second on 12,250 rows, which proves the mechanism and nothing
-   about the scale.
+1. Repeat the restore exercise on production *topology* — a separate restore host,
+   a real network between dump and target, and concurrent write traffic. The scale
+   curve is now measured to 700k ledger rows and stays linear
+   (`docs/operations/DISASTER_RECOVERY_SCALE.md`); what remains unproven is shape,
+   not size.
 2. Commission an external penetration test of the decision surfaces.
 3. Write the tenant offboarding procedure that risk 4 requires.
 4. Export traces to a collector so an incident can be investigated.
 
 **To make the KPI framework real**
 
-5. Implement the computation behind each `kpi_definitions.formula` and populate
-   `kpi_values` on a schedule. Until then the executive surface reports definitions,
-   not measurements.
+5. Register computations for the two KPIs that still have none — point machine
+   failures needs an asset class on the incident register, door availability needs
+   a service-hours feed. Both are data-source gaps, not code gaps.
 
 **To close the remaining product gaps**
 
@@ -323,10 +328,12 @@ Stated plainly, with the marker the brief asks for.
 | Separation of duties | Approve only | Review ≠ approve; admin ≠ business authority | `BUSINESS_DECISION_AUTHORITY`; 2 live refusals | DONE |
 | Human stations | 1 of 5 | 4 of 5 (analysis handoff still implicit) | Lifecycle tests | PARTIAL |
 | Notifications | None | Routed by permission ∩ domain membership | 3 API tests | DONE |
-| KPI framework | 6-column samples | Definitions with formula, unit, direction, target | `test_every_kpi_carries_its_definition` | PARTIAL — no values |
+| KPI framework | 6-column samples | Definitions plus a computation registry; 4 of 6 measurable | Live pass: 2 computed, 2 insufficient data, 2 no computation | DONE |
 | Outcome verification | Unlinked ROI records | Target vs actual, verifier, method, verdict | DB constraint + live loop | DONE |
 | Learning | Absent | `lessons_learned`, linked to the decision | Live loop; case page | DONE |
 | Console redirects | Absolute, bind-address host | Path-only | Guard + observed `location: /` | DONE |
+| Tenant offboarding | Undefined; `DELETE` impossible | `retire_tenant` + runbook, hold-aware | 11 tests; ledger survives | DONE |
+| DR scale evidence | 12,250 rows, 1 s | Measured to 700k rows / 386 MB, linear | `DISASTER_RECOVERY_SCALE.md` | PARTIAL — topology unproven |
 | Accessibility | 23 surfaces | 25 surfaces, audit cannot pass unauthenticated | axe + auth guard | DONE |
 | Cross-tenant isolation | Proven | Proven, extended to the new tables | Rebind test | DONE |
 | Disaster recovery | Runs, unmeasured at scale | Runs, evidenced | RPO 0s, RTO 1s, 96 tables, 4,459 ledger entries re-hashed | PARTIAL |
@@ -353,7 +360,7 @@ Stated plainly, with the marker the brief asks for.
 | 7 target user roles | YES | YES | PARTIAL | NO |
 | Notifications | YES | YES | YES | NO |
 | KPI definitions | YES | YES | YES | NO |
-| KPI values | NO | NO | NO | NO |
+| KPI values | YES | YES | YES | NO |
 | Agents cannot act unsupervised | YES | YES | YES | NO |
 | No hidden chain-of-thought exposed | YES | YES | YES | NO |
 | Append-only decision history | YES | YES | YES | PARTIAL |

@@ -36,12 +36,39 @@ def _ctx(tenant_id: str, organization_id: str, user_id: str, **kw) -> ExecutionC
 
 
 @pytest.fixture()
-def scratch_tenant(provisioning_db, seeded):
+def bound(seeded):
+    """A rolled-back provisioning session holding a scratch tenant.
+
+    One session for the whole test, deliberately. The obvious shape — create
+    the tenant, commit, then retire it from a second session — leaves a tenant
+    behind on every run, and `retire_tenant` writes to the append-only ledger,
+    so the rows it creates cannot be cleaned up afterwards. Thirty-two scratch
+    tenants had accumulated before I noticed.
+
+    Using the provisioning role means RLS is bypassed here, which these tests
+    do not depend on: the cross-tenant refusal is enforced in the application
+    and is asserted directly.
+    """
+    from agentic_os.core.db import get_owner_engine
+    from sqlalchemy.orm import sessionmaker
+
+    session = sessionmaker(bind=get_owner_engine(), expire_on_commit=False, future=True)()
+    try:
+        session.execute(text("SET ROLE agentic_provisioner"))
+        yield session
+    finally:
+        session.rollback()
+        session.execute(text("RESET ROLE"))
+        session.close()
+
+
+@pytest.fixture()
+def scratch_tenant(bound):
     """A tenant of its own, so retirement never touches the seeded ones."""
-    org_id = provisioning_db.execute(text("SELECT id FROM organizations LIMIT 1")).scalar_one()
+    org_id = bound.execute(text("SELECT id FROM organizations LIMIT 1")).scalar_one()
     slug = f"retire-{uuid.uuid4().hex[:8]}"
     tenant_id = str(
-        provisioning_db.execute(
+        bound.execute(
             text(
                 "INSERT INTO tenants (organization_id, slug, name) "
                 "VALUES (:o, :s, 'Retirement scratch') RETURNING id"
@@ -50,7 +77,7 @@ def scratch_tenant(provisioning_db, seeded):
         ).scalar_one()
     )
     user_id = str(
-        provisioning_db.execute(
+        bound.execute(
             text(
                 "INSERT INTO users (tenant_id, organization_id, email, display_name, "
                 "password_hash) VALUES (CAST(:t AS uuid), :o, :e, 'Scratch user', 'x') "
@@ -59,22 +86,8 @@ def scratch_tenant(provisioning_db, seeded):
             {"t": tenant_id, "o": org_id, "e": f"{slug}@rta.example"},
         ).scalar_one()
     )
-    provisioning_db.commit()
+    bound.flush()
     return {"tenant_id": tenant_id, "organization_id": str(org_id), "user_id": user_id}
-
-
-@pytest.fixture()
-def bound(scratch_tenant):
-    """An application session bound to the scratch tenant."""
-    from agentic_os.core.db import bind_tenant, get_session_factory
-
-    session = get_session_factory()()
-    bind_tenant(session, scratch_tenant["tenant_id"], actor="test")
-    try:
-        yield session
-    finally:
-        session.rollback()
-        session.close()
 
 
 def _ctx_for(scratch_tenant, **kw) -> ExecutionContext:
@@ -223,7 +236,7 @@ def test_the_ledger_survives_retirement(bound, scratch_tenant) -> None:
     assert entries >= 1
 
 
-def test_every_retained_table_is_one_that_genuinely_cannot_be_deleted(provisioning_db, seeded) -> None:
+def test_every_retained_table_is_one_that_genuinely_cannot_be_deleted(bound) -> None:
     """A guard on the explanation, not just the behaviour.
 
     If a table appears in RETAINED that has no append-only trigger and no
@@ -232,7 +245,7 @@ def test_every_retained_table_is_one_that_genuinely_cannot_be_deleted(provisioni
     """
     protected = {
         str(r)
-        for r in provisioning_db.execute(
+        for r in bound.execute(
             text(
                 "SELECT DISTINCT c.relname FROM pg_trigger t "
                 "JOIN pg_class c ON c.oid = t.tgrelid "
