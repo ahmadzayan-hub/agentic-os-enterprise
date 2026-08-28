@@ -444,7 +444,22 @@ CASES: tuple[dict[str, Any], ...] = (
             ("HUMAN", "inspection-note-2026-08-19", "Standing water observed to 150mm depth.", 0.6, 9),
         ],
         "options": [],
-        "recommendation": None,
+        # A recommendation with no computable confidence. This is the case that
+        # matters most in a demo: an analyst has said what they think, and the
+        # platform declines to put a percentage on it because the inputs do not
+        # support one. Without this the "Not Calculated" state would exist only
+        # in a test and never on a rendered page.
+        "recommendation": {
+            "option": None,
+            "rationale": (
+                "Survey the drainage run before committing to any remedial work. "
+                "One inspection note is not enough to choose between causes."
+            ),
+            "reasoning_summary": (
+                "A single field observation with no options costed. There is not "
+                "enough evidence to compare alternatives, so none is proposed."
+            ),
+        },
     },
 )
 
@@ -575,7 +590,9 @@ def _seed_cases(session: Session, tenant_id: str, domains: dict[str, str], kpis:
                 {
                     "t": tenant_id,
                     "d": decision_id,
-                    "opt": option_ids[recommendation["option"]],
+                    "opt": (
+                        option_ids[recommendation["option"]] if recommendation["option"] is not None else None
+                    ),
                     "rationale": recommendation["rationale"],
                     "summary": recommendation["reasoning_summary"],
                     "conf": confidence.value,

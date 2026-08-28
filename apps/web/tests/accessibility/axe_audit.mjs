@@ -46,6 +46,8 @@ const EXECUTABLE = arg("chromium", process.env.PLAYWRIGHT_CHROMIUM_PATH ?? "");
 const SURFACES = [
   { path: "/login", label: "Sign in", authenticated: false },
   { path: "/", label: "Command Center" },
+  { path: "/decisions", label: "Decision Queue" },
+  { path: "/notifications", label: "Inbox" },
   { path: "/runs", label: "Runs" },
   { path: "/approvals", label: "Approvals" },
   { path: "/agents", label: "Agents" },

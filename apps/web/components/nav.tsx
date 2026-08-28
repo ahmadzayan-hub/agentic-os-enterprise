@@ -24,12 +24,22 @@ import { type Locale, type MessageKey, translator } from "@/lib/i18n";
 type NavItem = { href: string; label: MessageKey; permission?: string };
 
 const GROUPS: { label: MessageKey; items: NavItem[] }[] = [
+  // Decide comes first, and the ordering is deliberate. The platform groups
+  // below answer "is the machinery correct?"; this one answers "what does the
+  // organisation need to do?", which is why most people open the product.
+  {
+    label: "nav.group.decide",
+    items: [
+      { href: "/", label: "nav.commandCenter", permission: "analytics:read" },
+      { href: "/decisions", label: "nav.decisions", permission: "decisions:read" },
+      { href: "/notifications", label: "nav.inbox", permission: "notifications:read" },
+      { href: "/approvals", label: "nav.approvals", permission: "approvals:read" },
+    ],
+  },
   {
     label: "nav.group.operate",
     items: [
-      { href: "/", label: "nav.commandCenter", permission: "analytics:read" },
       { href: "/runs", label: "nav.runs", permission: "runs:read" },
-      { href: "/approvals", label: "nav.approvals", permission: "approvals:read" },
       { href: "/operations/incidents", label: "nav.incidents", permission: "incidents:read" },
       { href: "/operations/workflows", label: "nav.workflows", permission: "workflows:read" },
       { href: "/operations/resilience", label: "nav.resilience", permission: "incidents:read" },
