@@ -14,6 +14,7 @@ from agentic_os.api.serialization import row as json_row
 from agentic_os.api.serialization import rows as json_rows
 from agentic_os.core.errors import AgenticError
 from agentic_os.observability import telemetry
+from agentic_os.observability.alerting import visibility_predicate
 from agentic_os.outcomes import engine as outcomes_engine
 from agentic_os.runtime import events as event_bus
 from agentic_os.runtime import workflow_engine
@@ -232,12 +233,19 @@ def list_incidents(ctx: CtxDep, db: DbDep) -> dict:
         ),
         {"t": ctx.tenant_id},
     ).mappings()
+    # The same predicate the alert list itself uses. This query previously
+    # returned every alert in the tenant regardless of the caller's domains or
+    # permissions — invisible while the table was empty, a cross-domain
+    # disclosure as soon as anything raised one.
+    scope_sql, scope_params = visibility_predicate(ctx)
     alerts = db.execute(
         text(
-            "SELECT alert_type, severity, title, detail, source, acknowledged_at, created_at "
-            "FROM alerts WHERE tenant_id = :t ORDER BY created_at DESC LIMIT 100"
+            "SELECT a.alert_type, a.severity, a.title, a.detail, a.source, a.status, "  # noqa: S608
+            "a.acknowledged_at, a.created_at "
+            "FROM alerts a WHERE a.tenant_id = CAST(:t AS uuid)"
+            f"{scope_sql} ORDER BY a.created_at DESC LIMIT 100"
         ),
-        {"t": ctx.tenant_id},
+        scope_params | {"t": ctx.tenant_id},
     ).mappings()
     return {"incidents": json_rows(rows), "alerts": json_rows(alerts)}
 

@@ -3,7 +3,7 @@
 Generated from the application's own OpenAPI document by
 `scripts/generate_api_reference.py`. Do not edit by hand.
 
-**69 endpoints** under `/api/v1`, plus `/health` and `/ready`.
+**72 endpoints** under `/api/v1`, plus `/health` and `/ready`.
 
 Authentication is a session cookie issued by `POST /api/v1/auth/login`;
 the cookie is httpOnly and the console exchanges it server-side, so the
@@ -11,6 +11,14 @@ browser never holds a bearer token. Every endpoint below is authorised
 independently of the console: the permission column is what the route
 itself requires, and the request is refused without it whatever the
 caller's navigation shows.
+
+## alerts
+
+| Method | Path | Permission | Purpose |
+|---|---|---|---|
+| GET | `/api/v1/alerts` | `incidents:read` | List Alerts |
+| POST | `/api/v1/alerts/evaluate` | `incidents:write` | Run Evaluation |
+| POST | `/api/v1/alerts/{alert_id}/acknowledge` | `incidents:write` | Acknowledge Alert |
 
 ## auth
 

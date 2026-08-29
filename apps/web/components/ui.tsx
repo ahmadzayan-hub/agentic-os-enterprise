@@ -165,7 +165,7 @@ export function DataTable({
   empty = "No records.",
 }: {
   caption: string;
-  columns: { key: string; label: string; numeric?: boolean }[];
+  columns: { key: string; label: string; numeric?: boolean; hideLabel?: boolean }[];
   rows: Record<string, ReactNode>[];
   empty?: string;
 }) {
@@ -179,7 +179,17 @@ export function DataTable({
         <thead>
           <tr>
             {columns.map((column) => (
-              <th key={column.key} scope="col" className={column.numeric ? "num" : undefined}>
+              // A column of controls still needs a header a screen reader can
+              // announce. Leaving the label empty is the obvious thing and it is
+              // an axe violation (empty-table-header) — `hideLabel` keeps the
+              // column visually bare while still naming it.
+              <th
+                key={column.key}
+                scope="col"
+                className={[column.numeric ? "num" : "", column.hideLabel ? "visually-hidden" : ""]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
                 {column.label}
               </th>
             ))}

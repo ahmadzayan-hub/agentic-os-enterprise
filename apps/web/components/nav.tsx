@@ -40,6 +40,7 @@ const GROUPS: { label: MessageKey; items: NavItem[] }[] = [
     label: "nav.group.operate",
     items: [
       { href: "/runs", label: "nav.runs", permission: "runs:read" },
+      { href: "/operations/alerts", label: "nav.alerts", permission: "incidents:read" },
       { href: "/operations/incidents", label: "nav.incidents", permission: "incidents:read" },
       { href: "/operations/workflows", label: "nav.workflows", permission: "workflows:read" },
       { href: "/operations/resilience", label: "nav.resilience", permission: "incidents:read" },

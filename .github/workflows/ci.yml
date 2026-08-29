@@ -137,6 +137,21 @@ jobs:
       - name: API tests
         run: pytest tests/api -q
 
+      # Named steps rather than relying on the full-suite run below, matching
+      # every other suite here: a job that fails at "Full suite" says only that
+      # something broke. `tests/decisions` and `tests/evals` were missing from
+      # this list, which is the drift a named step per suite exists to prevent.
+      # `tests/performance` is deliberately not named — it reads the report the
+      # load test writes a few steps down, so it can only run after it.
+      - name: Decision intelligence tests
+        run: pytest tests/decisions -q
+
+      - name: Evaluation harness tests
+        run: pytest tests/evals -q
+
+      - name: Alerting and observability tests
+        run: pytest tests/observability -q
+
       - name: RAG evaluation and leakage tests
         run: pytest tests/rag -q
 
@@ -390,25 +405,36 @@ jobs:
         working-directory: apps/web
         run: |
           AGENTIC_RATE_LIMIT_PER_MINUTE=100000 \
+            # The audit signs in four times — two colour schemes by two writing
+          # directions — and the default per-minute budget refuses the later
+          # ones. When that happened the audit scanned the sign-in page
+          # twenty-five times and reported it clean, which is why the sign-in
+          # guard exists and why the budget is raised here.
+          AGENTIC_RATE_LIMIT_PER_MINUTE=100000 \
             uvicorn agentic_os.api.app:app --host 127.0.0.1 --port 8000 --log-level warning &
           cp -r .next/static .next/standalone/.next/static
           mkdir -p .next/standalone/public
-          AGENTIC_API_BASE_URL=http://127.0.0.1:8000 PORT=3000 \
+          AGENTIC_API_BASE_URL=http://127.0.0.1:8000 PORT=3000 HOSTNAME=127.0.0.1 \
             node .next/standalone/server.js &
           for _ in $(seq 1 30); do
             curl -fsS http://127.0.0.1:8000/health >/dev/null 2>&1 \
-              && curl -fsS http://127.0.0.1:3000/login >/dev/null 2>&1 && break
+              && curl -fsS http://localhost:3000/login >/dev/null 2>&1 && break
             sleep 2
           done
           curl -fsS http://127.0.0.1:8000/health
-          curl -fsS -o /dev/null -w "console: %{http_code}\n" http://127.0.0.1:3000/login
+          curl -fsS -o /dev/null -w "console: %{http_code}\n" http://localhost:3000/login
 
       - name: Accessibility audit (axe-core, WCAG 2.2 AA)
         working-directory: apps/web
         run: |
           npx playwright install --with-deps chromium
+          # `localhost`, not `127.0.0.1`. Next rewrites a same-port redirect
+          # Location to its own resolved hostname regardless of what the
+          # middleware emits, so a browser starting at 127.0.0.1 changes origin
+          # on the first redirect and loses its cookies. See SECURITY_REVIEW.md
+          # §1.20 — this is a measured framework behaviour, not a preference.
           node tests/accessibility/axe_audit.mjs \
-            --base http://127.0.0.1:3000 --out ../../artifacts/accessibility.json
+            --base http://localhost:3000 --out ../../artifacts/accessibility.json
 
       - name: Load test
         run: python scripts/loadtest.py --requests 120 --concurrency 1,8,32
@@ -506,24 +532,35 @@ jobs:
       - name: Start the API and the console
         working-directory: apps/web
         run: |
-          uvicorn agentic_os.api.app:app --host 127.0.0.1 --port 8000 --log-level warning &
+          # The audit signs in four times — two colour schemes by two writing
+          # directions — and the default per-minute budget refuses the later
+          # ones. When that happened the audit scanned the sign-in page
+          # twenty-five times and reported it clean, which is why the sign-in
+          # guard exists and why the budget is raised here.
+          AGENTIC_RATE_LIMIT_PER_MINUTE=100000 \
+            uvicorn agentic_os.api.app:app --host 127.0.0.1 --port 8000 --log-level warning &
           cp -r .next/static .next/standalone/.next/static
           mkdir -p .next/standalone/public
-          AGENTIC_API_BASE_URL=http://127.0.0.1:8000 PORT=3000 \
+          AGENTIC_API_BASE_URL=http://127.0.0.1:8000 PORT=3000 HOSTNAME=127.0.0.1 \
             node .next/standalone/server.js &
           for _ in $(seq 1 30); do
             curl -fsS http://127.0.0.1:8000/health >/dev/null 2>&1 \
-              && curl -fsS http://127.0.0.1:3000/login >/dev/null 2>&1 && break
+              && curl -fsS http://localhost:3000/login >/dev/null 2>&1 && break
             sleep 2
           done
           curl -fsS http://127.0.0.1:8000/health
-          curl -fsS -o /dev/null -w "console: %{http_code}\n" http://127.0.0.1:3000/login
+          curl -fsS -o /dev/null -w "console: %{http_code}\n" http://localhost:3000/login
       - name: Accessibility audit (axe-core, WCAG 2.2 AA)
         working-directory: apps/web
         run: |
           npx playwright install --with-deps chromium
+          # `localhost`, not `127.0.0.1`. Next rewrites a same-port redirect
+          # Location to its own resolved hostname regardless of what the
+          # middleware emits, so a browser starting at 127.0.0.1 changes origin
+          # on the first redirect and loses its cookies. See SECURITY_REVIEW.md
+          # §1.20 — this is a measured framework behaviour, not a preference.
           node tests/accessibility/axe_audit.mjs \
-            --base http://127.0.0.1:3000 --out ../../artifacts/accessibility.json
+            --base http://localhost:3000 --out ../../artifacts/accessibility.json
       - name: Assert no serious or critical violations
         # Without this the suite would skip a missing report and the job would
         # go green having audited nothing.
