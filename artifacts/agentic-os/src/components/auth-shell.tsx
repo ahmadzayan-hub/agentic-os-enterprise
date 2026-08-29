@@ -67,7 +67,18 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="app">
       <a className="skip-link" href="#main-content">{t("app.skipToContent")}</a>
-      <aside className={`sidebar ${navigationOpen ? "sidebar-open" : ""}`} id="primary-navigation">
+      {navigationOpen ? (
+        <button
+          className="mobile-nav-backdrop"
+          aria-label={t("chrome.closeNavigation")}
+          onClick={() => setNavigationOpen(false)}
+        />
+      ) : null}
+      <aside
+        className={`sidebar ${navigationOpen ? "sidebar-open" : ""}`}
+        id="primary-navigation"
+        style={navigationOpen ? { transform: "translateX(0)" } : undefined}
+      >
         <Link href="/" className="brand" style={{ color: "inherit" }}>
           <span className="brand-mark" aria-hidden="true">
             A

@@ -15,6 +15,7 @@ import {
 import {
   audit,
   authenticate,
+  DEMO_MODE,
   ensureSeedIdentity,
   listAudit,
   listRecords,
@@ -86,7 +87,7 @@ router.use(async (req, res, next): Promise<void> => {
     return;
   }
   res.locals.principal = principal;
-  if (process.env.NODE_ENV !== "production" && principal.tenant_id === TENANT_ID) await seedMutableState();
+  if (DEMO_MODE && principal.tenant_id === TENANT_ID) await seedMutableState();
   next();
 });
 router.get("/v1/auth/me", (_req, res): void => { res.json(res.locals.principal); });
@@ -140,6 +141,7 @@ router.get("/v1/command-center", async (_req, res) => {
   const killSwitches = await listRecords<{ engaged: boolean }>((res.locals.principal as Principal).tenant_id, "kill_switch");
   const engagedKillSwitches = killSwitches.filter((item) => item.engaged);
   res.json({
+  data_provenance: { mode: "SAMPLE", label: "Sample operational data", derived_from_persisted_evidence: false, generated_at: now() },
   requires_attention: { pending_approvals: approvals.filter((a) => a.status === "PENDING"), failed_runs: runs.filter((r) => r.status === "FAILED"), security_findings: [{ finding_type: "Blocked prompt injection", severity: "HIGH", source: "tool-gateway", created_at: now() }], open_incidents: [{ incident_key: "INC-042", title: "Elevated sensor data latency", severity: "MEDIUM", status: "INVESTIGATING" }], dead_letters: 0, expired_evidence: 1 },
   agent_operations: { runs: { total: runs.length, succeeded: 1, failed: 1, success_rate: 0.5, p95_duration_ms: 1840 }, tools: { total: 26, denied: 2, denial_rate: 0.077 }, retrieval: { queries: 12, chunks_withheld_by_acl: 3 }, security: { findings: 1, severe_findings: 1 }, policy: { decisions: 28, denied: 2, escalated_to_approval: 1 } },
   business_pulse: { runs_total: runs.length, runs_succeeded: 1, runs_awaiting_approval: 1, success_rate: 0.5, cost_usd: 31.42 }, engaged_kill_switches: engagedKillSwitches, read_only_mode: engagedKillSwitches.some((item) => item.engaged),

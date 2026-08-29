@@ -17,6 +17,12 @@ import {
 import { apiTry } from "@/lib/api";
 
 interface CommandCenter {
+  data_provenance: {
+    mode: "SAMPLE" | "PERSISTED";
+    label: string;
+    derived_from_persisted_evidence: boolean;
+    generated_at: string;
+  };
   requires_attention: {
     pending_approvals: {
       id: string;
@@ -101,9 +107,17 @@ export default function CommandCenterPage() {
         <h1>Command Center</h1>
         <p className="page-lede">
           Organised around what needs a decision, not around what happens to be
-          countable. Every figure below is computed from recorded platform activity.
+          countable. Figures marked as sample illustrate the operating model and are
+          not derived from persisted evidence.
         </p>
       </div>
+
+      {!data.data_provenance.derived_from_persisted_evidence ? (
+        <Notice tone="warn">
+          <strong>{data.data_provenance.label}.</strong> These figures are illustrative,
+          not production evidence.
+        </Notice>
+      ) : null}
 
       {data.engaged_kill_switches.length > 0 ? (
         <Notice tone="danger">

@@ -2,8 +2,9 @@ import { createHash, randomBytes, randomUUID, scryptSync, timingSafeEqual } from
 import { pool, type PoolClient } from "@workspace/db";
 
 export const TENANT_ID = "tenant_northstar";
-const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? (process.env.NODE_ENV === "production" ? "" : "Northstar!2026");
-const DEMO_MFA_CODE = process.env.DEMO_MFA_CODE ?? (process.env.NODE_ENV === "production" ? "" : "123456");
+export const DEMO_MODE = process.env.AGENTIC_DEMO_MODE === "true";
+const DEMO_PASSWORD = DEMO_MODE ? (process.env.DEMO_PASSWORD ?? "Northstar!2026") : "";
+const DEMO_MFA_CODE = DEMO_MODE ? (process.env.DEMO_MFA_CODE ?? "123456") : "";
 
 export type Principal = {
   user_id: string;
@@ -22,7 +23,7 @@ const hashPassword = (password: string, salt: string) =>
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
 
 export async function ensureSeedIdentity() {
-  if (!DEMO_PASSWORD) return;
+  if (!DEMO_MODE || !DEMO_PASSWORD) return;
   const salt = randomBytes(16).toString("hex");
   await pool.query(
     `insert into agentic_tenants (id, name, slug) values ($1,$2,$3)
@@ -55,6 +56,9 @@ export async function ensureSeedIdentity() {
 }
 
 export async function login(tenantSlug: string, email: string, password: string, mfaCode?: string) {
+  if (!DEMO_MODE && tenantSlug === "northstar-demo" && email.toLowerCase() === "alex.morgan@northstar.example") {
+    return null;
+  }
   await ensureSeedIdentity();
   const result = await pool.query(
     `select u.* from agentic_users u join agentic_tenants t on t.id=u.tenant_id

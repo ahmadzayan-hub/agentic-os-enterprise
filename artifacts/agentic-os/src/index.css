@@ -594,7 +594,8 @@ a:hover {
   overflow-y: auto;
 }
 .mobile-nav-trigger,
-.mobile-nav-close {
+.mobile-nav-close,
+.mobile-nav-backdrop {
   display: none;
 }
 .session-state {
@@ -1110,6 +1111,14 @@ pre.code {
   .mobile-nav-trigger,
   .mobile-nav-close {
     display: inline-flex;
+  }
+  .mobile-nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    border: 0;
+    background: rgb(15 23 42 / 38%);
   }
   .mobile-nav-close {
     width: 100%;

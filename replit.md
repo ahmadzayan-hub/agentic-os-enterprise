@@ -10,6 +10,8 @@ A governed enterprise AI control plane for operating agents, approvals, knowledg
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+- `pnpm --filter @workspace/db run generate` — generate a reviewed versioned migration
+- `pnpm --filter @workspace/db run migrate` — apply committed migrations
 - Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
@@ -31,6 +33,7 @@ A governed enterprise AI control plane for operating agents, approvals, knowledg
 ## Architecture decisions
 
 - PostgreSQL is the source of truth for users, sessions, mutable business records, and audit events.
+- GitHub's `claude/agentic-os-enterprise-v3.1-ogi9cq` branch is the authoritative source; reconcile by merge, never reset or discard divergent Replit work.
 - Demo records are seeded idempotently and never overwrite operator changes.
 - Session identifiers are random, stored only as hashes, and delivered in HTTP-only cookies.
 - The active runtime is Vite/React plus TypeScript/Express; archived Next.js/Python topology is not restored.
@@ -47,7 +50,8 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 - Push development schema changes with `pnpm --filter @workspace/db run push`.
 - Use the managed workflows for the proxied preview. Package builds also have safe local defaults.
-- Development can seed a demo identity; production requires `DEMO_PASSWORD` to be configured explicitly before bootstrap.
+- Demo identities and sample records are available only when `AGENTIC_DEMO_MODE=true`; the managed development command enables it explicitly and production fails closed.
+- Apply committed migrations before startup. Do not use schema push commands in post-merge or production workflows.
 
 ## Pointers
 
