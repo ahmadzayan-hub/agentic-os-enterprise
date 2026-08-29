@@ -260,8 +260,3 @@ function stableStringify(value: unknown): string {
   }
   return JSON.stringify(value);
 }
-
-export const demoCredentials = {
-  email: "alex.morgan@northstar.example",
-  password: DEMO_PASSWORD,
-};

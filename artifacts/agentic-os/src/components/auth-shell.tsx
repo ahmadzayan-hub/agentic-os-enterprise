@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, Link } from "wouter";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, ApiError } from "@/lib/api";
 import { Principal } from "@/lib/types";
 import { LanguageSwitch } from "@/components/language-switch";
 import { Nav } from "@/components/nav";
@@ -10,6 +10,9 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
   const [, navigate] = useLocation();
   const [me, setMe] = useState<Principal | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const [navigationOpen, setNavigationOpen] = useState(false);
 
   // In a real app we might sync locale to localStorage
   const locale = resolveLocale(localStorage.getItem("agentic_locale") || DEFAULT_LOCALE);
@@ -21,15 +24,21 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
     document.documentElement.dir = dir;
     document.documentElement.lang = locale;
 
+    setLoading(true);
+    setLoadError(false);
     apiFetch<Principal>("/api/v1/auth/me")
       .then((data) => {
         setMe(data);
-        setLoading(false);
       })
-      .catch(() => {
-        navigate("/login?reason=session");
-      });
-  }, [navigate, dir, locale]);
+      .catch((error) => {
+        if (error instanceof ApiError && error.status === 401) {
+          navigate("/login?reason=session");
+          return;
+        }
+        setLoadError(true);
+      })
+      .finally(() => setLoading(false));
+  }, [navigate, dir, locale, revision]);
 
   const handleLogout = async () => {
     try {
@@ -40,13 +49,25 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
     navigate("/login");
   };
 
-  if (loading || !me) {
-    return null; // or a skeleton loader
+  if (loading) {
+    return <div className="session-state" role="status">{t("chrome.loadingSession")}</div>;
+  }
+
+  if (loadError || !me) {
+    return (
+      <div className="session-state" role="alert">
+        <p>{t("chrome.sessionError")}</p>
+        <button className="btn btn-primary" onClick={() => setRevision((value) => value + 1)}>
+          {t("chrome.retry")}
+        </button>
+      </div>
+    );
   }
 
   return (
     <div className="app">
-      <aside className="sidebar">
+      <a className="skip-link" href="#main-content">{t("app.skipToContent")}</a>
+      <aside className={`sidebar ${navigationOpen ? "sidebar-open" : ""}`} id="primary-navigation">
         <Link href="/" className="brand" style={{ color: "inherit" }}>
           <span className="brand-mark" aria-hidden="true">
             A
@@ -57,11 +78,27 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
             <span className="brand-sub">{t("app.edition")}</span>
           </span>
         </Link>
-        <Nav permissions={me.permissions} locale={locale} />
+        <button
+          className="btn mobile-nav-close"
+          type="button"
+          onClick={() => setNavigationOpen(false)}
+        >
+          {t("chrome.closeNavigation")}
+        </button>
+        <Nav permissions={me.permissions} locale={locale} onNavigate={() => setNavigationOpen(false)} />
       </aside>
 
       <div className="main">
         <header className="topbar">
+          <button
+            className="btn mobile-nav-trigger"
+            type="button"
+            aria-expanded={navigationOpen}
+            aria-controls="primary-navigation"
+            onClick={() => setNavigationOpen(true)}
+          >
+            {t("chrome.openNavigation")}
+          </button>
           <div>
             <div className="mono muted">
               {t("chrome.tenant")} {me.tenant_id.slice(0, 8)} · {t("chrome.clearance")}{" "}

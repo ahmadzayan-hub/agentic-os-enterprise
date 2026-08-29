@@ -109,13 +109,26 @@ function requirePermission(permission: string) {
 router.use((req, res, next): void => {
   if (req.method !== "GET") { next(); return; }
   const rules: [string, string][] = [
+    ["/v1/auth/me", ""], ["/v1/command-center", "platform:read"],
     ["/v1/runs", "runs:read"], ["/v1/approvals", "approvals:read"],
-    ["/v1/agents", "agents:read"], ["/v1/documents", "documents:read"],
+    ["/v1/agents", "agents:read"], ["/v1/skills", "agents:read"],
+    ["/v1/models", "agents:read"], ["/v1/prompts", "agents:read"],
+    ["/v1/tools", "agents:read"], ["/v1/mcp", "agents:read"],
+    ["/v1/knowledge", "knowledge:read"], ["/v1/documents", "documents:read"],
+    ["/v1/datasets", "knowledge:read"], ["/v1/graph", "knowledge:read"],
+    ["/v1/evidence", "governance:read"], ["/v1/policies", "governance:read"],
     ["/v1/audit", "governance:read"], ["/v1/privacy", "governance:read"],
     ["/v1/risks", "governance:read"], ["/v1/security", "security:read"],
-    ["/v1/organization", "organization:read"],
+    ["/v1/analytics", "platform:read"], ["/v1/costs", "platform:read"],
+    ["/v1/outcomes", "platform:read"], ["/v1/incidents", "platform:read"],
+    ["/v1/workflows", "platform:read"], ["/v1/resilience", "platform:read"],
+    ["/v1/organization", "organization:read"], ["/v1/capabilities", "platform:read"],
   ];
-  const permission = rules.find(([prefix]) => req.path.startsWith(prefix))?.[1] ?? "platform:read";
+  const permission = rules.find(([prefix]) => req.path.startsWith(prefix))?.[1];
+  if (permission === undefined) {
+    res.status(403).json({ message: "This route has no authorization policy." });
+    return;
+  }
   if (permission && !(res.locals.principal as Principal).permissions.includes(permission)) {
     res.status(403).json({ message: `Permission required: ${permission}` });
     return;
@@ -160,6 +173,14 @@ router.post("/v1/approvals/:id/decide", requirePermission("approvals:decide"), a
   const storedApprovals = await listRecords<typeof approvals[number]>(principal.tenant_id, "approval");
   const approval = storedApprovals.find((item) => item.id === id);
   if (!approval) { res.status(404).json({ message: "Approval not found" }); return; }
+  if (approval.status !== "PENDING") {
+    res.status(409).json({ message: "This approval has already been decided." });
+    return;
+  }
+  if (new Date(approval.expires_at).getTime() <= Date.now()) {
+    res.status(409).json({ message: "This approval has expired and cannot be decided." });
+    return;
+  }
   const decision = String(req.body?.decision ?? req.body?.status ?? "").toUpperCase();
   if (!["APPROVED", "REJECTED", "CHANGES_REQUESTED"].includes(decision)) {
     res.status(400).json({ message: "Decision must be APPROVED, REJECTED, or CHANGES_REQUESTED." });
@@ -261,6 +282,14 @@ router.post("/v1/security/kill-switches", requirePermission("security:manage"), 
   const targetKey = parsed.data.target_key;
   const engaged = parsed.data.engaged;
   const reason = parsed.data.reason.trim();
+  if (!["GLOBAL", "AGENT"].includes(scope) || (scope === "GLOBAL" && targetKey)) {
+    res.status(400).json({ message: "Kill-switch scope or target is invalid." });
+    return;
+  }
+  if (scope === "AGENT" && !agents.some((agent) => agent.agent_key === targetKey)) {
+    res.status(400).json({ message: "The target agent does not exist." });
+    return;
+  }
   if (engaged && reason.length < 5) { res.status(400).json({ message: "A reason of at least 5 characters is required." }); return; }
   const id = `${scope}:${targetKey || "all"}`;
   const state = { scope, target_key: targetKey, engaged, reason, engaged_at: engaged ? now() : null };

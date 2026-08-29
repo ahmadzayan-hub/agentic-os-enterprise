@@ -29,39 +29,39 @@ const GROUPS: { label: MessageKey; items: NavItem[] }[] = [
       { href: "/", label: "nav.commandCenter", permission: "analytics:read" },
       { href: "/runs", label: "nav.runs", permission: "runs:read" },
       { href: "/approvals", label: "nav.approvals", permission: "approvals:read" },
-      { href: "/operations/incidents", label: "nav.incidents", permission: "incidents:read" },
-      { href: "/operations/workflows", label: "nav.workflows", permission: "workflows:read" },
-      { href: "/operations/resilience", label: "nav.resilience", permission: "incidents:read" },
+      { href: "/operations/incidents", label: "nav.incidents", permission: "platform:read" },
+      { href: "/operations/workflows", label: "nav.workflows", permission: "platform:read" },
+      { href: "/operations/resilience", label: "nav.resilience", permission: "platform:read" },
     ],
   },
   {
     label: "nav.group.build",
     items: [
       { href: "/agents", label: "nav.agents", permission: "agents:read" },
-      { href: "/agents/skills", label: "nav.skills", permission: "skills:read" },
-      { href: "/agents/models", label: "nav.models", permission: "models:read" },
-      { href: "/agents/prompts", label: "nav.prompts", permission: "prompts:read" },
-      { href: "/agents/tools", label: "nav.tools", permission: "tools:read" },
-      { href: "/agents/mcp", label: "nav.mcp", permission: "mcp:read" },
+      { href: "/agents/skills", label: "nav.skills", permission: "agents:read" },
+      { href: "/agents/models", label: "nav.models", permission: "agents:read" },
+      { href: "/agents/prompts", label: "nav.prompts", permission: "agents:read" },
+      { href: "/agents/tools", label: "nav.tools", permission: "agents:read" },
+      { href: "/agents/mcp", label: "nav.mcp", permission: "agents:read" },
     ],
   },
   {
     label: "nav.group.know",
     items: [
       { href: "/knowledge", label: "nav.knowledge", permission: "knowledge:read" },
-      { href: "/knowledge/documents", label: "nav.documents", permission: "knowledge:read" },
+      { href: "/knowledge/documents", label: "nav.documents", permission: "documents:read" },
       { href: "/knowledge/datasets", label: "nav.datasets", permission: "knowledge:read" },
-      { href: "/knowledge/graph", label: "nav.graph", permission: "graph:read" },
+      { href: "/knowledge/graph", label: "nav.graph", permission: "knowledge:read" },
     ],
   },
   {
     label: "nav.group.govern",
     items: [
-      { href: "/governance/evidence", label: "nav.evidence", permission: "evidence:read" },
-      { href: "/governance/policies", label: "nav.policies", permission: "policies:read" },
-      { href: "/governance/risks", label: "nav.risks", permission: "risks:read" },
-      { href: "/governance/audit", label: "nav.audit", permission: "audit:read" },
-      { href: "/governance/privacy", label: "nav.privacy", permission: "privacy:read" },
+      { href: "/governance/evidence", label: "nav.evidence", permission: "governance:read" },
+      { href: "/governance/policies", label: "nav.policies", permission: "governance:read" },
+      { href: "/governance/risks", label: "nav.risks", permission: "governance:read" },
+      { href: "/governance/audit", label: "nav.audit", permission: "governance:read" },
+      { href: "/governance/privacy", label: "nav.privacy", permission: "governance:read" },
       { href: "/security", label: "nav.security", permission: "security:read" },
     ],
   },
@@ -69,15 +69,15 @@ const GROUPS: { label: MessageKey; items: NavItem[] }[] = [
     label: "nav.group.measure",
     items: [
       { href: "/operations/analytics", label: "nav.analytics", permission: "analytics:read" },
-      { href: "/operations/costs", label: "nav.costs", permission: "costs:read" },
-      { href: "/operations/outcomes", label: "nav.outcomes", permission: "outcomes:read" },
+      { href: "/operations/costs", label: "nav.costs", permission: "platform:read" },
+      { href: "/operations/outcomes", label: "nav.outcomes", permission: "platform:read" },
     ],
   },
   {
     label: "nav.group.administer",
     items: [
-      { href: "/operations/organization", label: "nav.organization", permission: "org:read" },
-      { href: "/operations/capabilities", label: "nav.capabilities" },
+      { href: "/operations/organization", label: "nav.organization", permission: "organization:read" },
+      { href: "/operations/capabilities", label: "nav.capabilities", permission: "platform:read" },
     ],
   },
 ];
@@ -85,9 +85,11 @@ const GROUPS: { label: MessageKey; items: NavItem[] }[] = [
 export function Nav({
   permissions = [],
   locale,
+  onNavigate,
 }: {
   permissions?: string[];
   locale: Locale;
+  onNavigate?: () => void;
 }) {
   const [pathname] = useLocation();
   const t = translator(locale);
@@ -114,6 +116,7 @@ export function Nav({
                 href={item.href}
                 className="nav-link"
                 aria-current={current ? "page" : undefined}
+                onClick={onNavigate}
               >
                 {t(item.label)}
               </Link>

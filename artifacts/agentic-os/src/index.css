@@ -593,6 +593,19 @@ a:hover {
   height: 100vh;
   overflow-y: auto;
 }
+.mobile-nav-trigger,
+.mobile-nav-close {
+  display: none;
+}
+.session-state {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+}
 
 .brand {
   display: flex;
@@ -1078,10 +1091,30 @@ pre.code {
     grid-template-columns: 1fr;
   }
   .sidebar {
-    position: static;
-    height: auto;
-    border-inline-end: none;
-    border-bottom: 1px solid var(--border);
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: min(86vw, 320px);
+    height: 100vh;
+    z-index: 90;
+    transform: translateX(calc(-100% - 16px));
+    transition: transform 160ms ease;
+    box-shadow: var(--shadow-lg);
+  }
+  [dir="rtl"] .sidebar {
+    transform: translateX(calc(100% + 16px));
+  }
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+  .mobile-nav-trigger,
+  .mobile-nav-close {
+    display: inline-flex;
+  }
+  .mobile-nav-close {
+    width: 100%;
+    justify-content: center;
+    margin-bottom: 12px;
   }
   .content,
   .topbar {

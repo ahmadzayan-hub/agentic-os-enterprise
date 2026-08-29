@@ -114,6 +114,11 @@ const EN = {
   "chrome.noMfa": "no MFA",
   "chrome.signOut": "Sign out",
   "chrome.language": "Language",
+  "chrome.openNavigation": "Open navigation",
+  "chrome.closeNavigation": "Close navigation",
+  "chrome.loadingSession": "Loading your session…",
+  "chrome.sessionError": "We could not load your session.",
+  "chrome.retry": "Try again",
 
   "notice.untranslated":
     "This surface has not been translated. Layout direction follows your " +
@@ -174,6 +179,11 @@ const AR: Record<MessageKey, string> = {
   "chrome.noMfa": "بلا تحقق ثنائي",
   "chrome.signOut": "تسجيل الخروج",
   "chrome.language": "اللغة",
+  "chrome.openNavigation": "فتح قائمة التنقل",
+  "chrome.closeNavigation": "إغلاق قائمة التنقل",
+  "chrome.loadingSession": "جارٍ تحميل جلستك…",
+  "chrome.sessionError": "تعذّر تحميل جلستك.",
+  "chrome.retry": "إعادة المحاولة",
 
   "notice.untranslated":
     "لم تُترجَم هذه الشاشة بعد. اتجاه العرض يتبع لغتك، أما المحتوى أدناه " +

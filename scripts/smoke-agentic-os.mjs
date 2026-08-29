@@ -22,6 +22,16 @@ function assert(condition, message) {
 const anonymous = await request("/runs");
 assert(anonymous.response.status === 401, "anonymous runs request must be rejected");
 
+const readiness = await request("/../readyz");
+assert(readiness.response.ok && readiness.body.status === "ready", "database-backed readiness failed");
+
+const untrustedOrigin = await request("/auth/login", {
+  method: "POST",
+  headers: { origin: "https://attacker.invalid" },
+  body: JSON.stringify({ tenant: "northstar-demo", email: "nobody@example.com", password: "invalid" }),
+});
+assert(untrustedOrigin.response.status === 403, "untrusted mutation origin must be rejected");
+
 const withoutMfa = await request("/auth/login", {
   method: "POST",
   body: JSON.stringify({
@@ -49,6 +59,9 @@ const login = await request("/auth/login", {
 assert(login.response.ok && login.body.principal.mfa_satisfied, "MFA login failed");
 const cookie = login.cookie;
 
+const unknownPolicy = await request("/unknown-protected-route", {}, cookie);
+assert(unknownPolicy.response.status === 403, "protected routes without an authorization policy must fail closed");
+
 const before = await request("/audit/verify", {}, cookie);
 assert(before.response.ok && before.body.intact, "audit chain must begin intact");
 const marker = `smoke-${Date.now()}`;
@@ -68,6 +81,12 @@ const search = await request("/knowledge/search", {
   body: JSON.stringify({ query: marker }),
 }, cookie);
 assert(search.response.ok && search.body.results.some((item) => item.document_id === document.body.document.id), "ingested document was not searchable");
+
+const invalidKillSwitch = await request("/security/kill-switches", {
+  method: "POST",
+  body: JSON.stringify({ scope: "UNKNOWN", target_key: "", engaged: true, reason: "invalid scope", engaged_at: null }),
+}, cookie);
+assert(invalidKillSwitch.response.status === 400, "invalid kill-switch scope must be rejected");
 
 await request("/auth/logout", { method: "POST" }, cookie);
 const revoked = await request("/auth/me", {}, cookie);
