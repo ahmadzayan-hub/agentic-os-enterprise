@@ -48,23 +48,30 @@ DEMO_USERS: tuple[dict, ...] = (
     {
         "email": "chief.engineer@rta.example",
         "display_name": "Chief Engineer",
-        "roles": ["operator", "approver"],
+        "roles": ["operator", "approver", "department_manager"],
         "clearance": "CONFIDENTIAL",
         "attributes": {"section": "department", "title": "Chief Engineer"},
     },
     {
         "email": "systems.lead@rta.example",
         "display_name": "Systems Section Lead",
-        "roles": ["operator"],
+        "roles": ["operator", "section_lead"],
         "clearance": "CONFIDENTIAL",
         "attributes": {"section": "systems"},
     },
     {
         "email": "rollingstock.lead@rta.example",
         "display_name": "Rolling Stock Section Lead",
-        "roles": ["operator"],
+        "roles": ["operator", "section_lead"],
         "clearance": "CONFIDENTIAL",
         "attributes": {"section": "rolling_stock"},
+    },
+    {
+        "email": "field.engineer@rta.example",
+        "display_name": "Field Maintenance Engineer",
+        "roles": ["engineer"],
+        "clearance": "INTERNAL",
+        "attributes": {"section": "systems"},
     },
     {
         "email": "analyst@rta.example",
@@ -226,6 +233,11 @@ def seed_all(*, include_domain: bool = True) -> dict:
             summary["identity"]["primary"]["tenant_id"],
             summary["identity"]["primary"]["organization_id"],
         )
+
+        from agentic_os.core.seed_decisions import seed_decisions
+
+        with provisioning_session_scope() as session:
+            summary["decisions"] = seed_decisions(session, summary["identity"]["primary"]["tenant_id"])
     return summary
 
 

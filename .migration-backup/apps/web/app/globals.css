@@ -310,6 +310,34 @@ h3 {
   flex-direction: column;
   gap: 18px;
 }
+/* A tighter stack for content inside a card, where 18px reads as disconnected. */
+.stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* Label/value pairs. Logical properties throughout, so the definition column
+   sits on the correct side in Arabic without a second rule. */
+.kv {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+.kv dt {
+  color: var(--text-3);
+  font-size: 13px;
+}
+.kv dd {
+  margin-inline-start: 0;
+  font-size: 14px;
+}
+details > summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-3);
+  padding-block: 4px;
+}
 .row {
   display: flex;
   align-items: center;

@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
-
 import { ApiError, apiFetch } from "@/lib/api";
+import { redirectTo } from "@/lib/redirect";
 
 export async function POST(
   request: Request,
@@ -16,13 +15,10 @@ export async function POST(
       method: "POST",
       body: JSON.stringify({ decision, comment }),
     });
-    return NextResponse.redirect(new URL("/approvals?decided=1", request.url), {
-      status: 303,
-    });
+    return redirectTo("/approvals", { decided: "1" });
   } catch (error) {
-    const message = error instanceof ApiError ? error.message : "Decision failed";
-    const url = new URL("/approvals", request.url);
-    url.searchParams.set("error", message);
-    return NextResponse.redirect(url, { status: 303 });
+    return redirectTo("/approvals", {
+      error: error instanceof ApiError ? error.message : "Decision failed",
+    });
   }
 }

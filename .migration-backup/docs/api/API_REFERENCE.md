@@ -3,7 +3,7 @@
 Generated from the application's own OpenAPI document by
 `scripts/generate_api_reference.py`. Do not edit by hand.
 
-**54 endpoints** under `/api/v1`, plus `/health` and `/ready`.
+**69 endpoints** under `/api/v1`, plus `/health` and `/ready`.
 
 Authentication is a session cookie issued by `POST /api/v1/auth/login`;
 the cookie is httpOnly and the console exchanges it server-side, so the
@@ -35,6 +35,26 @@ caller's navigation shows.
 | GET | `/api/v1/skills` | `skills:read` | List Skills |
 | GET | `/api/v1/tools` | `tools:read` | List Tools |
 | GET | `/api/v1/tools/calls` | `tools:read` | Tool Calls |
+
+## decisions
+
+| Method | Path | Permission | Purpose |
+|---|---|---|---|
+| GET | `/api/v1/decisions` | `decisions:read` | Decision Queue |
+| POST | `/api/v1/decisions` | `decisions:create` | Raise Decision |
+| GET | `/api/v1/decisions/effectiveness` | `decisions:read` | Effectiveness |
+| GET | `/api/v1/decisions/states` | `decisions:read` | Lifecycle Graph |
+| GET | `/api/v1/decisions/{decision_id}` | `decisions:read` | Decision Case |
+| POST | `/api/v1/decisions/{decision_id}/evidence` | `decisions:analyse` | Add Evidence |
+| POST | `/api/v1/decisions/{decision_id}/lessons` | `decisions:verify` | Record Lesson |
+| POST | `/api/v1/decisions/{decision_id}/options` | `decisions:analyse` | Add Option |
+| POST | `/api/v1/decisions/{decision_id}/outcome` | `decisions:verify` | Record Outcome |
+| POST | `/api/v1/decisions/{decision_id}/recommendation` | `decisions:analyse` | Add Recommendation |
+| POST | `/api/v1/decisions/{decision_id}/transitions` | `decisions:read` | Move Decision |
+| GET | `/api/v1/kpis` | `kpis:read` | Kpi List |
+| POST | `/api/v1/kpis/compute` | `kpis:write` | Kpi Compute |
+| GET | `/api/v1/notifications` | `notifications:read` | Inbox |
+| POST | `/api/v1/notifications/{notification_id}/read` | `notifications:read` | Mark Read |
 
 ## governance
 

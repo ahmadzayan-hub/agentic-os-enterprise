@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { redirectTo } from "@/lib/redirect";
 
 import { API_BASE, SESSION_COOKIE } from "@/lib/api";
 
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     }).catch(() => undefined);
   }
 
-  const redirect = NextResponse.redirect(new URL("/login", request.url), { status: 303 });
+  const redirect = redirectTo("/login");
   redirect.cookies.delete(SESSION_COOKIE);
   return redirect;
 }

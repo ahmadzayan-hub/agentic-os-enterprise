@@ -282,3 +282,62 @@ def test_the_generated_api_reference_matches_the_application() -> None:
                 f"{method} {path} requires {permission} but the reference disagrees; "
                 "regenerate it with scripts/generate_api_reference.py"
             )
+
+
+# ------------------------------------------------------------- README facts
+#
+# Every headline count in the README was written by hand once and then drifted:
+# 60 controls when there were 70, 23 accessibility surfaces when there were 25,
+# 332 tests when there were 449. None of it was dishonest when written and all
+# of it was wrong by the time anyone read it. The block is generated now, and
+# this fails when it stops matching — the same treatment the API reference gets.
+
+
+def test_the_readme_headline_numbers_match_the_repository() -> None:
+    import sys
+
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    import repo_facts
+
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    assert repo_facts.START in readme and repo_facts.END in readme, (
+        "the README lost its generated region; restore the markers"
+    )
+
+    facts = repo_facts.collect()
+    # The two evidence-derived fields are excluded from the comparison: they
+    # come from artefacts a fresh checkout has not produced, and a test that
+    # demanded them would fail for want of a test run rather than for drift.
+    facts["executed_tests"] = None
+    facts["accessibility"] = None
+    expected = repo_facts.render(facts)
+
+    start = readme.index(repo_facts.START)
+    end = readme.index(repo_facts.END) + len(repo_facts.END)
+    actual = readme[start:end]
+
+    def structural(block: str) -> list[str]:
+        skip = ("| Tests |", "| Accessibility |")
+        return [line for line in block.splitlines() if not line.startswith(skip)]
+
+    assert structural(actual) == structural(expected), (
+        "the README's generated block is out of date; regenerate it with `python scripts/repo_facts.py`"
+    )
+
+
+def test_the_generator_reports_missing_evidence_rather_than_inventing_it() -> None:
+    """A count nobody executed is not evidence, and must not read like one."""
+    import sys
+
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    import repo_facts
+
+    blank = repo_facts.collect()
+    blank["executed_tests"] = None
+    blank["accessibility"] = None
+    rendered = repo_facts.render(blank)
+    assert "not measured in this checkout" in rendered
+    assert "not audited in this checkout" in rendered
+    # And it must not fall back to a plausible-looking zero.
+    assert "| Tests | 0" not in rendered
+    assert "0 scans" not in rendered

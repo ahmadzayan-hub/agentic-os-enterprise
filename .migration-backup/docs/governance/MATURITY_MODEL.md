@@ -22,6 +22,7 @@ A critical failed or expired control blocks production certification regardless 
 |---|---:|
 | Business architecture | 7 |
 | UX and accessibility | 9 |
+| Decision intelligence | 23 |
 | Enterprise architecture | 8 |
 | Agent architecture | 10 |
 | Workflow and orchestration | 8 |
@@ -39,7 +40,7 @@ A critical failed or expired control blocks production certification regardless 
 | Deployment | 4 |
 | Independent assurance | 3 |
 | Performance | 3 |
-| **Total** | **113** |
+| **Total** | **136** |
 
 The total is deliberately not normalised to 100. Because the score is verified
 weight over total applicable weight, a control the platform cannot yet satisfy

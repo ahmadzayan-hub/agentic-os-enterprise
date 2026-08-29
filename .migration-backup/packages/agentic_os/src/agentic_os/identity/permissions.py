@@ -98,6 +98,22 @@ CATALOGUE: tuple[Permission, ...] = (
     _p("outcomes:write", "Record business outcomes", "MEDIUM"),
     _p("costs:read", "View cost and budget data"),
     _p("costs:write", "Manage budgets", "HIGH"),
+    # Decision intelligence.
+    #
+    # ``decisions:read`` grants the *right* to read decisions; it does not grant
+    # access to any particular decision. Domain membership does that, and is
+    # evaluated inside the SQL predicate, so a holder of this permission with no
+    # membership sees zero rows rather than a filtered list.
+    _p("decisions:read", "View decision cases"),
+    _p("decisions:create", "Raise a decision case", "MEDIUM"),
+    _p("decisions:analyse", "Add options, evidence and recommendations", "MEDIUM"),
+    _p("decisions:review", "Review a recommendation and send it for approval", "HIGH"),
+    _p("decisions:approve", "Approve or reject a decision", "CRITICAL"),
+    _p("decisions:execute", "Dispatch the approved action", "CRITICAL"),
+    _p("decisions:verify", "Record a verified outcome against its target", "HIGH"),
+    _p("kpis:read", "View KPI definitions and values"),
+    _p("kpis:write", "Define KPIs and their targets", "HIGH"),
+    _p("notifications:read", "Read your own notification inbox"),
 )
 
 CATALOGUE_BY_ID = {p.id: p for p in CATALOGUE}
@@ -106,6 +122,17 @@ CATALOGUE_BY_ID = {p.id: p for p in CATALOGUE}
 def _ids(*prefixes: str) -> tuple[str, ...]:
     return tuple(p.id for p in CATALOGUE if p.id.split(":", 1)[0] in prefixes)
 
+
+#: Authority over a business decision, as distinct from authority over the
+#: platform that supports it. The Platform Administrator role is granted every
+#: permission in the catalogue, so without this exclusion the person who
+#: administers the AI platform would silently acquire the power to review,
+#: approve, execute and verify the organisation's decisions — a separation of
+#: duties failure that no amount of audit logging repairs after the fact. These
+#: four are held only by roles that carry the corresponding accountability.
+BUSINESS_DECISION_AUTHORITY = frozenset(
+    {"decisions:review", "decisions:approve", "decisions:execute", "decisions:verify"}
+)
 
 #: Reads that must not be granted by a blanket "read everything" role. The
 #: audit ledger and the privacy register expose who did what and whose personal
@@ -131,7 +158,7 @@ SYSTEM_ROLES: tuple[SystemRole, ...] = (
         slug="executive",
         name="Executive",
         description="Business oversight: outcomes, risk posture and approvals.",
-        permissions=READ_ONLY + ("approvals:decide", "runs:create"),
+        permissions=READ_ONLY + ("approvals:decide", "runs:create", "decisions:review", "decisions:approve"),
         max_autonomy="A2",
     ),
     SystemRole(
@@ -174,10 +201,71 @@ SYSTEM_ROLES: tuple[SystemRole, ...] = (
         max_autonomy="A2",
     ),
     SystemRole(
+        slug="engineer",
+        name="Engineer",
+        description=(
+            "Raises decision cases from the field and supplies the evidence "
+            "behind them. Cannot review, approve or execute their own case."
+        ),
+        permissions=READ_ONLY
+        + (
+            "runs:create",
+            "tasks:write",
+            "incidents:write",
+            "decisions:create",
+            "decisions:analyse",
+        ),
+        max_autonomy="A1",
+    ),
+    SystemRole(
+        slug="section_lead",
+        name="Section Lead",
+        description=(
+            "Reviews recommendations within their section and sends them for "
+            "approval. Reviewing is deliberately not approving: the brief "
+            "requires REVIEW and APPROVE to be separate stations, and a role "
+            "holding both collapses them."
+        ),
+        permissions=READ_ONLY
+        + (
+            "runs:create",
+            "tasks:write",
+            "incidents:write",
+            "workflows:execute",
+            "decisions:create",
+            "decisions:analyse",
+            "decisions:review",
+            "decisions:verify",
+        ),
+        max_autonomy="A2",
+    ),
+    SystemRole(
+        slug="department_manager",
+        name="Department Manager",
+        description=(
+            "Accountable for decisions across a department: approves within "
+            "authority, owns KPI targets and signs off verified outcomes."
+        ),
+        permissions=READ_ONLY
+        + (
+            "runs:create",
+            "approvals:decide",
+            "decisions:create",
+            "decisions:review",
+            "decisions:approve",
+            "decisions:execute",
+            "decisions:verify",
+            "kpis:write",
+            "outcomes:write",
+        ),
+        requires_mfa=True,
+        max_autonomy="A2",
+    ),
+    SystemRole(
         slug="approver",
         name="Approver",
         description="Holds human authorization authority for A4 actions.",
-        permissions=READ_ONLY + ("approvals:decide", "approvals:delegate"),
+        permissions=READ_ONLY + ("approvals:decide", "approvals:delegate", "decisions:approve"),
         requires_mfa=True,
         max_autonomy="A2",
     ),
@@ -231,8 +319,11 @@ SYSTEM_ROLES: tuple[SystemRole, ...] = (
     SystemRole(
         slug="platform_admin",
         name="Platform Administrator",
-        description="Full administrative authority within the tenant.",
-        permissions=tuple(p.id for p in CATALOGUE),
+        description=(
+            "Full administrative authority over the platform within the tenant. "
+            "Explicitly excludes authority over business decisions."
+        ),
+        permissions=tuple(p.id for p in CATALOGUE if p.id not in BUSINESS_DECISION_AUTHORITY),
         requires_mfa=True,
         max_autonomy="A3",
     ),

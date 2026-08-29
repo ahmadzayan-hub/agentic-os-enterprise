@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import functools
 import os
+import time
 from collections.abc import Iterator
 from typing import Any
 
@@ -231,3 +232,88 @@ def ctx(principal):
 @pytest.fixture()
 def demo_password() -> str:
     return DEMO_PASSWORD
+
+
+# --------------------------------------------------------------- signing in
+#
+# Several roles require a second factor, and the platform means it: login
+# returns 401 with ``mfa_required`` until a valid TOTP code is presented, and
+# replay protection then refuses that same code a second time. Signing in once
+# per user per run is therefore not an optimisation — repeated sign-ins inside
+# one 30-second window genuinely fail, and the right response to that is to
+# sign in once, not to weaken the control.
+
+
+def totp_for(email: str) -> str | None:
+    """A current code for a user, read back through the platform's own KMS."""
+    from agentic_os.identity.mfa import _kms, totp_now
+
+    with provisioning_session_scope() as session:
+        row = (
+            session.execute(
+                text(
+                    "SELECT u.id, m.secret_ciphertext, m.digits, m.period_seconds "
+                    "FROM users u JOIN user_mfa m ON m.user_id = u.id WHERE u.email = :e"
+                ),
+                {"e": email},
+            )
+            .mappings()
+            .first()
+        )
+        if row is None:
+            return None
+        secret = _kms().decrypt(row["secret_ciphertext"], aad=f"user:{row['id']}").decode("utf-8")
+        return totp_now(secret, digits=int(row["digits"]), period=int(row["period_seconds"]))
+
+
+def _wait_for_the_next_totp_period(email: str) -> None:
+    """Block until the current TOTP window rolls over."""
+    period = 30
+    with provisioning_session_scope() as session:
+        row = session.execute(
+            text(
+                "SELECT m.period_seconds FROM users u JOIN user_mfa m ON m.user_id = u.id WHERE u.email = :e"
+            ),
+            {"e": email},
+        ).scalar_one_or_none()
+        if row:
+            period = int(row)
+    time.sleep(period - (time.time() % period) + 1)
+
+
+@pytest.fixture(scope="session")
+def sign_in(seeded):
+    """Return a helper that signs a seeded user in and caches their token."""
+    from agentic_os.api.app import create_app
+    from fastapi.testclient import TestClient
+
+    client = TestClient(create_app(), raise_server_exceptions=False)
+    cache: dict[str, dict[str, str]] = {}
+
+    def _sign_in(email: str) -> dict[str, str]:
+        if email in cache:
+            return cache[email]
+        payload: dict[str, str] = {"email": email, "password": DEMO_PASSWORD}
+        response = client.post("/api/v1/auth/login", json=payload)
+        for attempt in range(2):
+            if response.status_code != 401:
+                break
+            detail = response.json().get("detail", {})
+            if not detail.get("details", {}).get("mfa_required"):
+                break
+            if attempt == 1:
+                # The current period's code has already been presented — by an
+                # earlier test module, or by a previous run inside the same
+                # 30 seconds. Waiting for the next period is the only correct
+                # answer; the alternative is disabling replay protection, which
+                # would leave the suite green while the control was off.
+                _wait_for_the_next_totp_period(email)
+            code = totp_for(email)
+            assert code is not None, f"{email} requires MFA but has no enrolment"
+            payload["mfa_code"] = code
+            response = client.post("/api/v1/auth/login", json=payload)
+        assert response.status_code == 200, f"{email}: {response.text}"
+        cache[email] = {"Authorization": f"Bearer {response.json()['access_token']}"}
+        return cache[email]
+
+    return _sign_in

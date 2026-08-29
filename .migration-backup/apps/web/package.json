@@ -8,7 +8,8 @@
     "start": "next start -p 3000",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "a11y": "node tests/accessibility/axe_audit.mjs"
+    "a11y": "node tests/accessibility/axe_audit.mjs",
+    "test": "node --experimental-strip-types --test tests/unit/*.test.ts"
   },
   "dependencies": {
     "next": "15.5.4",

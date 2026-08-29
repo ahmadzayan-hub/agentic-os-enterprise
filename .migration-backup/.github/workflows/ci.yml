@@ -376,6 +376,16 @@ jobs:
           npm ci || npm install
           npm run build
 
+      # Runs before the browser audit on purpose. These assert the display
+      # contract the axe run cannot see: axe checks that a page is reachable
+      # and readable, not that "Not Calculated" is the phrase where a figure
+      # is absent rather than a zero.
+      - name: Console display rules
+        working-directory: apps/web
+        run: |
+          npm run typecheck
+          npm test
+
       - name: Start the API and the console
         working-directory: apps/web
         run: |

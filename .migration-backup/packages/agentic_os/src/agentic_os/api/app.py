@@ -129,7 +129,15 @@ def create_app(*, include_docs: bool = True) -> FastAPI:
             status_code=exc.http_status, content=exc.to_dict(), headers=dict(_SECURITY_HEADERS)
         )
 
-    from agentic_os.api.v1 import auth, catalog, governance, knowledge, operations, runs
+    from agentic_os.api.v1 import (
+        auth,
+        catalog,
+        decisions,
+        governance,
+        knowledge,
+        operations,
+        runs,
+    )
 
     for router in (
         auth.router,
@@ -138,6 +146,7 @@ def create_app(*, include_docs: bool = True) -> FastAPI:
         catalog.router,
         knowledge.router,
         operations.router,
+        decisions.router,
     ):
         # The response class must be passed here as well as on the app: a router
         # created with a bare APIRouter() carries its own JSONResponse default,

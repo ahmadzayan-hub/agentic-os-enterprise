@@ -72,6 +72,7 @@ const EN = {
   "app.skipToContent": "Skip to main content",
 
   "nav.primary": "Primary",
+  "nav.group.decide": "Decide",
   "nav.group.operate": "Operate",
   "nav.group.build": "Build",
   "nav.group.know": "Know",
@@ -80,6 +81,8 @@ const EN = {
   "nav.group.administer": "Administer",
 
   "nav.commandCenter": "Command Center",
+  "nav.decisions": "Decision Queue",
+  "nav.inbox": "Inbox",
   "nav.runs": "Runs",
   "nav.approvals": "Approvals",
   "nav.incidents": "Incidents",
@@ -132,6 +135,7 @@ const AR: Record<MessageKey, string> = {
   "app.skipToContent": "تخطَّ إلى المحتوى الرئيسي",
 
   "nav.primary": "التنقل الرئيسي",
+  "nav.group.decide": "القرارات",
   "nav.group.operate": "التشغيل",
   "nav.group.build": "البناء",
   "nav.group.know": "المعرفة",
@@ -140,6 +144,8 @@ const AR: Record<MessageKey, string> = {
   "nav.group.administer": "الإدارة",
 
   "nav.commandCenter": "مركز القيادة",
+  "nav.decisions": "قائمة القرارات",
+  "nav.inbox": "صندوق الوارد",
   "nav.runs": "عمليات التنفيذ",
   "nav.approvals": "الموافقات",
   "nav.incidents": "الحوادث",

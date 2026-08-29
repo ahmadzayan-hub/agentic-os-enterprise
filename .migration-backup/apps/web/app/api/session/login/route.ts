@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
-
 import { API_BASE, SESSION_COOKIE } from "@/lib/api";
+import { redirectTo } from "@/lib/redirect";
 
 /**
  * Exchange credentials for a session cookie.
@@ -31,15 +30,15 @@ export async function POST(request: Request) {
       | null;
     const mfaRequired = payload?.detail?.details?.mfa_required === true;
     const message = payload?.detail?.message ?? "Sign-in failed";
-    const url = new URL("/login", request.url);
-    url.searchParams.set("error", message);
-    if (mfaRequired) url.searchParams.set("mfa", "1");
-    url.searchParams.set("email", email);
-    return NextResponse.redirect(url, { status: 303 });
+    return redirectTo("/login", {
+      error: message,
+      ...(mfaRequired ? { mfa: "1" } : {}),
+      email,
+    });
   }
 
   const body = (await response.json()) as { access_token: string; expires_in: number };
-  const redirect = NextResponse.redirect(new URL("/", request.url), { status: 303 });
+  const redirect = redirectTo("/");
   redirect.cookies.set({
     name: SESSION_COOKIE,
     value: body.access_token,
