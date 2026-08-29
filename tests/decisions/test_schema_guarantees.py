@@ -224,6 +224,18 @@ def test_a_confidence_with_its_inputs_is_accepted(scratch, probe) -> None:
         {**probe_params(probe), "c": REAL_CALCULATION},
     )
     scratch.flush()
+    # Read it back. "No exception was raised" is also true of a statement that
+    # quietly wrote nothing, and of one aimed at the wrong table.
+    stored = (
+        scratch.execute(
+            text("SELECT confidence, confidence_calculation FROM recommendations WHERE decision_id = :d"),
+            {"d": probe["decision"]},
+        )
+        .mappings()
+        .one()
+    )
+    assert float(stored["confidence"]) == 0.87
+    assert stored["confidence_calculation"]["inputs"][0]["name"] == "evidence_count"
 
 
 def test_a_recommendation_may_carry_no_confidence_at_all(scratch, probe) -> None:
@@ -240,6 +252,16 @@ def test_a_recommendation_may_carry_no_confidence_at_all(scratch, probe) -> None
         probe_params(probe),
     )
     scratch.flush()
+    stored = (
+        scratch.execute(
+            text("SELECT confidence, rationale FROM recommendations WHERE decision_id = :d"),
+            {"d": probe["decision"]},
+        )
+        .mappings()
+        .one()
+    )
+    assert stored["confidence"] is None, "the row must hold NULL, not a default"
+    assert stored["rationale"]
 
 
 # --------------------------------------------------------- verification is real
@@ -261,6 +283,20 @@ def test_a_verdict_with_a_verifier_and_a_method_is_accepted(scratch, probe) -> N
         probe_params(probe),
     )
     scratch.flush()
+    stored = (
+        scratch.execute(
+            text(
+                "SELECT verdict, verification_method, verified_at FROM decision_outcomes "
+                "WHERE decision_id = :d"
+            ),
+            {"d": probe["decision"]},
+        )
+        .mappings()
+        .one()
+    )
+    assert stored["verdict"] == "ACHIEVED"
+    assert stored["verification_method"]
+    assert stored["verified_at"] is not None
 
 
 # ---------------------------------------------------------------- other guards

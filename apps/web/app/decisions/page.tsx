@@ -1,6 +1,7 @@
 import { DecisionRow } from "@/components/decision";
 import { Card, Empty, Notice, SurfaceError } from "@/components/ui";
 import { apiTry } from "@/lib/api";
+import { queueBucket } from "@/lib/display";
 import type { DecisionQueue, DecisionSummary } from "@/lib/types";
 
 export const metadata = { title: "Decision Queue" };
@@ -18,9 +19,6 @@ export const metadata = { title: "Decision Queue" };
  * "nothing you can see is waiting".
  */
 
-const AWAITING_A_PERSON = ["AWAITING_REVIEW", "AWAITING_APPROVAL", "VERIFICATION_PENDING"];
-const IN_PROGRESS = ["DETECTED", "ANALYSING", "RECOMMENDATION_READY", "APPROVED", "EXECUTING"];
-
 export default async function DecisionsPage() {
   const { data, error, status } = await apiTry<DecisionQueue>("/api/v1/decisions?limit=200");
 
@@ -33,11 +31,9 @@ export default async function DecisionsPage() {
     );
   }
 
-  const waiting = data.items.filter((d) => AWAITING_A_PERSON.includes(d.state));
-  const active = data.items.filter((d) => IN_PROGRESS.includes(d.state));
-  const settled = data.items.filter(
-    (d) => !AWAITING_A_PERSON.includes(d.state) && !IN_PROGRESS.includes(d.state),
-  );
+  const waiting = data.items.filter((d) => queueBucket(d.state) === "WAITING_ON_A_PERSON");
+  const active = data.items.filter((d) => queueBucket(d.state) === "IN_PROGRESS");
+  const settled = data.items.filter((d) => queueBucket(d.state) === "SETTLED");
 
   return (
     <div className="stack">

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Empty, Status } from "@/components/ui";
+import { confidenceLabel, confidenceReason } from "@/lib/display";
 import type {
   Confidence,
   DecisionOption,
@@ -26,7 +27,7 @@ export function ConfidenceReadout({ confidence }: { confidence: Confidence }) {
           className={calculated ? "stat-value" : "badge badge-muted"}
           style={calculated ? { fontSize: 22 } : undefined}
         >
-          {confidence.display}
+          {confidenceLabel(confidence)}
         </span>
       </div>
       {calculated ? (
@@ -66,9 +67,7 @@ export function ConfidenceReadout({ confidence }: { confidence: Confidence }) {
         </details>
       ) : (
         <p className="muted" style={{ fontSize: 13 }}>
-          {confidence.calculation.reason ||
-            "There is not enough evidence to compute a defensible figure."}{" "}
-          A number has not been substituted.
+          {confidenceReason(confidence)} A number has not been substituted.
         </p>
       )}
     </div>

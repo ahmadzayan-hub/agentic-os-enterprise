@@ -186,7 +186,7 @@ residency from being processed by infrastructure in another; that enforcement
 lives in deployment topology, which does not exist yet (1.1).
 
 ### 2.11 Accessibility is automated-only
-23 surfaces × 2 colour schemes, 0 axe violations, 0 serious or critical — run
+25 surfaces × 2 colour schemes × 2 text directions, 0 violations — run
 against the real application in a real browser, and now in CI as well, against
 a seeded database with the API and console actually serving. But axe detects a minority of
 WCAG failures. There has been **no screen-reader pass, no keyboard-only
@@ -199,7 +199,7 @@ Right-to-left support is complete and verified. Locale drives `<html lang>` and
 `<html dir>`, the stylesheet contains no physical direction property — a test
 fails the build on `margin-left`, `text-align: right`, a bare `left:` offset or
 a `float`, in a rule written on one line as readily as on five — and the axe
-audit now runs all 23 surfaces in Arabic as well as English, 92 scans, zero
+audit now runs all 25 surfaces in Arabic as well as English, 100 scans, zero
 violations. A language switch posts to a real route and the choice survives in a
 cookie. That is UX-004.
 

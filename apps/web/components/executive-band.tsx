@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Card, Empty, Stat, Status } from "@/components/ui";
 import { apiTry } from "@/lib/api";
+import { effectivenessLabel, kpiValueLabel, queueBucket } from "@/lib/display";
 import type { DecisionQueue, Effectiveness, KpiDefinition } from "@/lib/types";
 
 /**
@@ -18,19 +19,6 @@ import type { DecisionQueue, Effectiveness, KpiDefinition } from "@/lib/types";
  * "Not Calculated" rather than as a zero.
  */
 
-const AWAITING_A_PERSON = ["AWAITING_REVIEW", "AWAITING_APPROVAL", "VERIFICATION_PENDING"];
-
-/**
- * Round a measurement for display.
- *
- * The stored value keeps full precision because the computation record has to
- * reconstruct it, but 87.610619% on an executive surface reads as false
- * precision — it implies the sixth decimal means something. Two decimals, and
- * trailing zeros dropped so a clean figure stays clean.
- */
-function formatMeasurement(value: number): string {
-  return Number(value.toFixed(2)).toLocaleString();
-}
 
 export async function ExecutiveBand() {
   const [queue, effectiveness, kpis] = await Promise.all([
@@ -45,7 +33,7 @@ export async function ExecutiveBand() {
   // simply does not claim to cover something it cannot see.
   if (!queue.data) return null;
 
-  const waiting = queue.data.items.filter((d) => AWAITING_A_PERSON.includes(d.state));
+  const waiting = queue.data.items.filter((d) => queueBucket(d.state) === "WAITING_ON_A_PERSON");
   const rate = effectiveness.data;
 
   return (
@@ -55,7 +43,7 @@ export async function ExecutiveBand() {
       <div className="grid grid-3">
         <Stat
           label="Decision effectiveness"
-          value={rate ? rate.display : "Not Calculated"}
+          value={effectivenessLabel(rate)}
           note={
             rate && rate.rate !== null ? (
               <>
@@ -126,14 +114,10 @@ export async function ExecutiveBand() {
                   </div>
                   <div style={{ fontSize: 14 }}>
                     {kpi.latest_value === null ? (
-                      <span className="muted">
-                        {kpi.computation === "NO_COMPUTATION"
-                          ? "Not measurable — this KPI is defined, and the platform holds no data it can be computed from"
-                          : "Not measured yet — nothing to measure in the current period"}
-                      </span>
+                      <span className="muted">{kpiValueLabel(kpi)}</span>
                     ) : (
                       <>
-                        {formatMeasurement(kpi.latest_value)} {kpi.unit}
+                        {kpiValueLabel(kpi)}
                         {kpi.target_value !== null ? (
                           <span className="muted">
                             {" "}
