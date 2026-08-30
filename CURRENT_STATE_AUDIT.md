@@ -68,7 +68,7 @@ Concretely — the directive's minimum data model versus the database:
 | `kpi_values` | **NO** | `metric_samples` (6 columns, no definition registry, no target, no owner) |
 | `actions` | **NO** | `run_steps` (execution steps, not governed business actions) |
 | `notifications` | **NO** | — |
-| `alerts` | partial | `alerts` (5 columns; no routing, no acknowledgement, no assignee) |
+| `alerts` | partial | `alerts` (5 columns; no routing, no acknowledgement, no assignee) — and, discovered later, **never written to at all**; closed by migration 0015, see `PRODUCTION_GAP_ANALYSIS.md` P1-6 |
 | `integrations` | partial | `connectors` (6 columns) |
 | `domains` | **NO** | `agents.domain` is a free string |
 | `teams` | **NO** | — |
@@ -286,7 +286,8 @@ metric samples tables, an incident register.
 
 Deductions, and they are substantial: **no OpenTelemetry export**, so traces stay in a
 Postgres table nobody will query during an incident. No dashboards. No alert routing —
-the `alerts` table has no assignee, no acknowledgement, no escalation. No SLO definitions
+the `alerts` table has no assignee, no acknowledgement, no escalation, and (found while
+closing this) has never held a row. No SLO definitions
 in code. Observability here is *recorded* but not *operable*: the data would support an
 investigation and would not surface a problem to a human unprompted.
 

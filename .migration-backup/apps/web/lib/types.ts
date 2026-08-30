@@ -268,3 +268,39 @@ export interface NotificationItem {
   decision_reference: string | null;
   decision_state: string | null;
 }
+
+export interface AlertRow {
+  id: string;
+  alert_type: string;
+  severity: string;
+  title: string;
+  detail: Record<string, unknown>;
+  source: string;
+  status: string;
+  dedupe_key: string;
+  occurrence_count: number;
+  escalation_level: number;
+  escalated_at: string | null;
+  required_permission: string;
+  created_at: string;
+  last_seen_at: string;
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+  assigned_at: string | null;
+  domain_slug: string | null;
+  domain_name: string | null;
+  assigned_to_email: string | null;
+  acknowledged_by_email: string | null;
+}
+
+export interface AlertList {
+  alerts: AlertRow[];
+  counts: {
+    total: number;
+    open: number;
+    critical_open: number;
+    unassigned: number;
+  };
+  limit: number;
+  offset: number;
+}

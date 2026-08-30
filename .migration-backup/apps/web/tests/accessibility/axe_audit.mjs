@@ -69,6 +69,7 @@ const SURFACES = [
   { path: "/operations/resilience", label: "Resilience" },
   { path: "/operations/workflows", label: "Workflows" },
   { path: "/operations/incidents", label: "Incidents" },
+  { path: "/operations/alerts", label: "Alerts" },
 ];
 
 // WCAG 2.2 AA plus the best-practice rules that catch real navigation problems.
@@ -112,10 +113,20 @@ async function main() {
     // the report would say "0 serious violations" about pages it never loaded.
     // That happened: the API's rate limiter refused the second context's login
     // after the first pass had spent the budget, and the run looked clean.
-    if (new URL(page.url()).pathname.startsWith("/login")) {
+    // Checked as "landed on the console", not as "is no longer on /login".
+    // The weaker test let a failure through: when the API was unreachable the
+    // sign-in route threw, the browser stopped on a 500 at
+    // /api/session/login — which does not start with "/login" — and the audit
+    // carried on to scan twenty-five redirects to the sign-in page and report
+    // them clean. A guard that only rules out the one failure you thought of
+    // is how this audit lies.
+    const landedAfterSignIn = new URL(page.url()).pathname;
+    if (landedAfterSignIn !== "/") {
       throw new Error(
-        `sign-in failed for ${scheme}/${locale}: still on ${page.url()}. ` +
-          `Raise AGENTIC_RATE_LIMIT_PER_MINUTE on the API this audit points at.`,
+        `sign-in failed for ${scheme}/${locale}: landed on ${page.url()} rather ` +
+          `than the console. Check the API is reachable at the address the ` +
+          `console is configured with, and raise AGENTIC_RATE_LIMIT_PER_MINUTE ` +
+          `on it — the audit signs in four times.`,
       );
     }
 

@@ -31,7 +31,7 @@ from agentic_os.control import approval_engine
 from agentic_os.core.context import system_context
 from agentic_os.core.db import bind_tenant, get_session_factory, provisioning_session_scope
 from agentic_os.core.ids import new_ulid
-from agentic_os.observability import telemetry
+from agentic_os.observability import alerting, telemetry
 from agentic_os.runtime import events as event_bus
 from agentic_os.runtime import workflow_engine
 
@@ -55,11 +55,16 @@ class PassResult:
     events_dispatched: int = 0
     events_dead: int = 0
     approvals_expired: int = 0
+    alerts_raised: int = 0
+    alerts_resolved: int = 0
+    alerting_ran: int = 0
     errors: list[str] = field(default_factory=list)
 
     @property
     def did_work(self) -> bool:
-        return bool(self.runs_advanced or self.events_dispatched or self.approvals_expired)
+        return bool(
+            self.runs_advanced or self.events_dispatched or self.approvals_expired or self.alerting_ran
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -68,6 +73,9 @@ class PassResult:
             "events_dispatched": self.events_dispatched,
             "events_dead": self.events_dead,
             "approvals_expired": self.approvals_expired,
+            "alerting_ran": self.alerting_ran,
+            "alerts_raised": self.alerts_raised,
+            "alerts_resolved": self.alerts_resolved,
             "errors": self.errors,
         }
 
@@ -108,6 +116,24 @@ def tick(config: WorkerConfig | None = None) -> PassResult:
             result.events_dead += int(delivery.get("dead", 0))
 
             result.approvals_expired += approval_engine.expire_due_approvals(session, tenant_id)
+
+            # Alerting, on its own schedule rather than every pass — see
+            # ALERTING_INTERVAL. This is what makes the platform say something
+            # unprompted: without it every rule, every route and every surface
+            # built for alerts still waits for somebody to come and look.
+            if alerting.due(session, ctx):
+                outcome = alerting.evaluate(session, ctx)
+                result.alerting_ran += 1
+                result.alerts_raised += outcome.raised
+                result.alerts_resolved += outcome.resolved
+                # A rule that could not run is a worker error, not a footnote.
+                # It means a condition is no longer being checked at all, and
+                # that has to reach the log the operator actually reads.
+                for rule_name, failure in outcome.failed_rules.items():
+                    result.errors.append(f"{tenant_id}: alert rule {rule_name}: {failure}")
+                telemetry.record_metric(
+                    session, ctx, alerting.ALERTING_RUN_METRIC, 1, labels=outcome.to_dict()
+                )
 
             telemetry.record_metric(
                 session,

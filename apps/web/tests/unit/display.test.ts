@@ -18,11 +18,15 @@ import { describe, it } from "node:test";
 
 import {
   NOT_CALCULATED,
+  alertOwnerLabel,
+  alertSummary,
   confidenceLabel,
   confidenceReason,
   effectivenessLabel,
+  escalationLabel,
   formatMeasurement,
   kpiValueLabel,
+  occurrenceLabel,
   queueBucket,
 } from "../../lib/display.ts";
 
@@ -188,5 +192,60 @@ describe("the decision queue", () => {
     assert.ok(buckets.every((b) => b !== undefined));
     // All three sections are used; a bucket nothing reaches is dead UI.
     assert.equal(new Set(buckets).size, 3);
+  });
+});
+
+describe("alerts", () => {
+  it("does not render a single occurrence as \"1 times\"", () => {
+    assert.equal(occurrenceLabel(1), "Seen once");
+    assert.equal(occurrenceLabel(0), "Seen once");
+  });
+
+  it("makes a recurring condition read as recurring", () => {
+    assert.equal(occurrenceLabel(14), "Seen 14 times");
+    assert.notEqual(occurrenceLabel(14), occurrenceLabel(1));
+  });
+
+  it("says an alert is not escalated rather than showing nothing", () => {
+    const label = escalationLabel(0);
+    assert.ok(label.length > 0);
+    assert.ok(!label.includes("0"));
+  });
+
+  it("counts escalations without inventing a plural", () => {
+    assert.equal(escalationLabel(1), "Escalated once");
+    assert.equal(escalationLabel(3), "Escalated 3 times");
+  });
+
+  it("never leaves an unassigned alert looking blank", () => {
+    // A blank owner cell reads as a rendering fault, and the alert nobody is
+    // named against is the one most likely to be missed.
+    const label = alertOwnerLabel(null);
+    assert.ok(label.length > 10);
+    assert.ok(label.toLowerCase().includes("unassigned"));
+  });
+
+  it("shows a real owner as themselves", () => {
+    assert.equal(alertOwnerLabel("lead@rta.example"), "lead@rta.example");
+  });
+
+  it("distinguishes a quiet system from one that has never alerted", () => {
+    const never = alertSummary({ total: 0, open: 0, critical_open: 0, unassigned: 0 });
+    const quiet = alertSummary({ total: 9, open: 0, critical_open: 0, unassigned: 0 });
+    assert.notEqual(never, quiet);
+    assert.ok(never.includes("ever been raised"));
+    assert.ok(quiet.includes("resolved"));
+  });
+
+  it("leads with what is open, and names what nobody owns", () => {
+    const summary = alertSummary({ total: 12, open: 4, critical_open: 1, unassigned: 2 });
+    assert.ok(summary.startsWith("4 open"));
+    assert.ok(summary.includes("1 critical"));
+    assert.ok(summary.includes("nobody assigned"));
+  });
+
+  it("does not mention critical or unassigned when there are none", () => {
+    const summary = alertSummary({ total: 5, open: 2, critical_open: 0, unassigned: 0 });
+    assert.equal(summary, "2 open.");
   });
 });

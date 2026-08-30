@@ -116,3 +116,66 @@ export function queueBucket(state: string): Bucket {
   if (IN_PROGRESS.has(state)) return "IN_PROGRESS";
   return "SETTLED";
 }
+
+/**
+ * How many times a condition has recurred, in words.
+ *
+ * The count is the difference between "this happened" and "this has been
+ * happening all week", and a bare integer in a column reads as neither. One
+ * occurrence must not render as "1 times", and — more importantly — must not
+ * be silently dropped, because an alert with no count beside it looks like an
+ * alert that only just started.
+ */
+export function occurrenceLabel(count: number): string {
+  if (count <= 1) return "Seen once";
+  return `Seen ${count.toLocaleString("en-US")} times`;
+}
+
+/**
+ * Escalation, which is a claim that nobody has answered.
+ *
+ * Level 0 is the common case and says something real — it was raised and the
+ * clock has not run out — so it gets words rather than a blank cell.
+ */
+export function escalationLabel(level: number): string {
+  if (level <= 0) return "Not escalated";
+  return level === 1 ? "Escalated once" : `Escalated ${level} times`;
+}
+
+/**
+ * Who owns an alert.
+ *
+ * An unassigned alert must say so. A blank owner column reads as a rendering
+ * gap and an alert nobody is named against is the one most likely to be missed
+ * — the platform could find nobody holding the required permission inside the
+ * relevant domain, and that is a staffing fact worth putting on the screen
+ * rather than an empty cell.
+ */
+export function alertOwnerLabel(email: string | null): string {
+  return email ?? "Unassigned — nobody holds the permission this alert needs";
+}
+
+/**
+ * What the alert list is telling you overall.
+ *
+ * Zero open alerts is reported as a measurement, not as silence: "nothing is
+ * open" and "alerting has never run" look identical on a quiet screen, and
+ * only one of them is good news.
+ */
+export function alertSummary(counts: {
+  total: number;
+  open: number;
+  critical_open: number;
+  unassigned: number;
+}): string {
+  if (counts.total === 0) {
+    return "No alert has ever been raised in your domains.";
+  }
+  if (counts.open === 0) {
+    return `Nothing is open. ${counts.total.toLocaleString("en-US")} alerts have been raised and resolved.`;
+  }
+  const parts = [`${counts.open.toLocaleString("en-US")} open`];
+  if (counts.critical_open > 0) parts.push(`${counts.critical_open} critical`);
+  if (counts.unassigned > 0) parts.push(`${counts.unassigned} with nobody assigned`);
+  return `${parts.join(", ")}.`;
+}
