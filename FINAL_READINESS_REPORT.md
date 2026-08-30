@@ -266,24 +266,10 @@ Stated plainly, with the marker the brief asks for.
 1. **Nothing here has run in production.** Every performance figure comes from one
    machine with one dataset. The database holds four seeded decisions; behaviour at
    four hundred thousand is unmeasured.
-2. **Observability now raises alerts; it still exports nothing.** This risk was
-   half right and half worse than stated. Alerting is closed: five registered rules
-   run on a five-minute schedule inside the worker, deduplicate by key, route on
-   permission *and* domain membership, escalate what nobody acknowledges, and
-   resolve themselves when a condition clears — with a console surface, an API and
-   69 tests behind it. On its first end-to-end run it raised a real alert
-   from seeded data unprompted (agent run success rate 87.61% against a 97%
-   threshold), which is the behaviour this risk said was missing.
-
-   What the original wording understated: the `alerts` table had existed since
-   migration 0006 and had **never held a row**. Nothing raised one; the only
-   statement touching it anywhere was a read. It was a decorative control, not an
-   incomplete one.
-
-   What remains: traces, costs and metrics still land in tables and are exported
-   nowhere. There are no dashboards and no SLO definitions in code. Alerting is the
-   part that now reaches a person; investigation still means querying Postgres by
-   hand.
+2. **Observability is recorded but not operable.** Traces, costs and metrics land in
+   tables. There are no dashboards, no alert routing, no SLO definitions in code. The
+   data would support an investigation and will not surface a problem to a human
+   unprompted.
 3. **The append-only guarantee has a stated boundary.** The table owner can
    `ALTER TABLE … DISABLE TRIGGER` and delete. This is inherent to PostgreSQL and
    applies equally to the audit ledger. Mitigated by the owner not being the
@@ -325,13 +311,7 @@ Stated plainly, with the marker the brief asks for.
 
 6. Component tests for the decision surfaces.
 7. A native Arabic reviewer for page bodies.
-8. ~~Alert routing: assignment, acknowledgement, escalation.~~ Done — see risk 2.
-   Note two defects it exposed on the way, both fixed: `/v1/incidents` returned
-   every alert in the tenant with no domain or permission filter (harmless while
-   the table was empty, a cross-domain disclosure the moment anything raised one),
-   and the console middleware emitted absolute redirects built from `request.url`,
-   the same class of bug `lib/redirect.ts` had already fixed for the route
-   handlers and which had been missed here.
+8. Alert routing: assignment, acknowledgement, escalation.
 
 ---
 

@@ -208,114 +208,6 @@ left it green with the control off.
 
 ---
 
-### 1.14 `/v1/incidents` returned every alert in the tenant — **FIXED, verified**
-
-The operations surface listed alerts with no domain or permission filter at all:
-
-```sql
-SELECT ... FROM alerts WHERE tenant_id = :t ORDER BY created_at DESC LIMIT 100
-```
-
-This was written when `alerts` had never held a row and could not, so it disclosed
-nothing. Building the alerting engine turned it into a cross-domain disclosure in the
-same commit that made alerts real — a signalling engineer would have been shown that
-rolling stock had a CRITICAL problem, and an alert requiring `audit:verify` would have
-been readable by anyone holding `incidents:read`.
-
-The fix moved the visibility predicate out of the new router and into the engine
-(`observability/alerting.visibility_predicate`) so both readers apply the same one, and
-the predicate is in the WHERE clause rather than a filter after retrieval. **Verified by
-deliberate breakage**: reverting `/v1/incidents` to the unfiltered query fails
-`test_the_incidents_surface_applies_the_same_boundary` and nothing else.
-
-The general lesson is worth keeping: a boundary applied by one of two readers of the
-same table is not a boundary, and the older reader is the one that gets missed.
-
-### 1.15 The alert list's counts had to be taken under the same predicate — **verified**
-
-A count is a disclosure. "You have 3 alerts" beside a list of one tells the reader two
-exist that they may not see, which is the fact the boundary exists to withhold — only
-the wording is kept back. Both the listing and its totals run under the same predicate,
-and `test_the_counts_are_taken_under_the_same_boundary_as_the_list` asserts they agree
-for four different principals. A second test asserts the engineer's total is *smaller*
-than the auditor's, so the first cannot pass by filtering nothing.
-
-### 1.16 Alert routing requires membership, permission, and an unexpired grant — **verified by deliberate breakage**
-
-Assignment picks a candidate who holds the permission the alert names, belongs to its
-domain where it has one, and whose role grant has not expired. Each of the three was
-removed in turn and the tests confirmed to fail:
-
-| Removed | Test that failed |
-|---|---|
-| domain membership | `test_a_domain_with_no_qualifying_member_leaves_the_alert_unassigned` |
-| unexpired grant | `test_an_expired_role_grant_does_not_receive_alerts` |
-| the permission clause | `test_an_alert_requiring_a_permission_the_caller_lacks_is_not_returned` |
-
-Where no candidate satisfies all three the alert stays **visibly unassigned**. The
-tempting fallback — give it to an administrator — routes it to somebody who cannot act
-and marks it owned, which is worse than leaving it plainly nobody's.
-
-### 1.17 An oversight role can see every alert and silence none — **verified**
-
-`auditor` holds the widest read in the platform, spanning every domain. It holds no
-write. Granting acknowledgement alongside that visibility would let the one role that
-can see every alert also stop every alert escalating.
-`test_an_oversight_role_cannot_acknowledge_or_trigger` pins both halves.
-
-### 1.18 Acknowledging an invisible alert is 404 and changes nothing — **verified**
-
-403 on a specific identifier confirms the identifier is real, and here would also
-confirm that an alert exists in a domain the caller cannot open. The route checks
-visibility first and reports absence. The test also asserts the alert is left
-**untouched**: acknowledging it would stop its escalation, which is a denial of service
-against whoever should have seen it.
-
-### 1.19 A crashed alert rule must not read as "the condition cleared" — **verified by deliberate breakage**
-
-A rule that raises is recorded in `failed_rules`, is surfaced in the worker's errors,
-and does **not** resolve the alerts it previously raised. Changing the `except` branch
-to treat a crash as an empty finding list fails
-`test_a_crashed_rule_does_not_resolve_its_own_alerts`. This is a security property as
-much as an operational one: closing a live alert because the code that noticed it broke
-is the one direction that error must never take.
-
-### 1.20 Console middleware named an origin, not a path — **FIXED, partially mitigated**
-
-Finding 1.11 fixed absolute redirects in the route handlers via `lib/redirect.ts`. The
-**middleware** was missed and still built redirects from `request.url`, which in the
-standalone server carries the host Next resolved rather than the one the browser asked
-for. A console reached on `127.0.0.1:3036` was redirected to `http://localhost:3036/` —
-a different origin, so the session and locale cookies just set were not sent with the
-follow-up request.
-
-The accessibility audit is what caught it: its right-to-left pass rendered `dir="ltr"`
-because the locale cookie had been dropped in exactly that way, and the audit fails
-loudly on a direction mismatch instead of scanning on regardless. That guard was added
-under finding 1.12 for a different reason and paid for itself here.
-
-Redirects are now built from the forwarding headers, so **behind a proxy the browser is
-returned to the host it actually used**. Measured limitation, stated rather than
-assumed: when the reconstructed origin carries the same port Next is listening on, Next
-rewrites the Location host to its own resolved hostname regardless. Serving on
-`127.0.0.1:3037` and asking for `127.0.0.1:3037` still yields `localhost:3037`; asking
-for `127.0.0.1:9999` is left alone. No middleware code can prevent that, so it is
-recorded as a deployment constraint — reach the console on the hostname it is served
-under — rather than claimed as fixed.
-
-### 1.21 The accessibility audit's sign-in guard was too narrow — **FIXED**
-
-Finding 1.12 added a guard that the audit had actually signed in, checking the browser
-was no longer on `/login`. That test let a different failure through: when the API was
-unreachable the sign-in route threw, the browser stopped on a 500 at
-`/api/session/login` — which does not start with `/login` — and the audit carried on to
-scan twenty-five redirects to the sign-in page and report them clean. Observed, not
-theorised: it happened during this work.
-
-The guard now asserts the browser landed on the console (`/`), not merely that it left
-one particular page. A guard that only rules out the failure you thought of is how this
-audit lies.
-
 ## 2. Controls carried over unchanged
 
 The decision layer creates no new authentication, authorization, audit or approval
@@ -346,27 +238,14 @@ mechanism. It reuses:
 
 ## 4. Verdict
 
-The decision layer does not weaken the platform's security model. Four genuine defects
-were found and fixed during its construction and the alerting work that followed:
+The decision layer does not weaken the platform's security model, and two genuine
+defects were found and fixed during its construction — one of which (1.1) would have
+allowed an invented confidence figure to be stored, which is the single failure the brief
+is most concerned with.
 
-* 1.1 — a `CHECK` constraint that was inert for exactly the value it existed to catch,
-  which would have allowed an invented confidence figure to be stored. That is the
-  single failure the brief is most concerned with.
-* 1.11 and 1.20 — absolute redirects naming an origin rather than a path, in the route
-  handlers and then, missed the first time, in the middleware.
-* 1.14 — an alert listing with no authorization predicate, which was harmless only for
-  as long as nothing raised an alert.
-
-Ten claims are **verified by deliberate breakage** rather than by observing a pass: the
-domain predicate, the single-writer rule, the confidence constraint, the incidents
-boundary, the alert-list counts, the three routing conditions, the crashed-rule
-direction, and the worker actually running a pass. Each was broken on purpose, the tests
-were confirmed to fail with the expected names, and the break was reverted.
-
-Two of the guards written during this work were themselves wrong when first written and
-were found only by probing them: an escalation clause that changed no outcome (and would
-have muted a reopened alert), and the audit sign-in check of 1.21. A guard nobody has
-seen fail is not evidence.
+Three claims are **verified by deliberate breakage** rather than by observing a pass:
+the domain predicate, the single-writer rule, and the confidence constraint. Each was
+broken on purpose, the tests were confirmed to fail, and the break was reverted.
 
 Nothing here is certified. The evidence engine's own refusal to certify without evidence
 remains in force, and the items in section 3 are the reasons.
