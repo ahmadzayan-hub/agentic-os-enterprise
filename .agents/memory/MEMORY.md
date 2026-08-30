@@ -1,0 +1,1 @@
+- [GitHub connector HTML blobs](github-connector-html-blobs.md) — exact Git blob uploads containing HTML may need an octet-stream JSON request to bypass intermediary blocking.
