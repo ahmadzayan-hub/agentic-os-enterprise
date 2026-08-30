@@ -134,9 +134,18 @@ Executing a decision produces run steps, not a business action with an owner and
 reversal path. **Closure:** `actions` table linked to the decision, with executor,
 status, reversibility and result.
 
-### P1-6 · Alerts have no routing
-No assignee, no acknowledgement, no escalation. **Closure:** assignment and
-acknowledgement columns plus an acknowledgement path; test.
+### P1-6 · Alerts have no routing — **CLOSED**
+Recorded as "no assignee, no acknowledgement, no escalation". That understated it: the
+acknowledgement columns *did* exist, and the real gap was that the `alerts` table had
+held no row since it shipped in migration 0006 — nothing anywhere raised one, and the
+only statement touching it was a read.
+
+**Closed by** migration 0015, `observability/alerting.py` (five registered rules,
+deduplication, resolution, permission-and-domain routing, escalation), the `/v1/alerts`
+routes, the `/operations/alerts` console surface, and a five-minute schedule inside the
+worker so a pass runs without anybody asking. 69 tests; each guard verified by
+deliberate breakage. Evidence: `SECURITY_REVIEW.md` §1.14–1.19,
+`FINAL_READINESS_REPORT.md` risk 2.
 
 ### P1-7 · No frontend tests
 Build + axe only. **Closure:** at minimum, tests for the decision surfaces' authorization
