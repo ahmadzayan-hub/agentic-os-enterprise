@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="400" viewBox="0 0 1280 400" role="img" aria-labelledby="title desc">
+  <title id="title">Agentic OS Enterprise</title>
+  <desc id="desc">Governed control plane for AI agents, approvals, knowledge, policy and audit evidence.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0c0f16"/>
+      <stop offset="1" stop-color="#131822"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f4fd8"/>
+      <stop offset="1" stop-color="#1740b4"/>
+    </linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#2a3446" stroke-width="1" opacity="0.55"/>
+    </pattern>
+  </defs>
+
+  <rect width="1280" height="400" fill="url(#bg)"/>
+  <rect x="760" width="520" height="400" fill="url(#grid)"/>
+
+  <!-- Control-plane motif: a governed flow from request to audited outcome -->
+  <g fill="none" stroke-width="2.5" stroke-linecap="round">
+    <path d="M840 120 H960" stroke="#3b4860"/>
+    <path d="M1000 120 V200" stroke="#3b4860"/>
+    <path d="M1000 240 V280 H1120" stroke="#3b4860"/>
+    <path d="M1040 220 H1160" stroke="#3b4860"/>
+  </g>
+  <g>
+    <rect x="800" y="96" width="48" height="48" rx="10" fill="#1a212e" stroke="#3b4860" stroke-width="2"/>
+    <rect x="960" y="96" width="80" height="48" rx="10" fill="#1a212e" stroke="#3b4860" stroke-width="2"/>
+    <rect x="964" y="196" width="72" height="48" rx="10" fill="url(#accent)"/>
+    <rect x="1160" y="196" width="64" height="48" rx="10" fill="#1a212e" stroke="#12694a" stroke-width="2"/>
+    <rect x="1120" y="256" width="64" height="48" rx="10" fill="#1a212e" stroke="#8a5a00" stroke-width="2"/>
+    <circle cx="824" cy="120" r="7" fill="#a8b3c4"/>
+    <path d="M988 214 l8 8 l16 -16" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M1180 220 h24" stroke="#12694a" stroke-width="3" stroke-linecap="round"/>
+    <path d="M1140 280 h24" stroke="#8a5a00" stroke-width="3" stroke-linecap="round"/>
+    <path d="M980 114 h40 M980 126 h28" stroke="#a8b3c4" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13" fill="#a8b3c4">
+    <text x="800" y="170">request</text>
+    <text x="960" y="170">policy</text>
+    <text x="964" y="268">approval</text>
+    <text x="1160" y="186">run</text>
+    <text x="1120" y="326">audit</text>
+  </g>
+
+  <!-- Brand mark -->
+  <rect x="80" y="104" width="56" height="56" rx="12" fill="url(#accent)"/>
+  <text x="108" y="142" text-anchor="middle" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="28" font-weight="700" fill="#ffffff">A</text>
+
+  <g font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif">
+    <text x="80" y="226" font-size="54" font-weight="700" fill="#e8ecf3" letter-spacing="-1">Agentic OS Enterprise</text>
+    <text x="80" y="272" font-size="22" fill="#a8b3c4">A governed control plane for AI agents, approvals,</text>
+    <text x="80" y="302" font-size="22" fill="#a8b3c4">knowledge, policy and audit evidence.</text>
+  </g>
+  <text x="80" y="350" font-family="ui-monospace, Menlo, Consolas, monospace" font-size="14" fill="#6b7a92">React + Vite console · Express 5 API · PostgreSQL</text>
+</svg>

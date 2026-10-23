@@ -593,9 +593,13 @@ a:hover {
   height: 100vh;
   overflow-y: auto;
 }
+/* The nav buttons also carry `.btn`, which is declared later with
+   display: inline-flex. The doubled class keeps them hidden on desktop. */
 .mobile-nav-trigger,
 .mobile-nav-close,
-.mobile-nav-backdrop {
+.mobile-nav-backdrop,
+.btn.mobile-nav-trigger,
+.btn.mobile-nav-close {
   display: none;
 }
 .session-state {
@@ -1108,8 +1112,8 @@ pre.code {
   .sidebar.sidebar-open {
     transform: translateX(0);
   }
-  .mobile-nav-trigger,
-  .mobile-nav-close {
+  .btn.mobile-nav-trigger,
+  .btn.mobile-nav-close {
     display: inline-flex;
   }
   .mobile-nav-backdrop {
@@ -1120,7 +1124,7 @@ pre.code {
     border: 0;
     background: rgb(15 23 42 / 38%);
   }
-  .mobile-nav-close {
+  .btn.mobile-nav-close {
     width: 100%;
     justify-content: center;
     margin-bottom: 12px;
@@ -1128,6 +1132,27 @@ pre.code {
   .content,
   .topbar {
     padding-inline: 16px;
+  }
+  /* Let the identity strip wrap under the trigger instead of pushing the
+     page wider than the viewport. */
+  .topbar {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .topbar-context {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .topbar-identity {
+    flex-basis: 100%;
+    gap: 8px;
+  }
+  .topbar-email,
+  .topbar-roles {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 

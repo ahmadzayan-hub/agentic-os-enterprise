@@ -15,6 +15,15 @@ if (Number.isNaN(port) || port <= 0) {
 
 const basePath = process.env.BASE_PATH ?? '/';
 
+// Optional local proxy for the API. On Replit the platform routes `/api` to the
+// API service. Elsewhere, set API_PROXY_TARGET (for example
+// http://localhost:8080) so `vite dev` and `vite preview` forward `/api` to a
+// running API server. Unset means no proxy, which matches the old behaviour.
+const apiProxyTarget = process.env.API_PROXY_TARGET;
+const apiProxy = apiProxyTarget
+  ? { '/api': { target: apiProxyTarget, changeOrigin: false } }
+  : undefined;
+
 export default defineConfig({
   base: basePath,
   plugins: [
@@ -60,10 +69,12 @@ export default defineConfig({
     fs: {
       strict: true,
     },
+    proxy: apiProxy,
   },
   preview: {
     port,
     host: '0.0.0.0',
     allowedHosts: true,
+    proxy: apiProxy,
   },
 });
