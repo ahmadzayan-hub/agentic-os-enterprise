@@ -66,6 +66,8 @@ pnpm install --frozen-lockfile
 export DATABASE_URL=postgresql://USER@localhost:5432/agentic
 pnpm --filter @workspace/db run migrate
 
+<p align="center"><img src="docs/assets/hero.jpg" alt="Concept image (AI-generated). Not a product screenshot." width="100%"><br><sub><em>Concept image (AI-generated). Not a product screenshot.</em></sub></p>
+
 # 2. API on port 8080 (demo mode seeds one demo identity)
 pnpm --filter @workspace/api-server run dev
 
