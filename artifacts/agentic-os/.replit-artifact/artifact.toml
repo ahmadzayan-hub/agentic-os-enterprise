@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Agentic OS Enterprise"
+description = "A governed enterprise AI control and intelligence platform for operating agent workflows, approvals, knowledge, security, and audit surfaces from one command center."
+version = "1.0.0"
+id = "artifacts/agentic-os"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22832
+
+[services.development]
+run = "pnpm --filter @workspace/agentic-os run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/agentic-os", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/agentic-os/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22832"
+BASE_PATH = "/"

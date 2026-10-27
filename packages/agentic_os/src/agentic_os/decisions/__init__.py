@@ -27,6 +27,13 @@ from agentic_os.decisions.effectiveness import (
     EffectivenessReport,
     decision_effectiveness_rate,
 )
+from agentic_os.decisions.kpi import (
+    COMPUTATIONS,
+    KpiOutcome,
+    computation_status,
+    compute_all,
+    month_bounds,
+)
 from agentic_os.decisions.lifecycle import (
     LEGAL_TRANSITIONS,
     STATES,
@@ -42,16 +49,21 @@ from agentic_os.decisions.repository import (
 )
 
 __all__ = [
+    "COMPUTATIONS",
     "LEGAL_TRANSITIONS",
     "STATES",
     "ConfidenceResult",
     "DecisionState",
     "EffectivenessReport",
     "IllegalTransition",
+    "KpiOutcome",
     "calculate_confidence",
+    "computation_status",
+    "compute_all",
     "create_decision",
     "decision_effectiveness_rate",
     "get_decision",
+    "month_bounds",
     "list_decisions",
     "transition",
     "user_domain_ids",

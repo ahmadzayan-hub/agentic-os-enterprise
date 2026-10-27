@@ -123,6 +123,9 @@ def get_decision(session: Session, ctx: ExecutionContext, decision_id: str) -> d
     Raises :class:`NotFound` when the caller may not see it. Not
     ``AuthorizationError``: a 403 against a specific identifier confirms the
     identifier names something real, which is the disclosure the brief forbids.
+
+    This request now loads the decision payload and every attached child table in
+    a single database round trip so the caller does not pay one query per list.
     """
     scope_sql, scope_params = _scope(session, ctx)
     row = (
@@ -130,7 +133,104 @@ def get_decision(session: Session, ctx: ExecutionContext, decision_id: str) -> d
             text(
                 f"""
                 SELECT {LIST_COLUMNS}, d.domain_id, d.owner_user_id, d.raised_by_user_id,
-                       d.run_id, d.detection_source, d.closed_at
+                       d.run_id, d.detection_source, d.closed_at,
+                       COALESCE(
+                         (
+                           SELECT jsonb_agg(to_jsonb(option_row))
+                           FROM (
+                             SELECT id, label, description, score, estimated_cost, currency,
+                                    risk, reversible, is_status_quo
+                               FROM decision_options option_row
+                              WHERE option_row.tenant_id = CAST(:t AS uuid)
+                                AND option_row.decision_id = d.id
+                              ORDER BY option_row.score DESC NULLS LAST
+                           ) AS option_row
+                         ),
+                         '[]'::jsonb
+                       ) AS options_json,
+                       COALESCE(
+                         (
+                           SELECT row_to_json(recommendation_row)
+                           FROM (
+                             SELECT id, option_id, rationale, reasoning_summary, produced_by,
+                                    confidence, confidence_calculation, created_at
+                               FROM recommendations recommendation_row
+                              WHERE recommendation_row.tenant_id = CAST(:t AS uuid)
+                                AND recommendation_row.decision_id = d.id
+                              ORDER BY recommendation_row.created_at DESC
+                              LIMIT 1
+                           ) AS recommendation_row
+                         ),
+                         'null'::jsonb
+                       ) AS recommendation_json,
+                       COALESCE(
+                         (
+                           SELECT jsonb_agg(to_jsonb(evidence_row))
+                           FROM (
+                             SELECT id, source_kind, source_ref, summary, authority_weight,
+                                    observed_at
+                               FROM decision_evidence evidence_row
+                              WHERE evidence_row.tenant_id = CAST(:t AS uuid)
+                                AND evidence_row.decision_id = d.id
+                              ORDER BY evidence_row.observed_at DESC
+                           ) AS evidence_row
+                         ),
+                         '[]'::jsonb
+                       ) AS evidence_json,
+                       COALESCE(
+                         (
+                           SELECT jsonb_agg(to_jsonb(transition_row))
+                           FROM (
+                             SELECT id, from_state, to_state, actor_kind, reason, occurred_at
+                               FROM decision_transitions transition_row
+                              WHERE transition_row.tenant_id = CAST(:t AS uuid)
+                                AND transition_row.decision_id = d.id
+                              ORDER BY transition_row.occurred_at ASC
+                           ) AS transition_row
+                         ),
+                         '[]'::jsonb
+                       ) AS transitions_json,
+                       COALESCE(
+                         (
+                           SELECT jsonb_agg(to_jsonb(action_row))
+                           FROM (
+                             SELECT id, title, action_kind, status, reversible, reversal_plan,
+                                    started_at, completed_at
+                               FROM actions action_row
+                              WHERE action_row.tenant_id = CAST(:t AS uuid)
+                                AND action_row.decision_id = d.id
+                              ORDER BY action_row.created_at ASC
+                           ) AS action_row
+                         ),
+                         '[]'::jsonb
+                       ) AS actions_json,
+                       COALESCE(
+                         (
+                           SELECT jsonb_agg(to_jsonb(outcome_row))
+                           FROM (
+                             SELECT id, kpi_definition_id, target_value, actual_value, unit,
+                                    verdict, verification_method, verified_at, notes
+                               FROM decision_outcomes outcome_row
+                              WHERE outcome_row.tenant_id = CAST(:t AS uuid)
+                                AND outcome_row.decision_id = d.id
+                              ORDER BY outcome_row.created_at DESC
+                           ) AS outcome_row
+                         ),
+                         '[]'::jsonb
+                       ) AS outcomes_json,
+                       COALESCE(
+                         (
+                           SELECT jsonb_agg(to_jsonb(lesson_row))
+                           FROM (
+                             SELECT id, lesson, category, created_at
+                               FROM lessons_learned lesson_row
+                              WHERE lesson_row.tenant_id = CAST(:t AS uuid)
+                                AND lesson_row.decision_id = d.id
+                              ORDER BY lesson_row.created_at ASC
+                           ) AS lesson_row
+                         ),
+                         '[]'::jsonb
+                       ) AS lessons_json
                   FROM decisions d
                   JOIN domains dom ON dom.id = d.domain_id AND dom.tenant_id = d.tenant_id
                   LEFT JOIN users owner
@@ -148,59 +248,13 @@ def get_decision(session: Session, ctx: ExecutionContext, decision_id: str) -> d
         raise NotFound(f"decision {decision_id} was not found")
 
     case = dict(row)
-    case["options"] = _children(
-        session,
-        ctx,
-        decision_id,
-        "SELECT id, label, description, score, estimated_cost, currency, risk, "
-        "reversible, is_status_quo FROM decision_options",
-        order="score DESC NULLS LAST",
-    )
-    case["recommendation"] = _one(
-        session,
-        ctx,
-        decision_id,
-        "SELECT id, option_id, rationale, reasoning_summary, produced_by, confidence, "
-        "confidence_calculation, created_at FROM recommendations",
-        order="created_at DESC",
-    )
-    case["evidence"] = _children(
-        session,
-        ctx,
-        decision_id,
-        "SELECT id, source_kind, source_ref, summary, authority_weight, observed_at FROM decision_evidence",
-        order="observed_at DESC",
-    )
-    case["transitions"] = _children(
-        session,
-        ctx,
-        decision_id,
-        "SELECT id, from_state, to_state, actor_kind, reason, occurred_at FROM decision_transitions",
-        order="occurred_at ASC",
-    )
-    case["actions"] = _children(
-        session,
-        ctx,
-        decision_id,
-        "SELECT id, title, action_kind, status, reversible, reversal_plan, "
-        "started_at, completed_at FROM actions",
-        order="created_at ASC",
-    )
-    case["outcomes"] = _children(
-        session,
-        ctx,
-        decision_id,
-        "SELECT id, kpi_definition_id, target_value, actual_value, unit, verdict, "
-        "verification_method, verified_at, notes FROM decision_outcomes",
-        order="created_at DESC",
-    )
-    case["lessons"] = _children(
-        session,
-        ctx,
-        decision_id,
-        "SELECT id, lesson, category, created_at FROM lessons_learned",
-        order="created_at ASC",
-    )
+    case["options"] = case.pop("options_json") or []
+    case["recommendation"] = case.pop("recommendation_json")
+    case["evidence"] = case.pop("evidence_json") or []
+    case["transitions"] = case.pop("transitions_json") or []
+    case["actions"] = case.pop("actions_json") or []
+    case["outcomes"] = case.pop("outcomes_json") or []
+    case["lessons"] = case.pop("lessons_json") or []
     return case
 
 

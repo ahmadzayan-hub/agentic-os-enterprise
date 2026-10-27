@@ -200,6 +200,21 @@ def test_a_stored_figure_satisfies_the_database_constraint(db, bench) -> None:
         },
     )
     db.flush()
+    # Read it back: the constraint accepting the row is only half the claim,
+    # and an INSERT that wrote nothing would satisfy the other half by default.
+    stored = (
+        db.execute(
+            text(
+                "SELECT confidence, confidence_calculation FROM recommendations "
+                "WHERE decision_id = CAST(:d AS uuid)"
+            ),
+            {"d": bench["id"]},
+        )
+        .mappings()
+        .one()
+    )
+    assert float(stored["confidence"]) == pytest.approx(result.value)
+    assert len(stored["confidence_calculation"]["inputs"]) == len(result.inputs)
 
 
 def test_more_evidence_than_saturation_does_not_keep_raising_it(db, bench) -> None:
