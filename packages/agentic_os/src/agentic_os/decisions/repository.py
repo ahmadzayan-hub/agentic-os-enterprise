@@ -150,7 +150,7 @@ def get_decision(session: Session, ctx: ExecutionContext, decision_id: str) -> d
                        ) AS options_json,
                        COALESCE(
                          (
-                           SELECT row_to_json(recommendation_row)
+                           SELECT to_jsonb(recommendation_row)
                            FROM (
                              SELECT id, option_id, rationale, reasoning_summary, produced_by,
                                     confidence, confidence_calculation, created_at
