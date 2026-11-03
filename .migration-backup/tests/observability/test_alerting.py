@@ -85,13 +85,11 @@ def _row(db: Session, dedupe_key: str) -> dict:
 
 
 def _rows(db: Session, dedupe_key: str) -> list[dict]:
-    return [
-        dict(r)
-        for r in db.execute(
-            text("SELECT * FROM alerts WHERE dedupe_key = :k ORDER BY created_at"),
-            {"k": dedupe_key},
-        ).mappings()
-    ]
+    # created_at is now(), the transaction start, so rows written inside one test
+    # transaction tie and their order would be the planner's. A resolved alert is by
+    # construction the earlier one, so it sorts first.
+    query = "SELECT * FROM alerts WHERE dedupe_key = :k ORDER BY created_at, (status <> 'RESOLVED')"
+    return [dict(r) for r in db.execute(text(query), {"k": dedupe_key}).mappings()]
 
 
 def _level(db: Session, dedupe_key: str) -> int:
