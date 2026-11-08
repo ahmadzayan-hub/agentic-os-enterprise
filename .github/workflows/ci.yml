@@ -6,7 +6,8 @@ name: ci
 on:
   pull_request:
   push:
-    branches: [main]
+    # Keep post-merge checks on the authoritative default branch as well as main.
+    branches: [main, claude/agentic-os-enterprise-v3.1-ogi9cq]
   workflow_dispatch:
 
 concurrency:
