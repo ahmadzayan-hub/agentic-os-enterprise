@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { apiFetch, ApiError } from "@/lib/api";
+import { apiFetch, ApiError, isApiUnavailable } from "@/lib/api";
 
 export default function LoginPage() {
   const [, navigate] = useLocation();
@@ -36,7 +36,11 @@ export default function LoginPage() {
       
       navigate("/");
     } catch (err) {
-      if (err instanceof ApiError) {
+      if (isApiUnavailable(err)) {
+        setError(
+          "The API server is not reachable. Start the API server, or route /api to it, then try again.",
+        );
+      } else if (err instanceof ApiError) {
         const p = err.payload as any;
         const mfaReq = p?.detail?.details?.mfa_required;
         if (mfaReq) {

@@ -119,6 +119,10 @@ const EN = {
   "chrome.loadingSession": "Loading your session…",
   "chrome.sessionError": "We could not load your session.",
   "chrome.retry": "Try again",
+  "chrome.apiUnavailable": "The API server is not reachable.",
+  "chrome.apiUnavailableHint":
+    "This console needs the Agentic OS API on the same origin under /api. " +
+    "Start the API server, or route /api to it, then try again.",
 
   "notice.untranslated":
     "This surface has not been translated. Layout direction follows your " +
@@ -184,6 +188,10 @@ const AR: Record<MessageKey, string> = {
   "chrome.loadingSession": "جارٍ تحميل جلستك…",
   "chrome.sessionError": "تعذّر تحميل جلستك.",
   "chrome.retry": "إعادة المحاولة",
+  "chrome.apiUnavailable": "تعذّر الوصول إلى خادم الواجهة البرمجية.",
+  "chrome.apiUnavailableHint":
+    "تحتاج وحدة التحكم إلى الواجهة البرمجية لنظام Agentic OS على النطاق نفسه " +
+    "تحت المسار ‎/api. شغّل خادم الواجهة البرمجية أو وجّه المسار ‎/api إليه، ثم أعد المحاولة.",
 
   "notice.untranslated":
     "لم تُترجَم هذه الشاشة بعد. اتجاه العرض يتبع لغتك، أما المحتوى أدناه " +

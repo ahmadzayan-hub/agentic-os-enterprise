@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, Link } from "wouter";
-import { apiFetch, ApiError } from "@/lib/api";
+import { apiFetch, ApiError, isApiUnavailable } from "@/lib/api";
 import { Principal } from "@/lib/types";
 import { LanguageSwitch } from "@/components/language-switch";
 import { Nav } from "@/components/nav";
@@ -10,7 +10,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
   const [, navigate] = useLocation();
   const [me, setMe] = useState<Principal | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+  const [loadError, setLoadError] = useState<"none" | "unavailable" | "failed">("none");
   const [revision, setRevision] = useState(0);
   const [navigationOpen, setNavigationOpen] = useState(false);
 
@@ -25,7 +25,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
     document.documentElement.lang = locale;
 
     setLoading(true);
-    setLoadError(false);
+    setLoadError("none");
     apiFetch<Principal>("/api/v1/auth/me")
       .then((data) => {
         setMe(data);
@@ -35,7 +35,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
           navigate("/login?reason=session");
           return;
         }
-        setLoadError(true);
+        setLoadError(isApiUnavailable(error) ? "unavailable" : "failed");
       })
       .finally(() => setLoading(false));
   }, [navigate, dir, locale, revision]);
@@ -53,10 +53,19 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
     return <div className="session-state" role="status">{t("chrome.loadingSession")}</div>;
   }
 
-  if (loadError || !me) {
+  if (loadError !== "none" || !me) {
     return (
       <div className="session-state" role="alert">
-        <p>{t("chrome.sessionError")}</p>
+        <p>
+          <strong>
+            {loadError === "unavailable" ? t("chrome.apiUnavailable") : t("chrome.sessionError")}
+          </strong>
+        </p>
+        {loadError === "unavailable" ? (
+          <p className="muted" style={{ maxWidth: 520, textAlign: "center" }}>
+            {t("chrome.apiUnavailableHint")}
+          </p>
+        ) : null}
         <button className="btn btn-primary" onClick={() => setRevision((value) => value + 1)}>
           {t("chrome.retry")}
         </button>
@@ -110,15 +119,15 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
           >
             {t("chrome.openNavigation")}
           </button>
-          <div>
+          <div className="topbar-context">
             <div className="mono muted">
               {t("chrome.tenant")} {me.tenant_id.slice(0, 8)} · {t("chrome.clearance")}{" "}
               {me.clearance}
             </div>
           </div>
-          <div className="row">
-            <span className="mono muted">{me.email}</span>
-            <span className="badge badge-muted">
+          <div className="row topbar-identity">
+            <span className="mono muted topbar-email">{me.email}</span>
+            <span className="badge badge-muted topbar-roles">
               {me.roles.join(locale === "ar" ? "، " : ", ") || t("chrome.noRoles")}
             </span>
             {me.mfa_satisfied ? (
